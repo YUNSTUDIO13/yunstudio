@@ -178,7 +178,7 @@ export default function Requirements() {
   const [filterStatus, setFilterStatus] = useState<ReqStatus | 'all'>('all')
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all')
   const [keyword, setKeyword] = useState('')
-  const [view, setView] = useState<'list' | 'quadrant'>('list')
+  const [view, setView] = useState<'list' | 'quadrant'>('quadrant')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Requirement | null>(null)
   const [draft, setDraft] = useState(EMPTY)

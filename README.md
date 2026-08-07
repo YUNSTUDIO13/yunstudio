@@ -99,6 +99,51 @@ VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
 ```
 
+### M3.2 用户配置上云（导航关系 + 主页卡片）
+
+导航关系数据（一级 Tab → 二级列 → 三级模块）与主页卡片配置，原只存浏览器 `localStorage`，换设备 / 清缓存即丢、无法多 PC 同步。现已与业务模块一致上云：
+
+进入 **SQL Editor**，把 `supabase/user-configs.sql` 全量粘贴执行（建 `user_configs` 表 + RLS + 触发器 + Realtime）。该表用 `kind` 区分两类配置：
+
+| kind | 配置 | 来源 Context |
+|---|---|---|
+| `nav` | 导航关系（NavConfig 整份 JSONB） | `NavContext` |
+| `dashboard` | 主页卡片（DashboardConfig 整份 JSONB） | `DashboardContext` |
+
+两个 Context 改为：**云端读取优先 → localStorage 兜底 → 默认**；**写入云端 upsert + localStorage 双写**；并订阅 `user_configs` Realtime 实现多 PC 秒级同步。
+
+> 若未执行此 SQL，配置自动回退 localStorage（不报错），但无法跨设备同步。
+
+### M3.3 个人主页（头像上传 + 资料编辑）
+
+进入 **SQL Editor**，把 `supabase/profile-avatar.sql` 全量粘贴执行，它做四件事：
+
+1. 给 `profiles` 补 `title` / `department` / `bio` 三个字段；
+2. 为历史账号补建缺失的 `profiles` 行（注册触发器只对新用户生效）；
+3. `profiles` 开启 Realtime（多 PC 头像 / 资料秒级同步）；
+4. 建 **`avatars` 公开存储桶**（2MB 上限、仅允许 webp/jpeg/png），并配 `storage.objects` 策略：**公开可读、仅本人可写自己的目录**。
+
+页面：左下 dock 头像 → `/account`（页面标题已改为「个人主页」），能力如下。
+
+| 功能 | 说明 |
+|---|---|
+| 头像上传 | 本地选图 → **前端 Canvas 压缩** → 预览确认 → 传 Storage → 回写 `profiles.avatar_url` |
+| 头像移除 | 删桶内文件并清空 `avatar_url`，回退首字母色块 |
+| 资料编辑 | 昵称 / 职位 / 部门 / 个性签名，脏值检测 + 字数校验 + 放弃修改 |
+| 修改密码 | `supabase.auth.updateUser({ password })`，含强度条与二次确认 |
+| 账号信息 | 邮箱 / 用户 ID / 角色 / 注册时间 / 最近登录（只读） |
+
+**头像压缩策略**（`src/lib/image.ts`，无第三方依赖）：
+
+- 入参校验：仅 `image/*` 且在白名单内，原图 ≤ 10MB；
+- 解码用 `createImageBitmap(..., { imageOrientation: 'from-image' })`，自动纠正手机照片 EXIF 旋转；
+- 居中**正方形裁切** → 缩放到 512px；
+- 优先编码 **WebP**（不支持则 JPEG，并铺白底避免 PNG 透明区变黑）；
+- 质量从 0.9 逐级降到 0.5，仍超 120KB 则依次降边长 384 / 256 / 192，最终稳定在 ~100KB 以内；
+- 文件路径固定 `avatars/{user_id}/avatar.webp` + `upsert`，同一用户永远只占一个文件，不会越传越多；URL 带 `?v=时间戳` 绕过 CDN 缓存。
+
+> 若未执行此 SQL，个人主页顶部会提示"资料加载失败"，并指明需要执行的脚本。
+
 ---
 
 ## 七、GitHub Pages 部署

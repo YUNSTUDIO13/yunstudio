@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import type { BuiltinModuleId } from '../lib/builtin-modules'
 import type { IconKey } from '../lib/icon-library'
 import { DEFAULT_NAV_CONFIG } from '../lib/default-nav'
@@ -47,8 +49,13 @@ interface NavContextValue {
 const NavContext = createContext<NavContextValue | null>(null)
 
 // ============================================================
-// localStorage 持久化（按 user 隔离；key: pw.nav.<uid>）
+// Supabase 持久化（user_configs 表，kind='nav'）
+// 读取优先级：云端 → localStorage 兜底 → 默认
+// 写入：云端 upsert + localStorage 双写；云端失败静默回退本地
 // ============================================================
+const TABLE = 'user_configs'
+const NAV_KIND = 'nav'
+
 function storageKey(userId: string): string {
   return `pw.nav.${userId}`
 }
@@ -68,14 +75,9 @@ function migrateConfig(cfg: NavConfig): NavConfig {
   // M2.10：若旧配置缺「新闻」一级 Tab，则按默认补齐（不破坏用户已有自定义）
   const hasNews = primaries.some((p) => p.groups.some((g) => g.modules.includes('news')))
   if (!hasNews) {
-    const defaultNews = DEFAULT_NAV_CONFIG.primaries.find(
-      (p) => p.id === 'p_news',
-    )
+    const defaultNews = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_news')
     if (defaultNews) {
-      primaries = [
-        ...primaries,
-        { ...defaultNews, order: primaries.length + 1 },
-      ]
+      primaries = [...primaries, { ...defaultNews, order: primaries.length + 1 }]
     }
   }
 
@@ -88,11 +90,8 @@ function loadFromStorage(userId: string): NavConfig | null {
     const raw = window.localStorage.getItem(storageKey(userId))
     if (!raw) return null
     const parsed = JSON.parse(raw) as NavConfig
-    // 简化：仅做最小健壮校验（缺字段则回退默认）
-    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.primaries)) {
-      return DEFAULT_NAV_CONFIG
-    }
-    return migrateConfig(parsed)
+    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.primaries)) return null
+    return parsed
   } catch {
     return null
   }
@@ -115,17 +114,87 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const userId = user?.id ?? 'anonymous'
   const [config, setConfig] = useState<NavConfig>(DEFAULT_NAV_CONFIG)
 
-  // 加载
+  // ----- 加载：云端优先，localStorage 兜底，无则默认 -----
   useEffect(() => {
-    const loaded = loadFromStorage(userId)
-    if (loaded) setConfig(loaded)
-    else setConfig(DEFAULT_NAV_CONFIG)
-  }, [userId])
+    let cancelled = false
+    async function load() {
+      if (!user) {
+        setConfig(DEFAULT_NAV_CONFIG)
+        return
+      }
+      const { data, error } = await supabase
+        .from(TABLE)
+        .select('config')
+        .eq('user_id', user.id)
+        .eq('kind', NAV_KIND)
+        .maybeSingle()
+      if (cancelled) return
+      if (data?.config) {
+        setConfig(migrateConfig(data.config as NavConfig))
+      } else if (!error) {
+        // 云端无记录 → 试 localStorage
+        const local = loadFromStorage(user.id)
+        setConfig(local ? migrateConfig(local) : DEFAULT_NAV_CONFIG)
+      } else {
+        // 云端异常（多见于表未创建）→ localStorage 兜底
+        const local = loadFromStorage(user.id)
+        setConfig(local ? migrateConfig(local) : DEFAULT_NAV_CONFIG)
+        console.warn('[nav] 云端读取失败，已用本地兜底：', error.message)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
-  // 持久化
+  // ----- 持久化：云端 upsert + localStorage 双写 -----
+  const persist = useCallback(
+    async (next: NavConfig) => {
+      setConfig(next)
+      if (user && userId !== 'anonymous') saveToStorage(user.id, next)
+      if (user) {
+        const { error } = await supabase
+          .from(TABLE)
+          .upsert(
+            { user_id: user.id, kind: NAV_KIND, config: next },
+            { onConflict: 'user_id,kind' },
+          )
+        if (error) {
+          console.warn('[nav] 云端保存失败，已保留本地：', error.message)
+        }
+      }
+    },
+    [user, userId],
+  )
+
+  // ----- Realtime：多 PC 同步 -----
   useEffect(() => {
-    if (userId !== 'anonymous') saveToStorage(userId, config)
-  }, [userId, config])
+    if (!user) return
+    const channel = supabase
+      .channel(`user_configs:nav:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: TABLE,
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: RealtimePostgresChangesPayload<{ kind: string; config: NavConfig }>) => {
+          const kind = (payload.new as { kind?: string })?.kind
+          if (kind !== NAV_KIND) return
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const cfg = (payload.new as { config?: NavConfig }).config
+            if (cfg) setConfig(migrateConfig(cfg))
+          }
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
 
   // ----- 派生查找 -----
   const findPrimaryByModule = useCallback(
@@ -155,6 +224,11 @@ export function NavProvider({ children }: { children: ReactNode }) {
     const sorted = (primaries: NavPrimary[]) =>
       [...primaries].sort((a, b) => a.order - b.order)
 
+    const commit = (next: NavConfig) => {
+      void persist(next)
+      return next
+    }
+
     return {
       addPrimary({ title, iconKey }) {
         const newP: NavPrimary = {
@@ -164,39 +238,37 @@ export function NavProvider({ children }: { children: ReactNode }) {
           order: config.primaries.length
             ? Math.max(...config.primaries.map((p) => p.order)) + 1
             : 1,
-          groups: [
-            { id: uid('g'), title: '默认', modules: [] },
-          ],
+          groups: [{ id: uid('g'), title: '默认', modules: [] }],
         }
-        setConfig((c) => ({ ...c, primaries: [...c.primaries, newP] }))
+        commit({ ...config, primaries: [...config.primaries, newP] })
         return newP
       },
 
       updatePrimary(id, patch) {
-        setConfig((c) => ({
-          ...c,
-          primaries: c.primaries.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-        }))
+        commit({
+          ...config,
+          primaries: config.primaries.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        })
       },
 
       removePrimary(id) {
-        setConfig((c) => ({ ...c, primaries: c.primaries.filter((p) => p.id !== id) }))
+        commit({
+          ...config,
+          primaries: config.primaries.filter((p) => p.id !== id),
+        })
       },
 
       movePrimary(id, direction) {
-        setConfig((c) => {
-          const ordered = sorted(c.primaries)
-          const idx = ordered.findIndex((p) => p.id === id)
-          if (idx < 0) return c
-          const target = direction === 'up' ? idx - 1 : idx + 1
-          if (target < 0 || target >= ordered.length) return c
-          const swap = [...ordered]
-          ;[swap[idx], swap[target]] = [swap[target], swap[idx]]
-          // 重新分配 order
-          return {
-            ...c,
-            primaries: swap.map((p, i) => ({ ...p, order: i + 1 })),
-          }
+        const ordered = sorted(config.primaries)
+        const idx = ordered.findIndex((p) => p.id === id)
+        if (idx < 0) return
+        const target = direction === 'up' ? idx - 1 : idx + 1
+        if (target < 0 || target >= ordered.length) return
+        const swap = [...ordered]
+        ;[swap[idx], swap[target]] = [swap[target], swap[idx]]
+        commit({
+          ...config,
+          primaries: swap.map((p, i) => ({ ...p, order: i + 1 })),
         })
       },
 
@@ -204,19 +276,19 @@ export function NavProvider({ children }: { children: ReactNode }) {
         const p = config.primaries.find((x) => x.id === primaryId)
         if (!p) return null
         const g: SecondaryColumn = { id: uid('g'), title, modules: [] }
-        setConfig((c) => ({
-          ...c,
-          primaries: c.primaries.map((pp) =>
+        commit({
+          ...config,
+          primaries: config.primaries.map((pp) =>
             pp.id === primaryId ? { ...pp, groups: [...pp.groups, g] } : pp,
           ),
-        }))
+        })
         return g
       },
 
       updateSecondary(primaryId, groupId, title) {
-        setConfig((c) => ({
-          ...c,
-          primaries: c.primaries.map((pp) =>
+        commit({
+          ...config,
+          primaries: config.primaries.map((pp) =>
             pp.id === primaryId
               ? {
                   ...pp,
@@ -224,24 +296,24 @@ export function NavProvider({ children }: { children: ReactNode }) {
                 }
               : pp,
           ),
-        }))
+        })
       },
 
       removeSecondary(primaryId, groupId) {
-        setConfig((c) => ({
-          ...c,
-          primaries: c.primaries.map((pp) =>
+        commit({
+          ...config,
+          primaries: config.primaries.map((pp) =>
             pp.id === primaryId
               ? { ...pp, groups: pp.groups.filter((g) => g.id !== groupId) }
               : pp,
           ),
-        }))
+        })
       },
 
       moveSecondary(primaryId, groupId, direction) {
-        setConfig((c) => ({
-          ...c,
-          primaries: c.primaries.map((pp) => {
+        commit({
+          ...config,
+          primaries: config.primaries.map((pp) => {
             if (pp.id !== primaryId) return pp
             const idx = pp.groups.findIndex((g) => g.id === groupId)
             if (idx < 0) return pp
@@ -251,7 +323,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
             ;[groups[idx], groups[target]] = [groups[target], groups[idx]]
             return { ...pp, groups }
           }),
-        }))
+        })
       },
 
       setGroupModules(primaryId, groupId, modules) {
@@ -260,9 +332,9 @@ export function NavProvider({ children }: { children: ReactNode }) {
         for (const m of modules) {
           if (!unique.includes(m)) unique.push(m)
         }
-        setConfig((c) => ({
-          ...c,
-          primaries: c.primaries.map((pp) =>
+        commit({
+          ...config,
+          primaries: config.primaries.map((pp) =>
             pp.id === primaryId
               ? {
                   ...pp,
@@ -272,14 +344,14 @@ export function NavProvider({ children }: { children: ReactNode }) {
                 }
               : pp,
           ),
-        }))
+        })
       },
 
       resetToDefault() {
-        setConfig(DEFAULT_NAV_CONFIG)
+        commit(DEFAULT_NAV_CONFIG)
       },
     }
-  }, [config])
+  }, [config, persist])
 
   const value: NavContextValue = {
     config,

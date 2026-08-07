@@ -167,7 +167,7 @@ export default function Bugs() {
   const [filterStatus, setFilterStatus] = useState<BugStatus | 'all'>('all')
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all')
   const [keyword, setKeyword] = useState('')
-  const [view, setView] = useState<'list' | 'quadrant'>('list')
+  const [view, setView] = useState<'list' | 'quadrant'>('quadrant')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Bug | null>(null)
   const [draft, setDraft] = useState(EMPTY)

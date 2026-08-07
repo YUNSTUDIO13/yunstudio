@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { ProfileProvider } from './context/ProfileContext'
 import { TodosProvider } from './context/TodosContext'
 import { RequirementsProvider } from './context/RequirementsContext'
 import { SprintsProvider } from './context/SprintsContext'
@@ -16,6 +17,7 @@ import AccountPage from './pages/Account'
 export default function App() {
   return (
     <AuthProvider>
+      <ProfileProvider>
       <TodosProvider>
         <RequirementsProvider>
           <SprintsProvider>
@@ -44,6 +46,7 @@ export default function App() {
           </SprintsProvider>
         </RequirementsProvider>
       </TodosProvider>
+      </ProfileProvider>
     </AuthProvider>
   )
 }

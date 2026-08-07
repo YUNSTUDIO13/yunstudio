@@ -1,23 +1,16 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useProfile } from '../context/ProfileContext'
 import { useNav } from '../context/NavContext'
 import { renderIcon } from '../lib/icon-library'
 import MegaMenu from './MegaMenu'
+import Avatar from './Avatar'
 import type { BuiltinModuleId } from '../lib/builtin-modules'
 
 // ============================================================
 // 工具
 // ============================================================
-
-function avatarFromUser(email?: string | null): { letter: string; bg: string } {
-  const local = (email ?? '').split('@')[0] || 'U'
-  const letter = local.slice(0, 1).toUpperCase()
-  let hash = 0
-  for (let i = 0; i < local.length; i++) hash = (hash * 31 + local.charCodeAt(i)) | 0
-  const hue = Math.abs(hash) % 360
-  return { letter, bg: `hsl(${hue} 35% 60%)` }
-}
 
 /**
  * 把 /modules/:id 形式的 url 反推为 BuiltinModuleId
@@ -88,8 +81,8 @@ function PrimaryDockItem({
 // ============================================================
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const { profile } = useProfile()
   const { config, findPrimaryByModule } = useNav()
-  const { letter, bg } = avatarFromUser(user?.email)
   const location = useLocation()
 
   const [openPrimaryId, setOpenPrimaryId] = useState<string | null>(null)
@@ -205,16 +198,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <Link
           to="/account"
-          title={`账号（${user?.email ?? ''}）`}
-          aria-label="账号"
+          title={`个人主页（${profile?.display_name || user?.email || ''}）`}
+          aria-label="个人主页"
           className="
-            grid h-11 w-11 place-items-center rounded-full border border-line
-            text-sm font-semibold text-white shadow-iconBtn
-            transition hover:scale-105
+            block h-11 w-11 rounded-full border border-line
+            shadow-iconBtn transition hover:scale-105
           "
-          style={{ backgroundColor: bg }}
         >
-          {letter}
+          <Avatar
+            url={profile?.avatar_url}
+            seed={user?.email}
+            className="h-full w-full rounded-full"
+            textClassName="text-sm"
+          />
         </Link>
       </aside>
 

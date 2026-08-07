@@ -1,11 +1,14 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { DEFAULT_DASHBOARD, WIDGETS, WIDGET_LIST, type WidgetDef } from '../widgets/registry'
 
@@ -35,10 +38,24 @@ interface DashboardContextValue {
 const DashboardContext = createContext<DashboardContextValue | null>(null)
 
 // ============================================================
-// localStorage 持久化（按 user 隔离：pw.dash.<uid>）
+// Supabase 持久化（user_configs 表，kind='dashboard'）
+// 读取优先级：云端 → localStorage 兜底 → 默认
+// 写入：云端 upsert + localStorage 双写；云端失败静默回退本地
 // ============================================================
+const TABLE = 'user_configs'
+const DASHBOARD_KIND = 'dashboard'
+
 function storageKey(userId: string): string {
   return `pw.dash.${userId}`
+}
+
+function isDashboardConfig(x: unknown): x is DashboardConfig {
+  return (
+    !!x &&
+    typeof x === 'object' &&
+    (x as DashboardConfig).version === 1 &&
+    Array.isArray((x as DashboardConfig).widgetIds)
+  )
 }
 
 function loadFromStorage(userId: string): DashboardConfig | null {
@@ -46,9 +63,8 @@ function loadFromStorage(userId: string): DashboardConfig | null {
   try {
     const raw = window.localStorage.getItem(storageKey(userId))
     if (!raw) return null
-    const parsed = JSON.parse(raw) as DashboardConfig
-    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.widgetIds)) return null
-    return parsed
+    const parsed = JSON.parse(raw)
+    return isDashboardConfig(parsed) ? parsed : null
   } catch {
     return null
   }
@@ -69,17 +85,94 @@ function saveToStorage(userId: string, config: DashboardConfig): void {
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const userId = user?.id ?? 'anonymous'
-  const [config, setConfig] = useState<DashboardConfig>({ version: 1, widgetIds: DEFAULT_DASHBOARD })
+  const [config, setConfig] = useState<DashboardConfig>({
+    version: 1,
+    widgetIds: DEFAULT_DASHBOARD,
+  })
 
+  // ----- 加载：云端优先，localStorage 兜底，无则默认 -----
   useEffect(() => {
-    const loaded = loadFromStorage(userId)
-    if (loaded) setConfig(loaded)
-    else setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD })
-  }, [userId])
+    let cancelled = false
+    async function load() {
+      if (!user) {
+        setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD })
+        return
+      }
+      const { data, error } = await supabase
+        .from(TABLE)
+        .select('config')
+        .eq('user_id', user.id)
+        .eq('kind', DASHBOARD_KIND)
+        .maybeSingle()
+      if (cancelled) return
+      if (data?.config && isDashboardConfig(data.config)) {
+        setConfig(data.config)
+      } else {
+        const local = loadFromStorage(user.id)
+        setConfig(local ?? { version: 1, widgetIds: DEFAULT_DASHBOARD })
+        if (error) {
+          console.warn('[dashboard] 云端读取失败，已用本地兜底：', error.message)
+        }
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
+  // ----- 持久化：云端 upsert + localStorage 双写 -----
+  const persist = useCallback(
+    async (next: DashboardConfig) => {
+      setConfig(next)
+      if (user && userId !== 'anonymous') saveToStorage(user.id, next)
+      if (user) {
+        const { error } = await supabase
+          .from(TABLE)
+          .upsert(
+            { user_id: user.id, kind: DASHBOARD_KIND, config: next },
+            { onConflict: 'user_id,kind' },
+          )
+        if (error) {
+          console.warn('[dashboard] 云端保存失败，已保留本地：', error.message)
+        }
+      }
+    },
+    [user, userId],
+  )
+
+  // ----- Realtime：多 PC 同步 -----
   useEffect(() => {
-    if (userId !== 'anonymous') saveToStorage(userId, config)
-  }, [userId, config])
+    if (!user) return
+    const channel = supabase
+      .channel(`user_configs:dashboard:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: TABLE,
+          filter: `user_id=eq.${user.id}`,
+        },
+        (
+          payload: RealtimePostgresChangesPayload<{
+            kind: string
+            config: DashboardConfig
+          }>,
+        ) => {
+          const kind = (payload.new as { kind?: string })?.kind
+          if (kind !== DASHBOARD_KIND) return
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const cfg = (payload.new as { config?: DashboardConfig }).config
+            if (cfg && isDashboardConfig(cfg)) setConfig(cfg)
+          }
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
 
   // 派生：按配置顺序过滤出有效卡片
   const widgets = useMemo(
@@ -93,31 +186,26 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const actions: DashboardActions = useMemo(
     () => ({
       addWidget(id) {
-        setConfig((c) => {
-          if (c.widgetIds.includes(id)) return c
-          if (!WIDGETS[id]) return c
-          return { ...c, widgetIds: [...c.widgetIds, id] }
-        })
+        if (config.widgetIds.includes(id) || !WIDGETS[id]) return
+        void persist({ ...config, widgetIds: [...config.widgetIds, id] })
       },
       removeWidget(id) {
-        setConfig((c) => ({ ...c, widgetIds: c.widgetIds.filter((x) => x !== id) }))
+        void persist({ ...config, widgetIds: config.widgetIds.filter((x) => x !== id) })
       },
       moveWidget(id, direction) {
-        setConfig((c) => {
-          const idx = c.widgetIds.indexOf(id)
-          if (idx < 0) return c
-          const target = direction === 'up' ? idx - 1 : idx + 1
-          if (target < 0 || target >= c.widgetIds.length) return c
-          const next = [...c.widgetIds]
-          ;[next[idx], next[target]] = [next[target], next[idx]]
-          return { ...c, widgetIds: next }
-        })
+        const idx = config.widgetIds.indexOf(id)
+        if (idx < 0) return
+        const target = direction === 'up' ? idx - 1 : idx + 1
+        if (target < 0 || target >= config.widgetIds.length) return
+        const next = [...config.widgetIds]
+        ;[next[idx], next[target]] = [next[target], next[idx]]
+        void persist({ ...config, widgetIds: next })
       },
       resetToDefault() {
-        setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD })
+        void persist({ version: 1, widgetIds: DEFAULT_DASHBOARD })
       },
     }),
-    [],
+    [config, persist],
   )
 
   const value: DashboardContextValue = { config, widgets, actions }

@@ -97,7 +97,7 @@ export default function Todos() {
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all')
   const [sortKey, setSortKey] = useState<SortKey>('score')
   const [query, setQuery] = useState('')
-  const [view, setView] = useState<ViewKey>('list')
+  const [view, setView] = useState<ViewKey>('quadrant')
   const [helpOpen, setHelpOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Todo | null>(null)

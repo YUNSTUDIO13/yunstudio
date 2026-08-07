@@ -185,3 +185,26 @@ export type NewsInput = {
   period_start?: string | null
   period_end?: string | null
 }
+
+// ------------------------------------------------------------
+// 个人资料（public.profiles，与 auth.users 1:1，主键即 user id）
+// ------------------------------------------------------------
+export interface Profile {
+  id: string // = auth.users.id
+  email?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  title?: string | null // 职位
+  department?: string | null // 部门
+  bio?: string | null // 个性签名 / 简介
+  created_at: string
+  updated_at: string
+}
+
+/** 个人主页可编辑字段 */
+export type ProfileInput = {
+  display_name?: string | null
+  title?: string | null
+  department?: string | null
+  bio?: string | null
+}
