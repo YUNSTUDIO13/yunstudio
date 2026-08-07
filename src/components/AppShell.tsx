@@ -135,6 +135,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // 路由变化时强制关闭 MegaMenu / Sheet
+  // 解决：切到其它页（如导航配置/个人主页/主页）后底部 sheet 仍浮着挡住内容
+  useEffect(() => {
+    setOpenPrimaryId(null)
+  }, [location.pathname])
+
   function openMenu(id: string) {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current)
