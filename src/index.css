@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background-color: #F4F1EA;
+  color: #1F2024;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 自定义滚动条（适配亮色暖米底） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D8D2C6;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #BFB8A8;
+}
+
+/* Modal 进出动画 */
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/* 自建 Listbox 浮层进出 */
+@keyframes popover-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-modal {
+  animation: modal-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.animate-overlay {
+  animation: overlay-in 140ms ease-out;
+}
+.animate-popover {
+  animation: popover-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top center;
+}
