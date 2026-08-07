@@ -175,10 +175,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           title="主页"
           className="mb-1 grid h-11 w-11 place-items-center rounded-2xl bg-ink-strong text-white"
         >
-          <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-            <path d="M12 3l8 14H4z" />
-            <circle cx="12" cy="13" r="1.6" fill="#F4F1EA" />
-          </svg>
+          {renderIcon('home')}
         </Link>
 
         <nav className="flex flex-col items-center gap-2">
@@ -269,10 +266,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           "
         >
           <Link to="/" title="主页" aria-label="主页" className="grid h-14 w-12 place-items-center text-ink-soft">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-              <path d="M12 3l8 14H4z" />
-              <circle cx="12" cy="13" r="1.6" fill="#F4F1EA" />
-            </svg>
+            {renderIcon('home')}
           </Link>
 
           {sortedPrimaries.map((p) => {
