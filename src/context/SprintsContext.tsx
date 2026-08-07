@@ -98,8 +98,8 @@ export function SprintsProvider({ children }: { children: ReactNode }) {
         name: input.name.trim(),
         goal: input.goal.trim(),
         status: input.status,
-        start_date: input.startDate || null,
-        end_date: input.endDate || null,
+        start_date: input.start_date || null,
+        end_date: input.end_date || null,
         progress,
         burndown: [Math.max(1, Math.round(progress || 1))],
       })
@@ -117,8 +117,8 @@ export function SprintsProvider({ children }: { children: ReactNode }) {
           ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
           ...(patch.goal !== undefined ? { goal: patch.goal.trim() } : {}),
           ...(patch.status !== undefined ? { status: patch.status } : {}),
-          ...(patch.startDate !== undefined ? { start_date: patch.startDate || null } : {}),
-          ...(patch.endDate !== undefined ? { end_date: patch.endDate || null } : {}),
+          ...(patch.start_date !== undefined ? { start_date: patch.start_date || null } : {}),
+          ...(patch.end_date !== undefined ? { end_date: patch.end_date || null } : {}),
           ...(patch.progress != null
             ? { progress: Math.max(0, Math.min(100, patch.progress)) }
             : {}),

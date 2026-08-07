@@ -100,7 +100,7 @@ export function BugsProvider({ children }: { children: ReactNode }) {
         priority: input.priority,
         status: input.status,
         reporter: input.reporter?.trim() || null,
-        source_url: input.sourceUrl || null,
+        source_url: input.source_url || null,
       })
       if (err) throw err
       await load()
@@ -118,7 +118,7 @@ export function BugsProvider({ children }: { children: ReactNode }) {
           ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
           ...(patch.status !== undefined ? { status: patch.status } : {}),
           ...(patch.reporter !== undefined ? { reporter: patch.reporter?.trim() || null } : {}),
-          ...(patch.sourceUrl !== undefined ? { source_url: patch.sourceUrl || null } : {}),
+          ...(patch.source_url !== undefined ? { source_url: patch.source_url || null } : {}),
         })
         .eq('id', id)
       if (err) throw err

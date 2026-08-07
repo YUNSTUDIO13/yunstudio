@@ -98,8 +98,8 @@ export function RequirementsProvider({ children }: { children: ReactNode }) {
         title: input.title.trim(),
         priority: input.priority,
         status: input.status,
-        value_desc: input.valueDesc.trim(),
-        source_url: input.sourceUrl || null,
+        value_desc: input.value_desc.trim(),
+        source_url: input.source_url || null,
         owner: input.owner?.trim() || null,
       })
       if (err) throw err
@@ -114,10 +114,10 @@ export function RequirementsProvider({ children }: { children: ReactNode }) {
         .from(TABLE)
         .update({
           ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
-          ...(patch.valueDesc !== undefined ? { value_desc: patch.valueDesc.trim() } : {}),
+          ...(patch.value_desc !== undefined ? { value_desc: patch.value_desc.trim() } : {}),
           ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
           ...(patch.status !== undefined ? { status: patch.status } : {}),
-          ...(patch.sourceUrl !== undefined ? { source_url: patch.sourceUrl || null } : {}),
+          ...(patch.source_url !== undefined ? { source_url: patch.source_url || null } : {}),
           ...(patch.owner !== undefined ? { owner: patch.owner?.trim() || null } : {}),
         })
         .eq('id', id)

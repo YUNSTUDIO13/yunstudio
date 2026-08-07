@@ -100,7 +100,7 @@ export function KpisProvider({ children }: { children: ReactNode }) {
         unit: input.unit.trim() || '',
         target: input.target,
         trend: input.trend && input.trend.length ? input.trend : [input.value],
-        lower_is_better: input.lowerIsBetter ?? false,
+        lower_is_better: input.lower_is_better ?? false,
       })
       if (err) throw err
       await load()
@@ -121,8 +121,8 @@ export function KpisProvider({ children }: { children: ReactNode }) {
           ...(patch.trend !== undefined
             ? { trend: patch.trend && patch.trend.length ? patch.trend : [patch.value ?? 0] }
             : {}),
-          ...(patch.lowerIsBetter !== undefined
-            ? { lower_is_better: patch.lowerIsBetter ?? false }
+          ...(patch.lower_is_better !== undefined
+            ? { lower_is_better: patch.lower_is_better ?? false }
             : {}),
         })
         .eq('id', id)

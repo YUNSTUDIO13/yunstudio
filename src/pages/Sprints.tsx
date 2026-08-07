@@ -29,8 +29,8 @@ const EMPTY = {
   name: '',
   goal: '',
   status: 'planning' as SprintStatus,
-  startDate: '',
-  endDate: '',
+  start_date: '',
+  end_date: '',
   progress: 0,
 }
 
@@ -69,8 +69,8 @@ export default function Sprints() {
       name: s.name,
       goal: s.goal,
       status: s.status,
-      startDate: s.startDate,
-      endDate: s.endDate,
+      start_date: s.start_date,
+      end_date: s.end_date,
       progress: s.progress,
     })
     setNameError('')
@@ -79,13 +79,13 @@ export default function Sprints() {
   const submit = () => {
     const name = draft.name.trim()
     if (!name) return setNameError('迭代名称必填')
-    if (!draft.startDate || !draft.endDate) return setNameError('请填写起止日期')
+    if (!draft.start_date || !draft.end_date) return setNameError('请填写起止日期')
     const payload = {
       name,
       goal: draft.goal,
       status: draft.status,
-      startDate: draft.startDate,
-      endDate: draft.endDate,
+      start_date: draft.start_date,
+      end_date: draft.end_date,
       progress: draft.progress,
     }
     if (editing) updateSprint(editing.id, payload)
@@ -232,7 +232,7 @@ export default function Sprints() {
               {/* 日期 + 进度 */}
               <div className="flex items-center justify-between text-xs text-ink-soft">
                 <span>
-                  {fmtDate(s.startDate)} → {fmtDate(s.endDate)}
+                  {fmtDate(s.start_date)} → {fmtDate(s.end_date)}
                 </span>
                 <span className="font-medium text-ink-strong">{s.progress}%</span>
               </div>
@@ -308,15 +308,15 @@ export default function Sprints() {
           <Field label="开始日期">
             <Input
               type="date"
-              value={draft.startDate}
-              onChange={(e) => setDraft({ ...draft, startDate: e.target.value })}
+              value={draft.start_date}
+              onChange={(e) => setDraft({ ...draft, start_date: e.target.value })}
             />
           </Field>
           <Field label="结束日期">
             <Input
               type="date"
-              value={draft.endDate}
-              onChange={(e) => setDraft({ ...draft, endDate: e.target.value })}
+              value={draft.end_date}
+              onChange={(e) => setDraft({ ...draft, end_date: e.target.value })}
             />
           </Field>
         </div>

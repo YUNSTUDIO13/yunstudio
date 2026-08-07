@@ -58,7 +58,7 @@ const EMPTY = {
   priority: 'P2' as Priority,
   status: 'open' as BugStatus,
   reporter: '',
-  sourceUrl: '',
+  source_url: '',
 }
 
 // ============== 图标 ==============
@@ -96,9 +96,9 @@ function BugActions({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {b.sourceUrl && (
+      {b.source_url && (
         <a
-          href={b.sourceUrl}
+          href={b.source_url}
           target="_blank"
           rel="noopener noreferrer"
           title="打开缺陷单"
@@ -211,7 +211,7 @@ export default function Bugs() {
       priority: b.priority,
       status: b.status,
       reporter: b.reporter ?? '',
-      sourceUrl: b.sourceUrl ?? '',
+      source_url: b.source_url ?? '',
     })
     setTitleError('')
     setModalOpen(true)
@@ -225,7 +225,7 @@ export default function Bugs() {
       priority: draft.priority,
       status: draft.status,
       reporter: draft.reporter || null,
-      sourceUrl: draft.sourceUrl || null,
+      source_url: draft.source_url || null,
     }
     if (editing) updateBug(editing.id, payload)
     else addBug(payload)
@@ -563,8 +563,8 @@ export default function Bugs() {
           </Field>
           <Field label="缺陷单链接（可选）">
             <Input
-              value={draft.sourceUrl}
-              onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })}
+              value={draft.source_url}
+              onChange={(e) => setDraft({ ...draft, source_url: e.target.value })}
               placeholder="https://..."
             />
           </Field>

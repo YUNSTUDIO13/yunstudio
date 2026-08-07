@@ -43,8 +43,8 @@ export interface Requirement {
   title: string
   priority: Priority
   status: ReqStatus
-  valueDesc: string // 业务价值说明（DB 端加密，此处仅展示）
-  sourceUrl?: string | null // 外部系统链接（仅跳转不对接）
+  value_desc: string // 业务价值说明（DB 端加密，此处仅展示）
+  source_url?: string | null // 外部系统链接（仅跳转不对接）
   owner?: string | null // 负责人
   created_at: string
   updated_at: string
@@ -54,8 +54,8 @@ export type RequirementInput = {
   title: string
   priority: Priority
   status: ReqStatus
-  valueDesc: string
-  sourceUrl?: string | null
+  value_desc: string
+  source_url?: string | null
   owner?: string | null
 }
 
@@ -75,8 +75,8 @@ export interface Sprint {
   name: string
   goal: string // 迭代目标
   status: SprintStatus
-  startDate: string // ISO
-  endDate: string // ISO
+  start_date: string // ISO
+  end_date: string // ISO
   progress: number // 完成百分比 0-100
   burndown: number[] // 剩余工作量序列（用于燃尽图）
   created_at: string
@@ -87,8 +87,8 @@ export type SprintInput = {
   name: string
   goal: string
   status: SprintStatus
-  startDate: string
-  endDate: string
+  start_date: string
+  end_date: string
   progress: number
 }
 
@@ -106,7 +106,7 @@ export interface Bug {
   priority: Priority
   status: BugStatus
   reporter?: string | null // 报告人
-  sourceUrl?: string | null // 复现/缺陷单链接
+  source_url?: string | null // 复现/缺陷单链接
   created_at: string
   updated_at: string
 }
@@ -117,7 +117,7 @@ export type BugInput = {
   priority: Priority
   status: BugStatus
   reporter?: string | null
-  sourceUrl?: string | null
+  source_url?: string | null
 }
 
 // ============================================================
@@ -134,7 +134,7 @@ export interface Kpi {
   unit: string
   target: number
   trend: number[] // 近期数值序列（用于迷你趋势线）
-  lowerIsBetter?: boolean // true 时数值越低越好（如缺陷修复时长）
+  lower_is_better?: boolean // true 时数值越低越好（如缺陷修复时长）
   created_at: string
   updated_at: string
 }
@@ -146,7 +146,7 @@ export type KpiInput = {
   unit: string
   target: number
   trend: number[]
-  lowerIsBetter?: boolean
+  lower_is_better?: boolean
 }
 
 // ============================================================

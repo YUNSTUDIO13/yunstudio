@@ -98,15 +98,15 @@ export default function Kpis() {
     const last = k.trend[k.trend.length - 1] ?? k.value
     const delta = first ? ((last - first) / Math.abs(first)) * 100 : 0
     const up = last >= first
-    const good = k.lowerIsBetter ? !up : up
-    const met = k.lowerIsBetter ? k.value <= k.target : k.value >= k.target
-    const pct = k.lowerIsBetter
+    const good = k.lower_is_better ? !up : up
+    const met = k.lower_is_better ? k.value <= k.target : k.value >= k.target
+    const pct = k.lower_is_better
       ? Math.min(100, k.target && k.value ? (k.target / k.value) * 100 : 0)
       : Math.min(100, k.target ? (k.value / k.target) * 100 : 0)
     return { delta, up, good, met, pct }
   }
 
-  const metCount = kpis.filter((k) => (k.lowerIsBetter ? k.value <= k.target : k.value >= k.target)).length
+  const metCount = kpis.filter((k) => (k.lower_is_better ? k.value <= k.target : k.value >= k.target)).length
   const improved = kpis.filter((k) => derive(k).good).length
   const declined = kpis.length - improved
 

@@ -36,9 +36,9 @@ const EMPTY = {
   title: '',
   priority: 'P2' as Priority,
   status: 'draft' as ReqStatus,
-  valueDesc: '',
+  value_desc: '',
   owner: '',
-  sourceUrl: '',
+  source_url: '',
 }
 
 // 终态：已上线 / 作废
@@ -99,9 +99,9 @@ function ReqActions({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {r.sourceUrl && (
+      {r.source_url && (
         <a
-          href={r.sourceUrl}
+          href={r.source_url}
           target="_blank"
           rel="noopener noreferrer"
           title="打开来源链接"
@@ -217,9 +217,9 @@ export default function Requirements() {
       title: r.title,
       priority: r.priority,
       status: r.status,
-      valueDesc: r.valueDesc,
+      value_desc: r.value_desc,
       owner: r.owner ?? '',
-      sourceUrl: r.sourceUrl ?? '',
+      source_url: r.source_url ?? '',
     })
     setTitleError('')
     setModalOpen(true)
@@ -232,9 +232,9 @@ export default function Requirements() {
       title,
       priority: draft.priority,
       status: draft.status,
-      valueDesc: draft.valueDesc,
+      value_desc: draft.value_desc,
       owner: draft.owner || null,
-      sourceUrl: draft.sourceUrl || null,
+      source_url: draft.source_url || null,
     }
     if (editing) updateRequirement(editing.id, payload)
     else addRequirement(payload)
@@ -434,7 +434,7 @@ export default function Requirements() {
                     <div className="mt-0.5 flex items-center gap-2 truncate text-xs text-ink-mute">
                       <span className="shrink-0">{r.owner ?? '未指派'}</span>
                       <span className="text-line">·</span>
-                      <span className="truncate">价值：{r.valueDesc}</span>
+                      <span className="truncate">价值：{r.value_desc}</span>
                     </div>
                   </div>
                   <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
@@ -486,7 +486,7 @@ export default function Requirements() {
                               </span>
                             </div>
                             <div className="mt-1 truncate text-xs text-ink-mute">
-                              {r.owner ?? '未指派'} · {r.valueDesc}
+                              {r.owner ?? '未指派'} · {r.value_desc}
                             </div>
                           </div>
                           <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
@@ -560,8 +560,8 @@ export default function Requirements() {
           </Field>
           <Field label="来源链接（可选）">
             <Input
-              value={draft.sourceUrl}
-              onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })}
+              value={draft.source_url}
+              onChange={(e) => setDraft({ ...draft, source_url: e.target.value })}
               placeholder="https://..."
             />
           </Field>
@@ -569,8 +569,8 @@ export default function Requirements() {
         <Field label="业务价值说明">
           <Textarea
             rows={3}
-            value={draft.valueDesc}
-            onChange={(e) => setDraft({ ...draft, valueDesc: e.target.value })}
+            value={draft.value_desc}
+            onChange={(e) => setDraft({ ...draft, value_desc: e.target.value })}
             placeholder="这个需求带来的业务价值 / 目标"
           />
         </Field>
