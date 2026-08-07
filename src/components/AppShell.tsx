@@ -175,7 +175,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           to="/"
           title="主页"
           aria-label="主页"
-          className="mb-1 grid h-11 w-11 place-items-center overflow-hidden rounded-2xl shadow-iconBtn transition hover:scale-105"
+          className="mb-1 grid h-11 w-11 place-items-center overflow-hidden rounded-full shadow-iconBtn transition hover:scale-105"
         >
           <img src={logoUrl} alt="YUN STUDIO" className="h-full w-full object-cover" />
         </Link>
@@ -267,8 +267,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
             pb-[env(safe-area-inset-bottom)] backdrop-blur
           "
         >
-          <Link to="/" title="主页" aria-label="主页" className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl transition active:scale-95">
-            <img src={logoUrl} alt="YUN STUDIO" className="h-10 w-10 object-contain" />
+          <Link
+            to="/"
+            title="主页"
+            aria-label="主页"
+            className="
+              flex h-14 w-12 items-center justify-center
+              overflow-hidden rounded-full transition active:scale-95
+            "
+          >
+            <img
+              src={logoUrl}
+              alt="YUN STUDIO"
+              className="h-9 w-9 rounded-full object-cover"
+            />
           </Link>
 
           {sortedPrimaries.map((p) => {
