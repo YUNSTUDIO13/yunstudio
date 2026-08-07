@@ -464,9 +464,9 @@ export default function Bugs() {
                   <ul className="space-y-2">
                     {items.map((b) => (
                       <li key={b.id} className="rounded-xl border border-line bg-canvas/40 p-3">
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
+                            <div className="flex flex-col items-start gap-1 md:flex-row md:flex-wrap md:items-center md:gap-1.5">
                               <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
                                 {BUG_SEVERITY_META[b.severity].label}
                               </StatusTag>

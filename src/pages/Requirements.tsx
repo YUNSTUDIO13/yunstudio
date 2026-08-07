@@ -475,9 +475,9 @@ export default function Requirements() {
                         key={r.id}
                         className="rounded-xl border border-line bg-canvas/40 p-3"
                       >
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-2">
                               <StatusTag tone={REQ_STATUS_META[r.status].tone}>
                                 {REQ_STATUS_META[r.status].label}
                               </StatusTag>

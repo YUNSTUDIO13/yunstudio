@@ -484,7 +484,7 @@ export default function Todos() {
                       return (
                         <li
                           key={t.id}
-                          className={`flex items-center gap-2 px-1 py-2.5 ${t.done ? 'opacity-60' : ''}`}
+                          className={`flex flex-wrap items-center gap-2 px-1 py-2.5 md:flex-nowrap ${t.done ? 'opacity-60' : ''}`}
                         >
                           <input
                             type="checkbox"
