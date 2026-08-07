@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../context/ProfileContext'
 import { useNav } from '../context/NavContext'
 import { renderIcon } from '../lib/icon-library'
+import logoUrl from '/logo.jpg'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import MegaMenu from './MegaMenu'
 import MobileMegaSheet from './MobileMegaSheet'
@@ -173,9 +174,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <Link
           to="/"
           title="主页"
-          className="mb-1 grid h-11 w-11 place-items-center rounded-2xl bg-ink-strong text-white"
+          aria-label="主页"
+          className="mb-1 grid h-11 w-11 place-items-center overflow-hidden rounded-2xl shadow-iconBtn transition hover:scale-105"
         >
-          {renderIcon('home')}
+          <img src={logoUrl} alt="YUN STUDIO" className="h-full w-full object-cover" />
         </Link>
 
         <nav className="flex flex-col items-center gap-2">
@@ -265,8 +267,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
             pb-[env(safe-area-inset-bottom)] backdrop-blur
           "
         >
-          <Link to="/" title="主页" aria-label="主页" className="grid h-14 w-12 place-items-center text-ink-soft">
-            {renderIcon('home')}
+          <Link to="/" title="主页" aria-label="主页" className="grid h-12 w-14 place-items-center overflow-hidden rounded-xl transition active:scale-95">
+            <img src={logoUrl} alt="YUN STUDIO" className="h-10 w-10 rounded-lg object-cover" />
           </Link>
 
           {sortedPrimaries.map((p) => {
