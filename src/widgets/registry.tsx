@@ -442,11 +442,12 @@ export const DEFAULT_DASHBOARD: string[] = [
 ]
 
 /** 栅格列宽 → 静态 class（避免 Tailwind JIT 因动态拼接丢类） */
+// 移动端单列堆叠（col-span-12），桌面 ≥768px 恢复原始跨度（md:col-span-X）
 export const SPAN_CLASS: Record<number, string> = {
-  3: 'col-span-3',
-  4: 'col-span-4',
-  5: 'col-span-5',
-  7: 'col-span-7',
-  8: 'col-span-8',
+  3: 'col-span-12 md:col-span-3',
+  4: 'col-span-12 md:col-span-4',
+  5: 'col-span-12 md:col-span-5',
+  7: 'col-span-12 md:col-span-7',
+  8: 'col-span-12 md:col-span-8',
   12: 'col-span-12',
 }

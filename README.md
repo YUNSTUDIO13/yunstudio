@@ -144,6 +144,8 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 
 > 若未执行此 SQL，个人主页顶部会提示"资料加载失败"，并指明需要执行的脚本。
 
+> 兜底急救：若发现账号 / 头像数据"消失了"，先跑 `supabase/profile-restore.sql`（自检 + 兜底补 profile 行 + 重建 avatars 桶 + 策略），全程只读诊断 + `ON CONFLICT DO NOTHING`，不会破坏既有数据。可重复执行。
+
 ---
 
 ## 七、GitHub Pages 部署
