@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ProfileProvider } from './context/ProfileContext'
 import { TodosProvider } from './context/TodosContext'
@@ -26,7 +26,7 @@ export default function App() {
                 <NewsProvider>
                 <DashboardProvider>
                   <NavProvider>
-                    <BrowserRouter>
+                    <HashRouter>
                     <AuthGate>
                       <AppShell>
                         <Routes>
@@ -37,7 +37,7 @@ export default function App() {
                         </Routes>
                       </AppShell>
                     </AuthGate>
-                  </BrowserRouter>
+                  </HashRouter>
                   </NavProvider>
                   </DashboardProvider>
                 </NewsProvider>
