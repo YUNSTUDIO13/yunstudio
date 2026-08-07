@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useProfile } from '../context/ProfileContext'
 import { useDashboard } from '../context/DashboardContext'
 import { SPAN_CLASS, type WidgetDef } from '../widgets/registry'
 import { renderIcon } from '../lib/icon-library'
@@ -23,10 +24,12 @@ function UndevelopedCard({ w }: { w: WidgetDef }) {
 
 export default function Overview() {
   const { user } = useAuth()
+  const { profile } = useProfile()
   const { widgets } = useDashboard()
   const navigate = useNavigate()
   const [configOpen, setConfigOpen] = useState(false)
-  const name = (user?.email ?? '').split('@')[0] || '您'
+  const name =
+    profile?.display_name || (user?.email ?? '').split('@')[0] || '您'
 
   return (
     <div className="mx-auto max-w-[1280px]">
