@@ -34,25 +34,15 @@ export default function Overview() {
   return (
     <div className="mx-auto max-w-[1280px]">
       {/* ============ 顶部 Header ============ */}
-      <header className="mb-7 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[28px] font-bold leading-tight text-ink-strong">Hi, {name}!</h1>
-          <p className="mt-1 text-sm text-ink-soft">让我们看看你今天的工作节奏</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setConfigOpen(true)}
-          className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5 text-sm font-medium text-ink-strong shadow-card transition hover:bg-brand-soft"
-        >
-          {renderIcon('grid')}
-          管理卡片
-        </button>
+      <header className="mb-7">
+        <h1 className="text-[28px] font-bold leading-tight text-ink-strong">Hi, {name}!</h1>
+        <p className="mt-1 text-sm text-ink-soft">让我们看看你今天的工作节奏</p>
       </header>
 
       {/* ============ 卡片网格（数据驱动） ============ */}
       {widgets.length === 0 ? (
         <div className="rounded-card border border-dashed border-line bg-surface p-16 text-center text-sm text-ink-mute">
-          主页暂无卡片，点击右上角「管理卡片」添加。
+          主页暂无卡片，点击下方「管理卡片」添加。
         </div>
       ) : (
         <div className="grid grid-cols-12 gap-6">
@@ -75,6 +65,18 @@ export default function Overview() {
           )}
         </div>
       )}
+
+      {/* ============ 底部管理按钮（居中） ============ */}
+      <div className="mt-8 flex justify-center">
+        <button
+          type="button"
+          onClick={() => setConfigOpen(true)}
+          className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-5 py-2.5 text-sm font-medium text-ink-strong shadow-card transition hover:bg-brand-soft"
+        >
+          {renderIcon('grid')}
+          管理卡片
+        </button>
+      </div>
 
       <DashboardConfig open={configOpen} onClose={() => setConfigOpen(false)} />
     </div>

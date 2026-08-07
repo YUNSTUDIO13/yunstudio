@@ -267,8 +267,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
             pb-[env(safe-area-inset-bottom)] backdrop-blur
           "
         >
-          <Link to="/" title="主页" aria-label="主页" className="grid h-12 w-14 place-items-center overflow-hidden rounded-xl transition active:scale-95">
-            <img src={logoUrl} alt="YUN STUDIO" className="h-10 w-10 rounded-lg object-cover" />
+          <Link to="/" title="主页" aria-label="主页" className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl transition active:scale-95">
+            <img src={logoUrl} alt="YUN STUDIO" className="h-10 w-10 object-contain" />
           </Link>
 
           {sortedPrimaries.map((p) => {
