@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../context/ProfileContext'
 import { useRequirements } from '../context/RequirementsContext'
 import { useTodos } from '../context/TodosContext'
+import { useMediaQuery } from '../lib/useMediaQuery'
 import { C, glass } from '../design/tokens'
 import {
   Card,
@@ -25,6 +26,7 @@ export default function Overview() {
   const { requirements } = useRequirements()
   const { todos } = useTodos()
   const navigate = useNavigate()
+  const isMobile = useMediaQuery('(max-width: 767px)')
 
   const name = profile?.display_name || (user?.email ?? '').split('@')[0] || '您'
 
@@ -41,7 +43,7 @@ export default function Overview() {
   const reqPct = reqTotal ? Math.round((reqLaunched / reqTotal) * 100) : 0
 
   return (
-    <div style={{ padding: '40px 44px 56px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ padding: isMobile ? '16px 16px 24px' : '40px 44px 56px', display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
       {/* 个性化 Header（保留 M3.8 昵称显示） */}
       <div style={{ marginBottom: 8 }}>
         <h1 style={{ fontSize: 13, fontWeight: 500, color: C.textGhost, letterSpacing: '.1em', textTransform: 'uppercase', margin: 0 }}>
@@ -53,7 +55,7 @@ export default function Overview() {
       </div>
 
       {/* top row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr', gap: 14 }}>
         <Card>
           <CardHeader
             title="今日完成"
@@ -103,7 +105,7 @@ export default function Overview() {
       </div>
 
       {/* mid row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 14 }}>
         <Card>
           <CardHeader title="整体进度" />
           <div style={{ marginBottom: 18 }}>
@@ -145,7 +147,7 @@ export default function Overview() {
       </div>
 
       {/* bottom row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
         <Card>
           <CardHeader title="缺陷概览" icon={<IconBell />} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>

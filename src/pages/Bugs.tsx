@@ -395,7 +395,7 @@ export default function Bugs() {
                     setDragId(null)
                     setOverId(null)
                   }}
-                  className={`group flex items-center gap-2 px-2 py-3 transition ${
+                  className={`group flex flex-col gap-2 px-2 py-3 transition md:flex-row md:items-center md:gap-2 ${
                     dragId === b.id ? 'opacity-40' : ''
                   } ${
                     dragId && overId === b.id && dragId !== b.id
@@ -403,26 +403,30 @@ export default function Bugs() {
                       : ''
                   }`}
                 >
-                  {/* 左侧拖拽手柄（hover 显示） */}
-                  <button
-                    type="button"
-                    aria-label="拖拽调整顺序"
-                    title="按住拖拽以调整顺序"
-                    onMouseDown={() => {
-                      dragAllowed.current = true
-                    }}
-                    onClick={(e) => e.preventDefault()}
-                    className="hidden shrink-0 cursor-grab text-ink-mute transition hover:text-ink-soft active:cursor-grabbing group-hover:block"
-                  >
-                    {gripIcon}
-                  </button>
-                  <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
-                    {BUG_SEVERITY_META[b.severity].label}
-                  </StatusTag>
-                  <StatusTag tone={BUG_STATUS_META[b.status].tone}>
-                    {BUG_STATUS_META[b.status].label}
-                  </StatusTag>
-                  <PriorityTag priority={b.priority} />
+                  {/* 标签组：移动端独立一行横排，桌面端与标题同行 */}
+                  <div className="flex items-center gap-2">
+                    {/* 左侧拖拽手柄（hover 显示） */}
+                    <button
+                      type="button"
+                      aria-label="拖拽调整顺序"
+                      title="按住拖拽以调整顺序"
+                      onMouseDown={() => {
+                        dragAllowed.current = true
+                      }}
+                      onClick={(e) => e.preventDefault()}
+                      className="hidden shrink-0 cursor-grab text-ink-mute transition hover:text-ink-soft active:cursor-grabbing group-hover:block"
+                    >
+                      {gripIcon}
+                    </button>
+                    <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
+                      {BUG_SEVERITY_META[b.severity].label}
+                    </StatusTag>
+                    <StatusTag tone={BUG_STATUS_META[b.status].tone}>
+                      {BUG_STATUS_META[b.status].label}
+                    </StatusTag>
+                    <PriorityTag priority={b.priority} />
+                  </div>
+                  {/* 标题段：移动端独占满宽；桌面端 flex-1 自适应 */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium text-ink-strong">
