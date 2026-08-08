@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Modal, Button } from './ui'
 import { renderIcon } from '../lib/icon-library'
 import { useDashboard } from '../context/DashboardContext'
-import { WIDGET_LIST, type WidgetCategory, type WidgetDef } from '../widgets/registry'
+import { WIDGET_LIST, OVERVIEW_CARD_IDS, type WidgetCategory, type WidgetDef } from '../widgets/registry'
 
 const CATEGORY_ORDER: WidgetCategory[] = ['待办', '模块概览', '规划', '协作']
 
@@ -10,10 +10,11 @@ export default function DashboardConfig({ open, onClose }: { open: boolean; onCl
   const { config, actions } = useDashboard()
   const enabledIds = config.widgetIds
 
-  // 按 category 分组（保持注册表顺序）
+  // 按 category 分组（仅含 Overview 实际可渲染的卡片，避免勾选无对应渲染段的卡）
   const grouped = useMemo(() => {
     const map: Record<string, WidgetDef[]> = {}
     for (const w of WIDGET_LIST) {
+      if (!OVERVIEW_CARD_IDS.includes(w.id)) continue
       ;(map[w.category] ??= []).push(w)
     }
     return map

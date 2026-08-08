@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../context/ProfileContext'
 import { useRequirements } from '../context/RequirementsContext'
 import { useTodos } from '../context/TodosContext'
 import { useMediaQuery } from '../lib/useMediaQuery'
+import { useDashboard } from '../context/DashboardContext'
+import DashboardConfig from '../components/DashboardConfig'
+import { SPAN_CLASS } from '../widgets/registry'
 import { C, glass } from '../design/tokens'
 import {
   Card,
@@ -27,6 +31,9 @@ export default function Overview() {
   const { todos } = useTodos()
   const navigate = useNavigate()
   const isMobile = useMediaQuery('(max-width: 767px)')
+  const { config } = useDashboard()
+  const vis = (id: string) => config.widgetIds.includes(id)
+  const [cfgOpen, setCfgOpen] = useState(false)
 
   const name = profile?.display_name || (user?.email ?? '').split('@')[0] || '您'
 
@@ -54,8 +61,10 @@ export default function Overview() {
         </div>
       </div>
 
-      {/* top row */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr', gap: 14 }}>
+      {/* 首页卡片（按配置显隐，统一 12 栅格自适应重排，隐藏任意卡片不留空洞） */}
+      <div className="grid grid-cols-12 gap-3 md:gap-4">
+        {vis('w_todo_ring') && (
+          <div className={SPAN_CLASS[5]}>
         <Card>
           <CardHeader
             title="今日完成"
@@ -95,17 +104,22 @@ export default function Overview() {
             </div>
           </div>
         </Card>
+          </div>
+        )}
 
+        {vis('w_todo_stream') && (
+          <div className={SPAN_CLASS[7]}>
         <Card style={{ display: 'flex', flexDirection: 'column' }}>
           <CardHeader title="项目流" icon={<PulseDot color="rgba(255,255,255,0.2)" />} />
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
             <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无活跃项目</span>
           </div>
         </Card>
-      </div>
+          </div>
+        )}
 
-      {/* mid row */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 14 }}>
+        {vis('w_todo_progress') && (
+          <div className={SPAN_CLASS[4]}>
         <Card>
           <CardHeader title="整体进度" />
           <div style={{ marginBottom: 18 }}>
@@ -125,7 +139,11 @@ export default function Overview() {
             <Label>{reqActive} 个进行中</Label>
           </div>
         </Card>
+          </div>
+        )}
 
+        {vis('w_req_summary') && (
+          <div className={SPAN_CLASS[4]}>
         <Card>
           <CardHeader title="需求概览" icon={<IconFile />} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
@@ -137,17 +155,22 @@ export default function Overview() {
             <Badge label={`待评审 ${reqReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
           </div>
         </Card>
+          </div>
+        )}
 
+        {vis('w_sprint_summary') && (
+          <div className={SPAN_CLASS[4]}>
         <Card style={{ display: 'flex', flexDirection: 'column' }}>
           <CardHeader title="迭代概览" icon={<IconClock />} />
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
             <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无迭代</span>
           </div>
         </Card>
-      </div>
+          </div>
+        )}
 
-      {/* bottom row */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
+        {vis('w_bug_summary') && (
+          <div className={SPAN_CLASS[6]}>
         <Card>
           <CardHeader title="缺陷概览" icon={<IconBell />} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
@@ -159,14 +182,32 @@ export default function Overview() {
             <Badge label="已关闭 0" color="rgba(255,255,255,0.22)" bg="rgba(255,255,255,0.04)" />
           </div>
         </Card>
+          </div>
+        )}
 
+        {vis('w_kpi_summary') && (
+          <div className={SPAN_CLASS[6]}>
         <Card style={{ display: 'flex', flexDirection: 'column' }}>
           <CardHeader title="指标概览" icon={<IconChart />} />
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
             <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无指标</span>
           </div>
         </Card>
+          </div>
+        )}
       </div>
+
+      {/* 卡片管理入口（恢复：可自定义是否展示首页卡片） */}
+      <div className="flex justify-center pt-1">
+        <button
+          type="button"
+          onClick={() => setCfgOpen(true)}
+          className="glass-pill inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink-soft transition hover:text-accent"
+        >
+          管理首页卡片
+        </button>
+      </div>
+      <DashboardConfig open={cfgOpen} onClose={() => setCfgOpen(false)} />
     </div>
   )
 }

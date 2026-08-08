@@ -415,8 +415,8 @@ function KpiSummaryWidget() {
 // ============================================================
 export const WIDGETS: Record<string, WidgetDef> = {
   // —— 待办派生（5 张已开发） ——
-  w_todo_focus: { id: 'w_todo_focus', title: '待办聚焦', desc: '总数 / 进行中 / 紧急 三球概览', category: '待办', iconKey: 'flame', developed: true, route: '/modules/todos', span: 8, Render: TodoFocusWidget },
-  w_todo_calendar: { id: 'w_todo_calendar', title: '本月节奏', desc: '待办截止日期月历热力', category: '待办', iconKey: 'clock', developed: true, route: '/modules/todos', span: 4, Render: TodoCalendarWidget },
+  w_todo_focus: { id: 'w_todo_focus', title: '待办聚焦', desc: '总数 / 进行中 / 紧急 三球概览', category: '待办', iconKey: 'flame', developed: false, route: '/modules/todos', span: 8, Render: TodoFocusWidget },
+  w_todo_calendar: { id: 'w_todo_calendar', title: '本月节奏', desc: '待办截止日期月历热力', category: '待办', iconKey: 'clock', developed: false, route: '/modules/todos', span: 4, Render: TodoCalendarWidget },
   w_todo_ring: { id: 'w_todo_ring', title: '今日完成', desc: '完成度目标圆环', category: '待办', iconKey: 'check', developed: true, route: '/modules/todos', span: 5, Render: TodoRingWidget },
   w_todo_stream: { id: 'w_todo_stream', title: '项目流', desc: 'Score 排序的活跃项目', category: '待办', iconKey: 'list', developed: true, route: '/modules/todos', span: 7, Render: TodoStreamWidget },
   w_todo_progress: { id: 'w_todo_progress', title: '整体进度', desc: '待办总完成进度条', category: '待办', iconKey: 'bar', developed: true, route: '/modules/todos', span: 5, Render: TodoProgressWidget },
@@ -435,9 +435,15 @@ export const WIDGETS: Record<string, WidgetDef> = {
 
 export const WIDGET_LIST: WidgetDef[] = Object.values(WIDGETS)
 
-/** 默认启用的卡片（顺序即展示顺序） */
+/** 默认启用的卡片（顺序即展示顺序）—— 仅含 Overview 实际渲染的 7 段 */
 export const DEFAULT_DASHBOARD: string[] = [
-  'w_todo_focus', 'w_todo_calendar', 'w_todo_ring', 'w_todo_stream', 'w_todo_progress',
+  'w_todo_ring', 'w_todo_stream', 'w_todo_progress',
+  'w_req_summary', 'w_sprint_summary', 'w_bug_summary', 'w_kpi_summary',
+]
+
+/** Overview 首页实际可渲染/可管理的卡片 id（弹窗只列这些，避免勾选无对应渲染段的卡片） */
+export const OVERVIEW_CARD_IDS: string[] = [
+  'w_todo_ring', 'w_todo_stream', 'w_todo_progress',
   'w_req_summary', 'w_sprint_summary', 'w_bug_summary', 'w_kpi_summary',
 ]
 
@@ -447,6 +453,7 @@ export const SPAN_CLASS: Record<number, string> = {
   3: 'col-span-12 md:col-span-3',
   4: 'col-span-12 md:col-span-4',
   5: 'col-span-12 md:col-span-5',
+  6: 'col-span-12 md:col-span-6',
   7: 'col-span-12 md:col-span-7',
   8: 'col-span-12 md:col-span-8',
   12: 'col-span-12',
