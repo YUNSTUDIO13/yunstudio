@@ -470,22 +470,25 @@ export default function Bugs() {
                       <li key={b.id} className="rounded-xl border border-line bg-canvas/40 p-3">
                         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-col items-start gap-1 md:flex-row md:flex-wrap md:items-center md:gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
                                 {BUG_SEVERITY_META[b.severity].label}
                               </StatusTag>
                               <StatusTag tone={BUG_STATUS_META[b.status].tone}>
                                 {BUG_STATUS_META[b.status].label}
                               </StatusTag>
-                              <span className="truncate text-sm font-medium text-ink-strong">
-                                {b.title}
-                              </span>
+                              <PriorityTag priority={b.priority} />
                             </div>
-                            <div className="mt-1 truncate text-xs text-ink-mute">
+                            <div className="mt-1.5 truncate text-sm font-medium text-ink-strong">
+                              {b.title}
+                            </div>
+                            <div className="mt-0.5 truncate text-xs text-ink-mute">
                               {b.reporter ?? '未指派'}
                             </div>
                           </div>
-                          <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
+                          <div className="flex items-center justify-end md:justify-end">
+                            <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
+                          </div>
                         </div>
                       </li>
                     ))}

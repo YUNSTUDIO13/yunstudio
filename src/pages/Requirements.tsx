@@ -406,7 +406,7 @@ export default function Requirements() {
                     setDragId(null)
                     setOverId(null)
                   }}
-                  className={`group flex items-center gap-2 px-2 py-3 transition ${
+                  className={`group flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:gap-2 transition ${
                     dragId === r.id ? 'opacity-40' : ''
                   } ${
                     dragId && overId === r.id && dragId !== r.id
@@ -423,27 +423,31 @@ export default function Requirements() {
                       dragAllowed.current = true
                     }}
                     onClick={(e) => e.preventDefault()}
-                    className="hidden shrink-0 cursor-grab text-ink-mute transition hover:text-ink-soft active:cursor-grabbing group-hover:block"
+                    className="hidden shrink-0 cursor-grab text-ink-mute transition hover:text-ink-soft active:cursor-grabbing group-hover:md:block"
                   >
                     {gripIcon}
                   </button>
-                  <StatusTag tone={REQ_STATUS_META[r.status].tone}>
-                    {REQ_STATUS_META[r.status].label}
-                  </StatusTag>
-                  <PriorityTag priority={r.priority} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-ink-strong">
-                        {r.title}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 truncate text-xs text-ink-mute">
-                      <span className="shrink-0">{r.owner ?? '未指派'}</span>
-                      <span className="text-line">·</span>
-                      <span className="truncate">价值：{r.value_desc}</span>
+                  <div className="flex flex-wrap items-center gap-2 md:contents">
+                    <StatusTag tone={REQ_STATUS_META[r.status].tone}>
+                      {REQ_STATUS_META[r.status].label}
+                    </StatusTag>
+                    <PriorityTag priority={r.priority} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium text-ink-strong">
+                          {r.title}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2 truncate text-xs text-ink-mute">
+                        <span className="shrink-0">{r.owner ?? '未指派'}</span>
+                        <span className="text-line">·</span>
+                        <span className="truncate">价值：{r.value_desc}</span>
+                      </div>
                     </div>
                   </div>
-                  <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
+                  <div className="flex items-center justify-end md:justify-end">
+                    <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
+                  </div>
                 </li>
               ))}
             </ul>

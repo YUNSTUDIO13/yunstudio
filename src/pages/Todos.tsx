@@ -399,61 +399,65 @@ export default function Todos() {
                 return (
                   <li
                     key={t.id}
-                    className={`flex items-center gap-3 px-2 py-3 ${t.done ? 'opacity-60' : ''}`}
+                    className={`flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:gap-3 ${t.done ? 'opacity-60' : ''}`}
                   >
                     <input
                       type="checkbox"
                       checked={t.done}
                       onChange={() => toggleDone(t.id)}
-                      className="h-4 w-4 accent-ink-strong"
+                      className="h-4 w-4 shrink-0 accent-ink-strong"
                     />
-                    <PriorityTag priority={t.priority} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`truncate text-sm ${
-                            t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
-                          }`}
-                        >
-                          {t.title}
-                        </span>
-                        {t.source_url && (
-                          <a
-                            href={t.source_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-accent hover:text-accent/80"
-                            title="打开来源链接"
+                    <div className="flex flex-wrap items-center gap-2 md:contents">
+                      <PriorityTag priority={t.priority} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`truncate text-sm ${
+                              t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
+                            }`}
                           >
-                            ↗
-                          </a>
+                            {t.title}
+                          </span>
+                          {t.source_url && (
+                            <a
+                              href={t.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 text-accent hover:text-accent/80"
+                              title="打开来源链接"
+                            >
+                              ↗
+                            </a>
+                          )}
+                        </div>
+                        {t.note && (
+                          <div className="mt-0.5 truncate text-xs text-ink-mute">{t.note}</div>
                         )}
                       </div>
-                      {t.note && (
-                        <div className="mt-0.5 truncate text-xs text-ink-mute">{t.note}</div>
-                      )}
                     </div>
-                    <span
-                      className={`text-xs ${
-                        risk === 'overdue'
-                          ? 'font-medium text-danger'
+                    <div className="flex items-center justify-between gap-3 md:justify-end">
+                      <span
+                        className={`text-xs ${
+                          risk === 'overdue'
+                            ? 'font-medium text-danger'
+                            : risk === 'urgent'
+                              ? 'font-medium text-warning'
+                              : 'text-ink-mute'
+                        }`}
+                      >
+                        {risk === 'overdue'
+                          ? '逾期'
                           : risk === 'urgent'
-                            ? 'font-medium text-warning'
-                            : 'text-ink-mute'
-                      }`}
-                    >
-                      {risk === 'overdue'
-                        ? '逾期'
-                        : risk === 'urgent'
-                          ? '紧急'
-                          : h == null
-                            ? '无截止'
-                            : `剩 ${Math.round(h)}h`}
-                    </span>
-                    <span className="w-10 text-right text-sm font-semibold text-ink-strong">
-                      {computeScore(t)}
-                    </span>
-                    <TodoActions onEdit={() => openEdit(t)} onDelete={() => setToDelete(t)} />
+                            ? '紧急'
+                            : h == null
+                              ? '无截止'
+                              : `剩 ${Math.round(h)}h`}
+                      </span>
+                      <span className="w-10 text-right text-sm font-semibold text-ink-strong">
+                        {computeScore(t)}
+                      </span>
+                      <TodoActions onEdit={() => openEdit(t)} onDelete={() => setToDelete(t)} />
+                    </div>
                   </li>
                 )
               })}
