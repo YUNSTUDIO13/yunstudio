@@ -10,6 +10,7 @@ import MegaMenu from './MegaMenu'
 import MobileMegaSheet from './MobileMegaSheet'
 import Avatar from './Avatar'
 import type { BuiltinModuleId } from '../lib/builtin-modules'
+import AuroraBackground from '../design/AuroraBackground'
 
 // ============================================================
 // 工具
@@ -78,14 +79,14 @@ function PrimaryDockItem({
         title={primary.title}
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        className={`
-          grid h-11 w-11 place-items-center rounded-2xl border transition
-          ${
-            isActive || isOpen
-              ? 'border-ink-strong bg-ink-strong text-white'
-              : 'border-line bg-surface text-ink-soft hover:bg-brand-soft hover:text-ink-strong'
-          }
-        `}
+          className={`
+            grid h-11 w-11 place-items-center rounded-2xl border transition
+            ${
+              isActive || isOpen
+                ? 'border-accent bg-accent/15 text-accent'
+                : 'border-white/10 bg-white/5 text-ink-soft hover:bg-white/10 hover:text-ink-strong'
+            }
+          `}
       >
         {renderIcon(primary.iconKey)}
       </Link>
@@ -169,12 +170,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const openPrimary = sortedPrimaries.find((p) => p.id === openPrimaryId) ?? null
 
   return (
-    <div className="min-h-screen bg-canvas text-ink-strong">
+    <div className="relative min-h-screen bg-canvas text-ink-strong">
+      <AuroraBackground />
       {/* ===== 桌面：左上悬浮 dock（主页 + 一级 Tab） ===== */}
       <aside
         className="
           fixed left-6 top-6 z-40 hidden w-[72px] flex-col items-center gap-2
-          rounded-3xl bg-surface p-3 shadow-card-hover md:flex
+          rounded-3xl glass-panel p-3 md:flex
         "
       >
         <Link
@@ -206,7 +208,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <aside
         className="
           fixed left-6 bottom-6 z-40 hidden w-[72px] flex-col items-center gap-3
-          rounded-3xl bg-surface p-3 shadow-card-hover md:flex
+          rounded-3xl glass-panel p-3 md:flex
         "
       >
         <Link
@@ -216,8 +218,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
             grid h-11 w-11 place-items-center rounded-2xl border transition
             ${
               isNavConfigActive
-                ? 'border-ink-strong bg-ink-strong text-white'
-                : 'border-line bg-surface text-ink-soft hover:bg-brand-soft hover:text-ink-strong'
+                ? 'border-accent bg-accent/15 text-accent'
+                : 'border-white/10 bg-white/5 text-ink-soft hover:bg-white/10 hover:text-ink-strong'
             }
           `}
         >
@@ -269,8 +271,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <nav
           className="
             fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-around
-            border-t border-line bg-surface/95 px-1
-            pb-[env(safe-area-inset-bottom)] backdrop-blur
+            border-t border-white/10 glass-panel px-1
+            pb-[env(safe-area-inset-bottom)]
           "
         >
           <Link
@@ -302,9 +304,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 className="flex h-14 flex-1 flex-col items-center justify-center"
               >
                 <span
-                  className={`grid h-9 w-9 place-items-center rounded-2xl transition ${
-                    active ? 'bg-ink-strong text-white' : 'text-ink-soft'
-                  }`}
+                className={`grid h-9 w-9 place-items-center rounded-2xl transition ${
+                  active ? 'bg-accent/20 text-accent' : 'text-ink-soft'
+                }`}
                 >
                   {renderIcon(p.iconKey)}
                 </span>
@@ -342,8 +344,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div
         className={
           isMobile
-            ? 'min-h-screen px-4 pb-28 pt-4'
-            : 'min-h-screen pl-[120px] pr-6 py-6'
+            ? 'relative z-10 min-h-screen px-4 pb-28 pt-4'
+            : 'relative z-10 min-h-screen pl-[120px] pr-6 py-6'
         }
       >
         {children}

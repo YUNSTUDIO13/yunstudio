@@ -48,7 +48,7 @@ const QUADRANTS: {
 }[] = [
   { priority: 'P0', title: '重要且紧急', axis: '重要 · 紧急', badge: 'bg-danger/10 text-danger' },
   { priority: 'P1', title: '重要不紧急', axis: '重要 · 不紧急', badge: 'bg-warning/10 text-warning' },
-  { priority: 'P2', title: '不重要但紧急', axis: '不重要 · 紧急', badge: 'bg-violet-50 text-violet-700' },
+  { priority: 'P2', title: '不重要但紧急', axis: '不重要 · 紧急', badge: 'bg-violet-400/10 text-violet-300' },
   { priority: 'P3', title: '不重要不紧急', axis: '不重要 · 不紧急', badge: 'bg-brand-soft text-ink-soft' },
 ]
 

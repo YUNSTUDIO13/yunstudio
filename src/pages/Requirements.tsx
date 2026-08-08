@@ -15,6 +15,8 @@ import StatusTag, { type Tone } from '../components/StatusTag'
 import { useRequirements } from '../context/RequirementsContext'
 import { renderIcon } from '../lib/icon-library'
 import type { Priority, ReqStatus, Requirement } from '../types'
+import { C, glass } from '../design/tokens'
+import { Display, Label } from '../design/primitives'
 
 // 状态元数据：中文标签 + 配色档位（与 8 态状态机一一对应）
 export const REQ_STATUS_META: Record<ReqStatus, { label: string; tone: Tone }> = {
@@ -60,7 +62,7 @@ const QUADRANTS: {
 }[] = [
   { priority: 'P0', title: '重要且紧急', axis: '重要 · 紧急', badge: 'bg-danger/10 text-danger' },
   { priority: 'P1', title: '重要不紧急', axis: '重要 · 不紧急', badge: 'bg-warning/10 text-warning' },
-  { priority: 'P2', title: '不重要但紧急', axis: '不重要 · 紧急', badge: 'bg-violet-50 text-violet-700' },
+  { priority: 'P2', title: '不重要但紧急', axis: '不重要 · 紧急', badge: 'bg-violet-400/10 text-violet-300' },
   { priority: 'P3', title: '不重要不紧急', axis: '不重要 · 不紧急', badge: 'bg-brand-soft text-ink-soft' },
 ]
 
@@ -140,7 +142,7 @@ function ViewSwitch({
         title="列表视图"
         className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition ${
           value === 'list'
-            ? 'bg-brand-soft text-ink-strong'
+            ? 'bg-accent/15 text-accent'
             : 'text-ink-mute hover:text-ink-soft'
         }`}
       >
@@ -153,7 +155,7 @@ function ViewSwitch({
         title="四象限视图"
         className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition ${
           value === 'quadrant'
-            ? 'bg-brand-soft text-ink-strong'
+            ? 'bg-accent/15 text-accent'
             : 'text-ink-mute hover:text-ink-soft'
         }`}
       >
@@ -242,21 +244,21 @@ export default function Requirements() {
   }
 
   const stats = [
-    { label: '需求总数', value: requirements.length, accent: 'text-ink-strong' },
+    { label: '需求总数', value: requirements.length, color: C.textPrimary },
     {
       label: '活跃',
       value: requirements.filter((r) => !TERMINAL.includes(r.status) && r.status !== 'hold').length,
-      accent: 'text-warning',
+      color: C.amber,
     },
     {
       label: '已上线',
       value: requirements.filter((r) => r.status === 'launched').length,
-      accent: 'text-success',
+      color: C.green,
     },
     {
       label: '挂起/作废',
       value: requirements.filter((r) => r.status === 'hold' || r.status === 'void').length,
-      accent: 'text-ink-mute',
+      color: C.textGhost,
     },
   ]
 
@@ -306,10 +308,14 @@ export default function Requirements() {
       {/* 统计条 */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {stats.map((s) => (
-          <Card key={s.label} className="!p-5">
-            <div className={`text-3xl font-semibold ${s.accent}`}>{s.value}</div>
-            <div className="mt-1 text-xs text-ink-soft">{s.label}</div>
-          </Card>
+          <div
+            key={s.label}
+            style={{ ...glass.card, borderRadius: 16, padding: '18px 22px', position: 'relative', overflow: 'hidden' }}
+          >
+            <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15) 50%, transparent)' }} />
+            <Display size={34} color={s.color}>{s.value}</Display>
+            <div style={{ marginTop: 5 }}><Label>{s.label}</Label></div>
+          </div>
         ))}
       </div>
 
@@ -448,7 +454,11 @@ export default function Requirements() {
           {QUADRANTS.map((q) => {
             const items = visible.filter((r) => r.priority === q.priority)
             return (
-              <Card key={q.priority} className="!p-4">
+              <div
+                key={q.priority}
+                style={{ ...glass.card, borderRadius: 18, padding: '22px 24px', minHeight: 200, position: 'relative', overflow: 'hidden' }}
+              >
+                <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 50%, transparent)' }} />
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span
@@ -473,7 +483,7 @@ export default function Requirements() {
                     {items.map((r) => (
                       <li
                         key={r.id}
-                        className="rounded-xl border border-line bg-canvas/40 p-3"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', borderRadius: 12, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}
                       >
                         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                           <div className="min-w-0 flex-1">
@@ -495,7 +505,7 @@ export default function Requirements() {
                     ))}
                   </ul>
                 )}
-              </Card>
+              </div>
             )
           })}
         </div>

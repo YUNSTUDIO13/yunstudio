@@ -295,11 +295,11 @@ function TodoProgressWidget() {
 // ============================================================
 function Pill({ tone, children }: { tone: 'info' | 'success' | 'warning' | 'danger' | 'violet' | 'neutral'; children: React.ReactNode }) {
   const map: Record<string, string> = {
-    info: 'bg-sky-50 text-sky-700',
-    success: 'bg-emerald-50 text-emerald-700',
-    warning: 'bg-amber-50 text-amber-700',
-    danger: 'bg-rose-50 text-rose-700',
-    violet: 'bg-violet-50 text-violet-700',
+    info: 'bg-sky-400/10 text-sky-300',
+    success: 'bg-emerald-400/10 text-emerald-300',
+    warning: 'bg-amber-500/15 text-amber-400',
+    danger: 'bg-rose-400/10 text-rose-300',
+    violet: 'bg-violet-400/10 text-violet-300',
     neutral: 'bg-brand-soft text-ink-soft',
   }
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${map[tone]}`}>{children}</span>

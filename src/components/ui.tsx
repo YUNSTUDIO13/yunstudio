@@ -22,7 +22,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-card border border-line bg-surface p-6 shadow-card ${className}`}
+      className={`glass-card p-6 ${className}`}
     >
       {children}
     </div>
@@ -60,7 +60,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-strong outline-none transition placeholder:text-ink-mute hover:border-ink-mute/60 focus:border-accent focus:ring-2 focus:ring-accent/15"
+      className="glass-input w-full rounded-lg px-3 py-2 text-sm text-ink-strong outline-none transition placeholder:text-ink-mute hover:border-accent/40 focus:border-accent focus:ring-2 focus:ring-accent/15"
     />
   )
 }
@@ -262,10 +262,10 @@ export function Select({
         disabled={disabled}
         onClick={() => !disabled && setOpen((o) => !o)}
         onKeyDown={onKeyDown}
-        className={`group flex w-full ${heightCls} items-center rounded-lg border bg-surface ${textCls} outline-none transition ${
+        className={`glass-input group flex w-full ${heightCls} items-center rounded-lg ${textCls} outline-none transition ${
           open
             ? 'border-accent/60 ring-2 ring-accent/15'
-            : 'border-line hover:border-ink-mute/60 focus:border-accent focus:ring-2 focus:ring-accent/15'
+            : 'hover:border-accent/40 focus:border-accent focus:ring-2 focus:ring-accent/15'
         } ${
           disabled
             ? 'cursor-not-allowed opacity-50'
@@ -304,7 +304,7 @@ export function Select({
       {open ? (
         <div
           ref={popRef}
-          className="absolute left-0 right-0 top-full z-50 mt-1.5 origin-top animate-popover rounded-xl border border-line bg-surface shadow-card-hover"
+          className="absolute left-0 right-0 top-full z-50 mt-1.5 origin-top animate-popover rounded-xl glass-panel"
           style={{ minWidth: '100%' }}
         >
           <ul
@@ -336,10 +336,10 @@ export function Select({
                     onClick={() => commit(i)}
                     className={`flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-sm transition-colors ${
                       selected
-                        ? 'bg-brand-soft font-medium text-ink-strong'
+                        ? 'bg-accent/20 font-medium text-white'
                         : isActive
-                          ? 'bg-brand-soft/70 text-ink-strong'
-                          : 'text-ink-strong hover:bg-brand-soft/50'
+                          ? 'bg-white/10 text-white'
+                          : 'text-ink-strong hover:bg-white/5'
                     } ${o.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
                     <span
@@ -380,7 +380,7 @@ export function Textarea(
   return (
     <textarea
       {...props}
-      className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink-strong outline-none transition placeholder:text-ink-mute focus:border-accent focus:ring-2 focus:ring-accent/15"
+      className="glass-input w-full resize-y rounded-lg px-3 py-2.5 text-sm text-ink-strong outline-none transition placeholder:text-ink-mute focus:border-accent focus:ring-2 focus:ring-accent/15"
     />
   )
 }
@@ -398,12 +398,12 @@ export function Button({
     'inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50'
   const styles =
     variant === 'primary'
-      ? 'bg-ink-strong text-white shadow-sm hover:bg-ink-strong/90'
+      ? 'bg-gradient-to-br from-[#7c85f5] to-[#c084fc] text-white shadow-[0_6px_28px_rgba(124,133,245,0.22)] hover:opacity-90'
       : variant === 'soft'
-        ? 'bg-brand-soft text-ink-strong hover:bg-line'
+        ? 'bg-white/5 text-ink-strong hover:bg-white/10'
         : variant === 'danger'
           ? 'bg-danger text-white shadow-sm hover:bg-danger/90'
-          : 'border border-line bg-surface text-ink-strong hover:bg-brand-soft'
+          : 'border border-white/10 bg-white/5 text-ink-strong hover:bg-white/10'
   return (
     <button {...props} className={`${base} ${styles} ${className}`}>
       {children}
@@ -419,7 +419,7 @@ export function IconButton({
   return (
     <button
       {...props}
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft transition hover:bg-brand-soft hover:text-ink-strong disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`glass-input inline-flex h-10 w-10 items-center justify-center rounded-xl text-ink-soft transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       {children}
     </button>
@@ -468,12 +468,12 @@ export function Modal({
       {/* 遮罩 */}
       <button
         aria-label="关闭"
-        className="absolute inset-0 animate-overlay bg-ink-strong/40 backdrop-blur-[2px]"
+        className="absolute inset-0 animate-overlay bg-black/60 backdrop-blur-[2px]"
         onClick={onClose}
       />
       {/* 内容 */}
       <div
-        className={`animate-modal relative z-10 w-full ${maxWidth} rounded-card border border-line bg-surface p-6 shadow-card-hover`}
+        className={`animate-modal relative z-10 w-full ${maxWidth} rounded-card glass-panel p-6`}
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink-strong">{title}</h2>

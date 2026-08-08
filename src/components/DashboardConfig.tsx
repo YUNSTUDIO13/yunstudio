@@ -56,7 +56,7 @@ export default function DashboardConfig({ open, onClose }: { open: boolean; onCl
                         <span className="flex items-center gap-2">
                           <span className="text-sm font-medium text-ink-strong">{w.title}</span>
                           {!w.developed && (
-                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                            <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-400">
                               建设中
                             </span>
                           )}

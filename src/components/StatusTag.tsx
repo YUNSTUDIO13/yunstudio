@@ -15,7 +15,7 @@ const TONE_CLS: Record<Tone, string> = {
   success: 'border-success/30 bg-success/10 text-success',
   warning: 'border-warning/30 bg-warning/10 text-warning',
   danger: 'border-danger/30 bg-danger/10 text-danger',
-  violet: 'border-violet-300 bg-violet-50 text-violet-700',
+  violet: 'border-violet-400/30 bg-violet-400/10 text-violet-300',
 }
 
 export default function StatusTag({

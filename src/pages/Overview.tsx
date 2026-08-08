@@ -1,84 +1,170 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../context/ProfileContext'
-import { useDashboard } from '../context/DashboardContext'
-import { SPAN_CLASS, type WidgetDef } from '../widgets/registry'
-import { renderIcon } from '../lib/icon-library'
-import DashboardConfig from '../components/DashboardConfig'
-
-// 建设中占位卡（developed=false 时渲染）
-function UndevelopedCard({ w }: { w: WidgetDef }) {
-  return (
-    <div className="flex h-full min-h-[180px] flex-col items-center justify-center rounded-card border border-dashed border-line bg-surface p-6 text-center">
-      <span className="grid h-12 w-12 place-items-center rounded-full bg-brand-soft text-ink-mute">
-        {renderIcon(w.iconKey)}
-      </span>
-      <div className="mt-3 text-sm font-semibold text-ink-strong">{w.title}</div>
-      <div className="mt-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-        建设中 · 敬请期待
-      </div>
-    </div>
-  )
-}
+import { useRequirements } from '../context/RequirementsContext'
+import { useTodos } from '../context/TodosContext'
+import { C, glass } from '../design/tokens'
+import {
+  Card,
+  CardHeader,
+  Display,
+  Badge,
+  Label,
+  Divider,
+  PulseDot,
+  RingChart,
+  IconFile,
+  IconBell,
+  IconClock,
+  IconChart,
+} from '../design/primitives'
 
 export default function Overview() {
   const { user } = useAuth()
   const { profile } = useProfile()
-  const { widgets } = useDashboard()
+  const { requirements } = useRequirements()
+  const { todos } = useTodos()
   const navigate = useNavigate()
-  const [configOpen, setConfigOpen] = useState(false)
-  const name =
-    profile?.display_name || (user?.email ?? '').split('@')[0] || '您'
+
+  const name = profile?.display_name || (user?.email ?? '').split('@')[0] || '您'
+
+  const totalTodos = todos.length
+  const doneTodos = todos.filter((t) => t.done).length
+  const todayPct = totalTodos ? Math.round((doneTodos / totalTodos) * 100) : 0
+
+  const reqTotal = requirements.length
+  const reqLaunched = requirements.filter((r) => r.status === 'launched').length
+  const reqActive = requirements.filter(
+    (r) => !['launched', 'void', 'hold'].includes(r.status),
+  ).length
+  const reqReview = requirements.filter((r) => r.status === 'review').length
+  const reqPct = reqTotal ? Math.round((reqLaunched / reqTotal) * 100) : 0
 
   return (
-    <div className="mx-auto max-w-[1280px]">
-      {/* ============ 顶部 Header ============ */}
-      <header className="mb-7">
-        <h1 className="text-[28px] font-bold leading-tight text-ink-strong">Hi, {name}!</h1>
-        <p className="mt-1 text-sm text-ink-soft">让我们看看你今天的工作节奏</p>
-      </header>
-
-      {/* ============ 卡片网格（数据驱动） ============ */}
-      {widgets.length === 0 ? (
-        <div className="rounded-card border border-dashed border-line bg-surface p-16 text-center text-sm text-ink-mute">
-          主页暂无卡片，点击下方「管理卡片」添加。
+    <div style={{ padding: '40px 44px 56px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* 个性化 Header（保留 M3.8 昵称显示） */}
+      <div style={{ marginBottom: 8 }}>
+        <h1 style={{ fontSize: 13, fontWeight: 500, color: C.textGhost, letterSpacing: '.1em', textTransform: 'uppercase', margin: 0 }}>
+          Overview
+        </h1>
+        <div style={{ marginTop: 8 }}>
+          <Display size={42} color={C.textPrimary}>{`Hi, ${name}`}</Display>
         </div>
-      ) : (
-        <div className="grid grid-cols-12 gap-6">
-          {widgets.map((w) =>
-            w.developed ? (
-              <button
-                key={w.id}
-                type="button"
-                onClick={() => w.route && navigate(w.route)}
-                title={`查看${w.title}`}
-                className={`${SPAN_CLASS[w.span] ?? 'col-span-4'} group block w-full rounded-card text-left outline-none transition hover:-translate-y-0.5 hover:shadow-card-hover focus-visible:ring-2 focus-visible:ring-accent/30`}
-              >
-                <w.Render />
-              </button>
-            ) : (
-              <div key={w.id} className={SPAN_CLASS[w.span] ?? 'col-span-4'}>
-                <UndevelopedCard w={w} />
-              </div>
-            ),
-          )}
-        </div>
-      )}
-
-      {/* ============ 底部管理按钮（居中） ============ */}
-      <div className="mt-8 flex justify-center">
-        <button
-          type="button"
-          onClick={() => setConfigOpen(true)}
-          className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-5 py-2.5 text-sm font-medium text-ink-strong shadow-card transition hover:bg-brand-soft"
-        >
-          {renderIcon('grid')}
-          管理卡片
-        </button>
       </div>
 
-      <DashboardConfig open={configOpen} onClose={() => setConfigOpen(false)} />
+      {/* top row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 14 }}>
+        <Card>
+          <CardHeader
+            title="今日完成"
+            action={
+              <button
+                onClick={() => navigate('/modules/todos')}
+                style={{
+                  ...glass.pill,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: C.accent,
+                  borderRadius: 7,
+                  padding: '4px 11px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  letterSpacing: '.02em',
+                }}
+              >
+                查看今日
+              </button>
+            }
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginTop: 4 }}>
+            <RingChart pct={todayPct} goal={8} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <Display size={48}>{doneTodos}</Display>
+                <div style={{ marginTop: 3 }}>
+                  <Label>已完成</Label>
+                </div>
+              </div>
+              <Divider />
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <Display size={32}>{todayPct}%</Display>
+                <Label>总完成度</Label>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card style={{ display: 'flex', flexDirection: 'column' }}>
+          <CardHeader title="项目流" icon={<PulseDot color="rgba(255,255,255,0.2)" />} />
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
+            <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无活跃项目</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* mid row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+        <Card>
+          <CardHeader title="整体进度" />
+          <div style={{ marginBottom: 18 }}>
+            <Display size={40}>{reqPct}%</Display>
+            <div style={{ marginTop: 2 }}>
+              <Label>Completed</Label>
+            </div>
+          </div>
+          <div style={{ position: 'relative', height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginBottom: 14, overflow: 'visible' }}>
+            <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span style={{ ...glass.pill, borderRadius: 6, padding: '2px 8px', fontSize: 11.5, color: C.accent, fontWeight: 600 }}>{reqLaunched}/{reqTotal}</span>
+              <Label>已上线</Label>
+            </div>
+            <Label>{reqActive} 个进行中</Label>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="需求概览" icon={<IconFile />} />
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
+            <Display size={40}>{reqTotal}</Display>
+            <Label>条需求</Label>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Badge label={`进行中 ${reqActive}`} color={C.green} bg="rgba(94,234,212,.09)" />
+            <Badge label={`待评审 ${reqReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
+          </div>
+        </Card>
+
+        <Card style={{ display: 'flex', flexDirection: 'column' }}>
+          <CardHeader title="迭代概览" icon={<IconClock />} />
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+            <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无迭代</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* bottom row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <Card>
+          <CardHeader title="缺陷概览" icon={<IconBell />} />
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
+            <Display size={40}>0</Display>
+            <Label>个未关闭</Label>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Badge label="致命 0" color={C.red} bg="rgba(248,113,113,.09)" />
+            <Badge label="已关闭 0" color="rgba(255,255,255,0.22)" bg="rgba(255,255,255,0.04)" />
+          </div>
+        </Card>
+
+        <Card style={{ display: 'flex', flexDirection: 'column' }}>
+          <CardHeader title="指标概览" icon={<IconChart />} />
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+            <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无指标</span>
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }

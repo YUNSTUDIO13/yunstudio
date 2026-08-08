@@ -1,6 +1,6 @@
 import type { Priority } from '../types'
 
-// 亮色背景下的优先级 tag（饱和度适中、可读）
+// 深色玻璃背景下的优先级 tag（暗底透色 + 亮色字，保证可读）
 const MAP: Record<Priority, { label: string; cls: string }> = {
   P0: {
     label: 'P0',
@@ -12,7 +12,7 @@ const MAP: Record<Priority, { label: string; cls: string }> = {
   },
   P2: {
     label: 'P2',
-    cls: 'border-amber-500/30 bg-amber-500/10 text-amber-600',
+    cls: 'border-amber-500/30 bg-amber-500/15 text-amber-400',
   },
   P3: {
     label: 'P3',

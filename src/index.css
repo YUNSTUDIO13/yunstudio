@@ -10,28 +10,86 @@ body,
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+  font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background-color: #F4F1EA;
-  color: #1F2024;
+  background-color: #040408;
+  color: rgba(255, 255, 255, 0.88);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 自定义滚动条（适配亮色暖米底） */
+/* 暗色细滚动条（适配极光背景） */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 3px;
+  height: 3px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D8D2C6;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #BFB8A8;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* 玻璃工具类（复刻高级简约UI） */
+.glass-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.038);
+  backdrop-filter: blur(32px) saturate(180%) brightness(1.04);
+  -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+    0 12px 48px rgba(0, 0, 0, 0.4);
+}
+.glass-panel {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(48px) saturate(220%) brightness(1.08);
+  -webkit-backdrop-filter: blur(48px) saturate(220%) brightness(1.08);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 32px 80px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.03);
+}
+.glass-input {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.glass-pill {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* 极光动画（与设计稿一致） */
+@keyframes aurora-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, -30px) scale(1.05); }
+  66% { transform: translate(-20px, 20px) scale(0.97); }
+}
+@keyframes aurora-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(-50px, 30px) scale(1.08); }
+  70% { transform: translate(30px, -20px) scale(0.95); }
+}
+@keyframes aurora-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, 40px) scale(1.06); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
 }
 
 /* Modal 进出动画 */
@@ -43,7 +101,6 @@ body {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-/* 自建 Listbox 浮层进出 */
 @keyframes popover-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
