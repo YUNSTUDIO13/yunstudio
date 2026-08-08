@@ -6,3 +6,6 @@ dist
 *.log
 .DS_Store
 .vite
+
+# agent-internal runtime data (memory / skills cache / project notes) — 含 PII，绝不入库
+.workbuddy/
