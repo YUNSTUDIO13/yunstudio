@@ -24,6 +24,14 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
           navigator.serviceWorker.register('./sw.js').catch(function () {});
+          // 新版本 Service Worker 接管后自动重载一次，确保用户看到最新内容
+          // （避免旧壳被缓存焊死、刷新无数次仍无变化）
+          var refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (refreshing) return;
+            refreshing = true;
+            window.location.reload();
+          });
         });
       }
     </script>

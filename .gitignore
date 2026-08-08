@@ -6,6 +6,8 @@ dist
 *.log
 .DS_Store
 .vite
+# tsc -b 生成的增量编译产物，无需入库
+*.tsbuildinfo
 
 # agent-internal runtime data (memory / skills cache / project notes) — 含 PII，绝不入库
 .workbuddy/
