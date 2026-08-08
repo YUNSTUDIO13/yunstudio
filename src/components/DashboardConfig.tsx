@@ -21,13 +21,28 @@ export default function DashboardConfig({ open, onClose }: { open: boolean; onCl
   }, [])
 
   return (
-    <Modal open={open} onClose={onClose} title="卡片管理" maxWidth="max-w-2xl">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="卡片管理"
+      maxWidth="max-w-2xl"
+      footer={
+        // 「恢复默认」靠左、「完成」靠右，与原视觉一致；footer 由 Modal 钉底，内容可滚
+        <div className="flex w-full items-center justify-between">
+          <Button variant="ghost" onClick={actions.resetToDefault}>
+            恢复默认
+          </Button>
+          <Button onClick={onClose}>完成</Button>
+        </div>
+      }
+    >
       <p className="mb-4 text-sm text-ink-soft">
         勾选可在主页启用的卡片；未勾选的将被移除。含「建设中」占位卡，可提前加入布局。
       </p>
 
       {/* —— 可用卡片（按分类勾选增删） —— */}
-      <div className="max-h-[46vh] space-y-5 overflow-y-auto pr-1">
+      {/* 整段进 Modal 自带的滚动容器；不再用 max-h 嵌套，避免双重滚动冲突 */}
+      <div className="space-y-5 pr-1">
         {CATEGORY_ORDER.map((cat) => {
           const list = grouped[cat] ?? []
           if (list.length === 0) return null
@@ -119,13 +134,6 @@ export default function DashboardConfig({ open, onClose }: { open: boolean; onCl
           </ul>
         </div>
       )}
-
-      <div className="mt-6 flex items-center justify-between">
-        <Button variant="ghost" onClick={actions.resetToDefault}>
-          恢复默认
-        </Button>
-        <Button onClick={onClose}>完成</Button>
-      </div>
     </Modal>
   )
 }

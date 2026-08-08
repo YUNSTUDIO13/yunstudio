@@ -489,11 +489,11 @@ export function Modal({
         className="absolute inset-0 animate-overlay bg-black/60 backdrop-blur-[2px]"
         onClick={onClose}
       />
-      {/* 内容 */}
+      {/* 内容：外层 flex 列、最高不超过视口、内层滚动 + footer 钉底（移动端长表单也能滚到底） */}
       <div
-        className={`animate-modal relative z-10 w-full ${maxWidth} rounded-card glass-panel p-6`}
+        className={`animate-modal relative z-10 flex w-full ${maxWidth} max-h-[calc(100vh-2rem)] flex-col rounded-card glass-panel p-6`}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-none items-center justify-between">
           <h2 className="text-base font-semibold text-ink-strong">{title}</h2>
           <button
             onClick={onClose}
@@ -503,9 +503,13 @@ export function Modal({
             ✕
           </button>
         </div>
-        <div>{children}</div>
+        <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+          {children}
+        </div>
         {footer && (
-          <div className="mt-6 flex justify-end gap-3">{footer}</div>
+          <div className="mt-4 flex flex-none justify-end gap-3 border-t border-white/8 pt-4">
+            {footer}
+          </div>
         )}
       </div>
     </div>

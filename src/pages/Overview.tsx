@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../context/ProfileContext'
 import { useRequirements } from '../context/RequirementsContext'
+import { useSprints } from '../context/SprintsContext'
+import { useBugs } from '../context/BugsContext'
+import { useKpis } from '../context/KpisContext'
 import { useTodos } from '../context/TodosContext'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { useDashboard } from '../context/DashboardContext'
 import DashboardConfig from '../components/DashboardConfig'
 import { SPAN_CLASS } from '../widgets/registry'
 import { C, glass } from '../design/tokens'
+import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
 import {
   Card,
   CardHeader,
@@ -28,6 +32,9 @@ export default function Overview() {
   const { user } = useAuth()
   const { profile } = useProfile()
   const { requirements } = useRequirements()
+  const { sprints } = useSprints()
+  const { bugs } = useBugs()
+  const { kpis } = useKpis()
   const { todos } = useTodos()
   const navigate = useNavigate()
   const isMobile = useMediaQuery('(max-width: 767px)')
@@ -48,6 +55,33 @@ export default function Overview() {
   ).length
   const reqReview = requirements.filter((r) => r.status === 'review').length
   const reqPct = reqTotal ? Math.round((reqLaunched / reqTotal) * 100) : 0
+
+  // 待办 Top 4（按 Score 倒序、未完成优先）
+  const topTodos = useMemo(
+    () =>
+      [...todos]
+        .filter((t) => !t.done)
+        .sort((a, b) => computeScore(b) - computeScore(a))
+        .slice(0, 4),
+    [todos],
+  )
+
+  // 缺陷：未关闭 / 致命 / 已关闭
+  const bugOpen = bugs.filter((b) => b.status !== 'closed').length
+  const bugCritical = bugs.filter((b) => b.severity === 'critical' && b.status !== 'closed').length
+  const bugFixed = bugs.filter((b) => b.status === 'closed').length
+
+  // 当前迭代：状态 active 的优先，其次第一条
+  const activeSprint = useMemo(
+    () => sprints.find((s) => s.status === 'active') ?? sprints[0] ?? null,
+    [sprints],
+  )
+
+  // Top 指标：按 |value| 取绝对值最大的
+  const topKpi = useMemo(
+    () => (kpis.length === 0 ? null : [...kpis].sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0]),
+    [kpis],
+  )
 
   return (
     <div style={{ padding: isMobile ? '16px 16px 24px' : '40px 44px 56px', display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
@@ -111,9 +145,56 @@ export default function Overview() {
           <div className={SPAN_CLASS[7]}>
         <Card style={{ display: 'flex', flexDirection: 'column' }}>
           <CardHeader title="项目流" icon={<PulseDot color="rgba(255,255,255,0.2)" />} />
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
-            <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无活跃项目</span>
-          </div>
+          {topTodos.length === 0 ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
+              <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无活跃待办</span>
+            </div>
+          ) : (
+            <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+              {topTodos.map((t) => {
+                const h = hoursToDeadline(t.deadline_at)
+                const risk = riskLevel(t)
+                const hLabel =
+                  h == null
+                    ? '无截止'
+                    : h < 0
+                      ? `逾期 ${Math.abs(Math.round(h))}h`
+                      : `剩 ${Math.round(h)}h`
+                const riskColor =
+                  risk === 'overdue'
+                    ? C.red
+                    : risk === 'urgent'
+                      ? C.amber
+                      : C.textSub
+                return (
+                  <li
+                    key={t.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12 }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background: riskColor,
+                        boxShadow: risk === 'overdue' ? `0 0 8px ${riskColor}` : 'none',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      className="min-w-0 flex-1 break-words text-sm leading-snug"
+                      style={{ color: C.textPrimary }}
+                    >
+                      {t.title}
+                    </span>
+                    <span style={{ fontSize: 11, color: C.textSub, flexShrink: 0 }}>
+                      {t.priority} · {hLabel}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </Card>
           </div>
         )}
@@ -162,9 +243,24 @@ export default function Overview() {
           <div className={SPAN_CLASS[4]}>
         <Card style={{ display: 'flex', flexDirection: 'column' }}>
           <CardHeader title="迭代概览" icon={<IconClock />} />
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
-            <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无迭代</span>
-          </div>
+          {activeSprint ? (
+            <>
+              <div className="min-w-0 break-words text-sm font-semibold leading-snug" style={{ color: C.textPrimary, marginTop: 4 }}>
+                {activeSprint.name}
+              </div>
+              <div className="relative" style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginTop: 14, marginBottom: 10, overflow: 'visible' }}>
+                <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${Math.round(activeSprint.progress)}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: C.textSub }}>
+                <span>{activeSprint.status}</span>
+                <span>{Math.round(activeSprint.progress)}%</span>
+              </div>
+            </>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+              <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无迭代</span>
+            </div>
+          )}
         </Card>
           </div>
         )}
@@ -174,12 +270,12 @@ export default function Overview() {
         <Card>
           <CardHeader title="缺陷概览" icon={<IconBell />} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-            <Display size={40}>0</Display>
+            <Display size={40}>{bugOpen}</Display>
             <Label>个未关闭</Label>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <Badge label="致命 0" color={C.red} bg="rgba(248,113,113,.09)" />
-            <Badge label="已关闭 0" color="rgba(255,255,255,0.22)" bg="rgba(255,255,255,0.04)" />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Badge label={`致命 ${bugCritical}`} color={C.red} bg="rgba(248,113,113,.09)" />
+            <Badge label={`已关闭 ${bugFixed}`} color="rgba(255,255,255,0.22)" bg="rgba(255,255,255,0.04)" />
           </div>
         </Card>
           </div>
@@ -189,9 +285,24 @@ export default function Overview() {
           <div className={SPAN_CLASS[6]}>
         <Card style={{ display: 'flex', flexDirection: 'column' }}>
           <CardHeader title="指标概览" icon={<IconChart />} />
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
-            <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无指标</span>
-          </div>
+          {topKpi ? (
+            <>
+              <div className="min-w-0 break-words text-sm font-semibold leading-snug" style={{ color: C.textPrimary, marginTop: 4 }}>
+                {topKpi.name}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+                <Display size={32}>{topKpi.value}</Display>
+                <Label>{topKpi.unit}</Label>
+              </div>
+              <div style={{ fontSize: 11.5, color: C.textSub, marginTop: 6 }}>
+                目标 {topKpi.target}{topKpi.unit} · {Math.round((topKpi.value / topKpi.target) * 100)}%
+              </div>
+            </>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+              <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无指标</span>
+            </div>
+          )}
         </Card>
           </div>
         )}
