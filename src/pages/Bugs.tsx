@@ -428,12 +428,10 @@ export default function Bugs() {
                   </div>
                   {/* 标题段：移动端独占满宽；桌面端 flex-1 自适应 */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-ink-strong">
-                        {b.title}
-                      </span>
+                    <div className="text-sm font-medium leading-snug text-ink-strong break-words">
+                      {b.title}
                     </div>
-                    <div className="mt-0.5 truncate text-xs text-ink-mute">
+                    <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
                       {b.reporter ?? '未指派'}
                     </div>
                   </div>
@@ -479,10 +477,10 @@ export default function Bugs() {
                               </StatusTag>
                               <PriorityTag priority={b.priority} />
                             </div>
-                            <div className="mt-1.5 truncate text-sm font-medium text-ink-strong">
+                            <div className="mt-1.5 text-sm font-medium leading-snug text-ink-strong break-words">
                               {b.title}
                             </div>
-                            <div className="mt-0.5 truncate text-xs text-ink-mute">
+                            <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
                               {b.reporter ?? '未指派'}
                             </div>
                           </div>

@@ -433,15 +433,20 @@ export default function Requirements() {
                     </StatusTag>
                     <PriorityTag priority={r.priority} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium text-ink-strong">
-                          {r.title}
-                        </span>
+                      <div className="text-sm font-medium leading-snug text-ink-strong break-words">
+                        {r.title}
                       </div>
-                      <div className="mt-0.5 flex items-center gap-2 truncate text-xs text-ink-mute">
-                        <span className="shrink-0">{r.owner ?? '未指派'}</span>
-                        <span className="text-line">·</span>
-                        <span className="truncate">价值：{r.value_desc}</span>
+                      <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
+                        <div className="break-words">
+                          <span className="text-ink-mute/80">责任人：</span>
+                          <span className="text-ink-soft">{r.owner ?? '未指派'}</span>
+                        </div>
+                        {r.value_desc && (
+                          <div className="break-words">
+                            <span className="text-ink-mute/80">价值：</span>
+                            <span>{r.value_desc}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -495,12 +500,21 @@ export default function Requirements() {
                               <StatusTag tone={REQ_STATUS_META[r.status].tone}>
                                 {REQ_STATUS_META[r.status].label}
                               </StatusTag>
-                              <span className="truncate text-sm font-medium text-ink-strong">
+                              <span className="break-words text-sm font-medium leading-snug text-ink-strong">
                                 {r.title}
                               </span>
                             </div>
-                            <div className="mt-1 truncate text-xs text-ink-mute">
-                              {r.owner ?? '未指派'} · {r.value_desc}
+                            <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
+                              <div className="break-words">
+                                <span className="text-ink-mute/80">责任人：</span>
+                                <span className="text-ink-soft">{r.owner ?? '未指派'}</span>
+                              </div>
+                              {r.value_desc && (
+                                <div className="break-words">
+                                  <span className="text-ink-mute/80">价值：</span>
+                                  <span>{r.value_desc}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />

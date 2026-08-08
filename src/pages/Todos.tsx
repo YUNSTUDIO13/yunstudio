@@ -412,7 +412,7 @@ export default function Todos() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`truncate text-sm ${
+                            className={`break-words text-sm leading-snug ${
                               t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
                             }`}
                           >
@@ -431,7 +431,7 @@ export default function Todos() {
                           )}
                         </div>
                         {t.note && (
-                          <div className="mt-0.5 truncate text-xs text-ink-mute">{t.note}</div>
+                          <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">{t.note}</div>
                         )}
                       </div>
                     </div>
@@ -499,7 +499,7 @@ export default function Todos() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span
-                                className={`truncate text-sm ${
+                                className={`break-words text-sm leading-snug ${
                                   t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
                                 }`}
                               >
@@ -517,7 +517,7 @@ export default function Todos() {
                                 </a>
                               )}
                             </div>
-                            <div className="mt-0.5 text-xs text-ink-mute">
+                            <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">
                               Score {computeScore(t)}
                               {risk === 'overdue'
                                 ? ' · 逾期'
