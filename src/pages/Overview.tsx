@@ -147,7 +147,7 @@ export default function Overview() {
               return (
                 <div key={id} className={SPAN_CLASS[7]}>
           <Card style={{ display: 'flex', flexDirection: 'column' }}>
-            <CardHeader title="项目流" icon={<PulseDot color="rgba(255,255,255,0.2)" />} />
+            <CardHeader title="待办" icon={<PulseDot color="rgba(255,255,255,0.2)" />} />
             {topTodos.length === 0 ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
                 <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无活跃待办</span>

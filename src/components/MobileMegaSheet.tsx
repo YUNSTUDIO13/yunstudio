@@ -37,7 +37,10 @@ export default function MobileMegaSheet({
       {/* 底部 sheet 内容
           - 四边圆角 rounded-3xl（不再 rounded-t-3xl，去掉 border-t，与底部 dock 浮岛风格一致）
           - 整体上移：mb 从 calc(3.5rem) 加大到 calc(4.5rem)，与底部 dock 间距更明显 */}
-      <div className="relative z-10 mb-[calc(5.5rem+env(safe-area-inset-bottom))] max-h-[calc(100dvh-5.5rem-env(safe-area-inset-bottom))] overflow-y-auto rounded-3xl glass-panel p-4 shadow-card-hover animate-modal">
+      <div
+        className="relative z-10 mb-[calc(5.5rem+env(safe-area-inset-bottom))] max-h-[calc(100dvh-5.5rem-env(safe-area-inset-bottom))] overflow-y-auto rounded-3xl bg-surface p-4 animate-modal"
+        style={{ boxShadow: '0 32px 80px rgba(0,0,0,0.55), 0 8px 28px -6px rgba(0,0,0,0.5)' }}
+      >
         {/* 顶部抓手 */}
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" aria-hidden />
         {/* 标题行 */}

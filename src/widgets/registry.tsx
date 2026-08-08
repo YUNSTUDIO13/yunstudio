@@ -231,7 +231,7 @@ function TodoStreamWidget() {
 
   return (
     <div className="h-full rounded-card bg-surface p-6 shadow-card">
-      <h2 className="mb-4 text-lg font-bold text-ink-strong">项目流</h2>
+      <h2 className="mb-4 text-lg font-bold text-ink-strong">待办</h2>
       {topHabits.length === 0 ? (
         <div className="py-10 text-center text-sm text-ink-mute">暂无活跃项目</div>
       ) : (
@@ -418,7 +418,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
   w_todo_focus: { id: 'w_todo_focus', title: '待办聚焦', desc: '总数 / 进行中 / 紧急 三球概览', category: '待办', iconKey: 'flame', developed: false, route: '/modules/todos', span: 8, Render: TodoFocusWidget },
   w_todo_calendar: { id: 'w_todo_calendar', title: '本月节奏', desc: '待办截止日期月历热力', category: '待办', iconKey: 'clock', developed: false, route: '/modules/todos', span: 4, Render: TodoCalendarWidget },
   w_todo_ring: { id: 'w_todo_ring', title: '今日完成', desc: '完成度目标圆环', category: '待办', iconKey: 'check', developed: true, route: '/modules/todos', span: 5, Render: TodoRingWidget },
-  w_todo_stream: { id: 'w_todo_stream', title: '项目流', desc: 'Score 排序的活跃项目', category: '待办', iconKey: 'list', developed: true, route: '/modules/todos', span: 7, Render: TodoStreamWidget },
+  w_todo_stream: { id: 'w_todo_stream', title: '待办', desc: 'Score 排序的活跃项目', category: '待办', iconKey: 'list', developed: true, route: '/modules/todos', span: 7, Render: TodoStreamWidget },
   w_todo_progress: { id: 'w_todo_progress', title: '整体进度', desc: '待办总完成进度条', category: '待办', iconKey: 'bar', developed: true, route: '/modules/todos', span: 5, Render: TodoProgressWidget },
 
   // —— 模块概览（4 张已开发） ——
