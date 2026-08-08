@@ -405,37 +405,40 @@ export default function Todos() {
                       type="checkbox"
                       checked={t.done}
                       onChange={() => toggleDone(t.id)}
-                      className="h-4 w-4 shrink-0 accent-ink-strong"
+                      className="h-4 w-4 shrink-0 self-start accent-ink-strong md:self-auto"
                     />
-                    <div className="flex flex-wrap items-center gap-2 md:contents">
+                    {/* 标签独立一栏（移动端独占一行；桌面端作 li 横排一栏，与 Bugs 列表项一致） */}
+                    <div className="flex items-center gap-2 self-start md:self-auto">
                       <PriorityTag priority={t.priority} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`break-words text-sm leading-snug ${
-                              t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
-                            }`}
+                    </div>
+                    {/* 标题段：占满剩余宽度，标题与 note 自由换行 */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`break-words text-sm leading-snug ${
+                            t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
+                          }`}
+                        >
+                          {t.title}
+                        </span>
+                        {t.source_url && (
+                          <a
+                            href={t.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 text-accent hover:text-accent/80"
+                            title="打开来源链接"
                           >
-                            {t.title}
-                          </span>
-                          {t.source_url && (
-                            <a
-                              href={t.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="shrink-0 text-accent hover:text-accent/80"
-                              title="打开来源链接"
-                            >
-                              ↗
-                            </a>
-                          )}
-                        </div>
-                        {t.note && (
-                          <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">{t.note}</div>
+                            ↗
+                          </a>
                         )}
                       </div>
+                      {t.note && (
+                        <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">{t.note}</div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between gap-3 md:justify-end">
+                    {/* 末行：风险 + Score + actions，移动端 justify-between，桌面端右对齐 */}
+                    <div className="flex items-center justify-between gap-3 self-end md:self-auto md:justify-end">
                       <span
                         className={`text-xs ${
                           risk === 'overdue'

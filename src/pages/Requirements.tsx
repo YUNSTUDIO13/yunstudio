@@ -427,30 +427,33 @@ export default function Requirements() {
                   >
                     {gripIcon}
                   </button>
-                  <div className="flex flex-wrap items-center gap-2 md:contents">
+                  {/* 标签组：移动端独立一行横排；桌面端作 li 横排一栏（与 Bugs 列表项一致） */}
+                  <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
                     <StatusTag tone={REQ_STATUS_META[r.status].tone}>
                       {REQ_STATUS_META[r.status].label}
                     </StatusTag>
                     <PriorityTag priority={r.priority} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium leading-snug text-ink-strong break-words">
-                        {r.title}
+                  </div>
+                  {/* 标题段：占满剩余宽度，标题与责任人/价值自由换行 */}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium leading-snug text-ink-strong break-words">
+                      {r.title}
+                    </div>
+                    <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
+                      <div className="break-words">
+                        <span className="text-ink-mute/80">责任人：</span>
+                        <span className="text-ink-soft">{r.owner ?? '未指派'}</span>
                       </div>
-                      <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
+                      {r.value_desc && (
                         <div className="break-words">
-                          <span className="text-ink-mute/80">责任人：</span>
-                          <span className="text-ink-soft">{r.owner ?? '未指派'}</span>
+                          <span className="text-ink-mute/80">价值：</span>
+                          <span>{r.value_desc}</span>
                         </div>
-                        {r.value_desc && (
-                          <div className="break-words">
-                            <span className="text-ink-mute/80">价值：</span>
-                            <span>{r.value_desc}</span>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center justify-end md:justify-end">
+                  {/* 末行：链接 + 编辑 + 删除，移动端靠右对齐（与 Bugs 一致） */}
+                  <div className="flex items-center justify-end self-end md:self-auto">
                     <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
                   </div>
                 </li>
