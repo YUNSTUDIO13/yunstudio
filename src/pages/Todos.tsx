@@ -401,14 +401,14 @@ export default function Todos() {
                     key={t.id}
                     className={`flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:gap-3 ${t.done ? 'opacity-60' : ''}`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={t.done}
-                      onChange={() => toggleDone(t.id)}
-                      className="h-4 w-4 shrink-0 self-start accent-ink-strong md:self-auto"
-                    />
-                    {/* 标签独立一栏（移动端独占一行；桌面端作 li 横排一栏，与 Bugs 列表项一致） */}
+                    {/* 紧凑头：checkbox + PriorityTag 合并为一个 wrapper，避免「勾选框 / P0 / 标题」被 gap 拆成三段独立块 */}
                     <div className="flex items-center gap-2 self-start md:self-auto">
+                      <input
+                        type="checkbox"
+                        checked={t.done}
+                        onChange={() => toggleDone(t.id)}
+                        className="h-4 w-4 shrink-0 accent-ink-strong"
+                      />
                       <PriorityTag priority={t.priority} />
                     </div>
                     {/* 标题段：占满剩余宽度，标题与 note 自由换行 */}
