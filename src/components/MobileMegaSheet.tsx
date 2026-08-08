@@ -31,7 +31,7 @@ export default function MobileMegaSheet({
       {/* 遮罩：点击关闭 */}
       <button
         aria-label="关闭"
-        className="absolute inset-0 animate-overlay bg-ink-strong/40 backdrop-blur-[2px]"
+        className="absolute inset-0 animate-overlay bg-black/60 backdrop-blur-[2px]"
         onClick={onClose}
       />
       {/* 底部 sheet 内容
