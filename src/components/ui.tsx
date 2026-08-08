@@ -2,6 +2,7 @@ import {
   Children,
   isValidElement,
   useEffect,
+  useLayoutEffect,
   useId,
   useMemo,
   useRef,
@@ -11,6 +12,7 @@ import {
   type ReactNode,
   type SelectHTMLAttributes,
 } from 'react'
+import { createPortal } from 'react-dom'
 
 /* ----------------------------- 卡片 ----------------------------- */
 export function Card({
@@ -147,6 +149,7 @@ export function Select({
   const current = options.find((o) => o.value === value) ?? null
 
   const [open, setOpen] = useState(false)
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null)
   const [activeIdx, setActiveIdx] = useState(() => {
     const i = options.findIndex((o) => o.value === value)
     return i >= 0 ? i : 0
@@ -156,15 +159,22 @@ export function Select({
   const popRef = useRef<HTMLDivElement>(null)
   const listboxId = useId()
 
-  // 同步 active：打开时或 value 变化时
-  useEffect(() => {
-    if (open) {
-      const i = options.findIndex((o) => o.value === value)
-      setActiveIdx(i >= 0 ? i : 0)
+  // 同步 active + 计算浮层定位坐标（portal 到 body，脱离父级 overflow/z-index 约束）
+  useLayoutEffect(() => {
+    if (!open) {
+      setCoords(null)
+      return
+    }
+    const i = options.findIndex((o) => o.value === value)
+    setActiveIdx(i >= 0 ? i : 0)
+    const el = triggerRef.current
+    if (el) {
+      const r = el.getBoundingClientRect()
+      setCoords({ top: r.bottom + 6, left: r.left, width: r.width })
     }
   }, [open, value, options])
 
-  // 点击外部 / Esc 关闭
+  // 点击外部 / Esc / 滚动关闭
   useEffect(() => {
     if (!open) return
     function onDoc(e: MouseEvent) {
@@ -184,11 +194,18 @@ export function Select({
         triggerRef.current?.focus()
       }
     }
+    function onScroll() {
+      setOpen(false)
+    }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
     return () => {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
     }
   }, [open])
 
@@ -301,11 +318,11 @@ export function Select({
         </span>
       </button>
 
-      {open ? (
+      {open && coords ? createPortal(
         <div
           ref={popRef}
-          className="absolute left-0 right-0 top-full z-50 mt-1.5 origin-top animate-popover rounded-xl glass-panel"
-          style={{ minWidth: '100%' }}
+          className="fixed z-[100] origin-top animate-popover rounded-xl glass-panel"
+          style={{ top: coords.top, left: coords.left, minWidth: coords.width }}
         >
           <ul
             id={listboxId}
@@ -368,7 +385,8 @@ export function Select({
               })
             )}
           </ul>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   )
