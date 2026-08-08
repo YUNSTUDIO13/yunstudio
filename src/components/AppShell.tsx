@@ -251,13 +251,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >
-          <div className="relative">
-            <span
-              className="absolute -left-2 top-7 inline-block h-4 w-4 rotate-45 rounded-tl border-l border-t border-line bg-surface"
-              aria-hidden
-            />
-            <MegaMenu primary={openPrimary} />
-          </div>
+          <MegaMenu primary={openPrimary} />
         </div>
       )}
 
