@@ -491,7 +491,7 @@ export function Modal({
       />
       {/* 内容：外层 flex 列、最高不超过视口、内层滚动 + footer 钉底（移动端长表单也能滚到底） */}
       <div
-        className={`animate-modal relative z-10 flex w-full ${maxWidth} max-h-[calc(100vh-2rem)] flex-col rounded-card glass-panel p-6`}
+        className={`animate-modal relative z-10 flex w-full ${maxWidth} max-h-[calc(100vh-2rem-5rem-env(safe-area-inset-bottom))] flex-col rounded-card glass-panel p-6 md:max-h-[calc(100vh-2rem)]`}
       >
         <div className="mb-4 flex flex-none items-center justify-between">
           <h2 className="text-base font-semibold text-ink-strong">{title}</h2>
