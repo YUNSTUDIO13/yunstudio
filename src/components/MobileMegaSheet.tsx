@@ -40,7 +40,8 @@ export default function MobileMegaSheet({
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" aria-hidden />
         {/* 标题行 */}
         <div className="mb-2 flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-ink-strong text-white">
+          {/* 标题行：primary icon 块走 accent 调（与 AppShell 桌面 dock / 移动底栏 active 态一致） */}
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-accent/20 text-accent ring-1 ring-accent/30">
             {renderIcon(primary.iconKey)}
           </span>
           <h3 className="text-base font-semibold text-ink-strong">{primary.title}</h3>
