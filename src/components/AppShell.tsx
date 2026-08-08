@@ -260,14 +260,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <MobileMegaSheet primary={openPrimary} onClose={() => setOpenPrimaryId(null)} />
       )}
 
-      {/* ===== 移动：底部 tab bar（拇指可达 + 安全区适配） ===== */}
+      {/* ===== 移动：底部 tab bar（悬浮岛：左/右/底 1rem 安全岛 + iOS 底安全区） ===== */}
       {isMobile && (
         <nav
           className="
-            fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-around
-            border-t border-white/10 glass-panel px-1 rounded-t-3xl
-            pb-[env(safe-area-inset-bottom)]
+            fixed left-4 right-4 z-50 flex items-stretch justify-around
+            glass-panel rounded-3xl px-1
           "
+          style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
         >
           <Link
             to="/"
