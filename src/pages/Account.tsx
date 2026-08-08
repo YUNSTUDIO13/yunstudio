@@ -193,7 +193,7 @@ export default function AccountPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-4">
       {/* 顶部标题 */}
-      <header className="rounded-2xl bg-surface p-5 shadow-card">
+      <header className="glass-card p-5">
         <h1 className="text-xl font-semibold text-ink-strong">个人主页</h1>
         <p className="mt-1 text-sm text-ink-soft">
           维护头像与个人资料，修改密码或退出登录。资料存于云端，多台电脑自动同步。
@@ -208,7 +208,7 @@ export default function AccountPage() {
             {error}
             <br />
             若提示表或字段不存在，请先在 Supabase SQL Editor 执行{' '}
-            <code className="rounded bg-surface px-1 py-0.5 text-xs">
+            <code className="rounded-md bg-surface px-1 py-0.5 text-xs">
               supabase/profile-avatar.sql
             </code>
             。
@@ -217,7 +217,7 @@ export default function AccountPage() {
       )}
 
       {/* 头像卡 */}
-      <section className="rounded-2xl bg-surface p-6 shadow-card">
+      <section className="glass-card p-6">
         <div className="flex items-center gap-5">
           <button
             type="button"
@@ -284,7 +284,7 @@ export default function AccountPage() {
       </section>
 
       {/* 资料编辑 */}
-      <section className="rounded-2xl bg-surface p-6 shadow-card">
+      <section className="glass-card p-6">
         <h2 className="mb-4 text-base font-semibold text-ink-strong">个人资料</h2>
 
         <Field label="昵称" error={nameError} hint="展示在头像旁，最多 24 字">
@@ -355,7 +355,7 @@ export default function AccountPage() {
       </section>
 
       {/* 修改密码 */}
-      <section className="rounded-2xl bg-surface p-6 shadow-card">
+      <section className="glass-card p-6">
         <h2 className="mb-1 text-base font-semibold text-ink-strong">修改密码</h2>
         <p className="mb-4 text-sm text-ink-soft">
           修改后当前会话仍然有效，其它设备需用新密码重新登录。
@@ -409,7 +409,7 @@ export default function AccountPage() {
       </section>
 
       {/* 账号信息（只读） */}
-      <section className="rounded-2xl bg-surface p-6 shadow-card">
+      <section className="glass-card p-6">
         <h2 className="mb-4 text-base font-semibold text-ink-strong">账号信息</h2>
 
         <Field label="邮箱地址">
@@ -458,7 +458,7 @@ export default function AccountPage() {
       </section>
 
       {/* 退出 */}
-      <section className="rounded-2xl bg-surface p-6 shadow-card">
+      <section className="glass-card p-6">
         <h2 className="mb-1 text-base font-semibold text-ink-strong">退出登录</h2>
         <p className="mb-4 text-sm text-ink-soft">
           退出后，本机的 Supabase 会话将被清空，下次需要重新登录。

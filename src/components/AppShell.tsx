@@ -271,7 +271,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <nav
           className="
             fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-around
-            border-t border-white/10 glass-panel px-1
+            border-t border-white/10 glass-panel px-1 rounded-t-3xl
             pb-[env(safe-area-inset-bottom)]
           "
         >

@@ -62,7 +62,7 @@ export default function NavConfigPage() {
   return (
     <div className="space-y-6">
       {/* 顶部：标题 + 重置默认 */}
-      <header className="flex items-start justify-between gap-4 rounded-2xl bg-surface p-5 shadow-card">
+      <header className="flex items-start justify-between gap-4 glass-card p-5">
         <div>
           <h1 className="text-xl font-semibold text-ink-strong">导航栏配置</h1>
           <p className="mt-1 text-sm text-ink-soft">
@@ -75,7 +75,7 @@ export default function NavConfigPage() {
       </header>
 
       {/* 一级 Tab 列表 */}
-      <section className="rounded-2xl bg-surface p-5 shadow-card">
+      <section className="glass-card p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink-strong">一级 Tab</h2>
           <Button
@@ -90,7 +90,7 @@ export default function NavConfigPage() {
           {sortedPrimaries.map((p, idx) => (
             <div
               key={p.id}
-              className="rounded-2xl border border-line bg-canvas/40 p-4"
+              className="glass-card p-4"
             >
               <div className="flex items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-surface text-ink-strong">
@@ -192,7 +192,7 @@ export default function NavConfigPage() {
       </section>
 
       {/* 高级：按一级 Tab 编辑三级模块归属（点二级列「编辑」并切到模块面板） */}
-      <section className="rounded-2xl bg-surface p-5 shadow-card">
+      <section className="glass-card p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink-strong">三级模块归属</h2>
           <div className="text-xs text-ink-mute">
