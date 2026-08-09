@@ -71,11 +71,12 @@ export default function Overview() {
 
   const reqTotal = requirements.length
   const reqLaunched = requirements.filter((r) => r.status === 'launched').length
-  // 已排期待上线（scheduled/developing/testing）—— 整体进度卡「待上线」指标
+  // 已排期待上线（scheduled/dev/test）—— 整体进度卡「待上线」指标
   const reqPendingLaunch = requirements.filter((r) =>
-    ['scheduled', 'developing', 'testing'].includes(r.status),
+    ['scheduled', 'dev', 'test'].includes(r.status),
   ).length
-  const reqReview = requirements.filter((r) => r.status === 'review').length
+  const reqInReview = requirements.filter((r) => r.status === 'review').length
+  const reqInDev = requirements.filter((r) => r.status === 'dev').length
   const reqActive = requirements.filter(
     (r) => !['launched', 'void', 'hold'].includes(r.status),
   ).length
@@ -91,7 +92,8 @@ export default function Overview() {
     [todos],
   )
 
-  // 缺陷：致命 / 严重（核心指标）—— BugSeverity 类型：critical/major/normal/minor
+  // 缺陷：有效中的缺陷数（业务可用 = 非已关闭）—— 大数字核心指标
+  const bugOpen = bugs.filter((b) => b.status !== 'closed').length
   const bugCritical = bugs.filter((b) => b.severity === 'critical' && b.status !== 'closed').length
   const bugSevere = bugs.filter((b) => b.severity === 'major' && b.status !== 'closed').length
 
@@ -129,9 +131,10 @@ export default function Overview() {
             case 'w_todo_ring':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
+          <Card style={{ height: '100%', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'flex-start' }}>
             <CardHeader
               title="今日完成"
+              style={{ marginBottom: 0 }}
               action={
                 isMobile ? null : (
                   <button
@@ -153,9 +156,9 @@ export default function Overview() {
                 )
               }
             />
-            <Display size={isMobile ? 38 : 44}>{doneTodos}</Display>
-            <Label>已完成</Label>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, flexWrap: 'nowrap' }}>
+            <Display size={36}>{doneTodos}</Display>
+            <Label>今日已完成</Label>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'nowrap' }}>
               <MetricPill label={`已完成 ${doneTodos}`} color={C.accent} bg={C.accentSoft} />
               <MetricPill label={`总完成度 ${todayPct}%`} color={C.green} bg="rgba(94,234,212,.09)" />
             </div>
@@ -223,12 +226,14 @@ export default function Overview() {
             case 'w_todo_progress':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
-            <CardHeader title="整体进度" />
+          <Card style={{ height: '100%', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'flex-start' }}>
+            <CardHeader title="整体进度" style={{ marginBottom: 0 }} />
             <div style={{ position: 'relative', height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'visible' }}>
               <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
             </div>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, flexWrap: 'nowrap' }}>
+            <Display size={36}>{reqPct}%</Display>
+            <Label>已完成率</Label>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'nowrap' }}>
               <MetricPill label={`已上线 ${reqLaunched}`} color={C.green} bg="rgba(94,234,212,.09)" />
               <MetricPill label={`待上线 ${reqPendingLaunch}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
@@ -238,13 +243,13 @@ export default function Overview() {
             case 'w_req_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
-            <CardHeader title="需求概览" icon={<IconFile />} />
-            <Display size={isMobile ? 38 : 44}>{reqReview}</Display>
-            <Label>待评审</Label>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, flexWrap: 'nowrap' }}>
-              <MetricPill label={`进行中 ${reqActive}`} color={C.green} bg="rgba(94,234,212,.09)" />
-              <MetricPill label={`待评审 ${reqReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
+          <Card style={{ height: '100%', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'flex-start' }}>
+            <CardHeader title="需求概览" icon={<IconFile />} style={{ marginBottom: 0 }} />
+            <Display size={36}>{reqActive}</Display>
+            <Label>有效需求</Label>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'nowrap' }}>
+              <MetricPill label={`待评审 ${reqInReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
+              <MetricPill label={`研发中 ${reqInDev}`} color={C.accent} bg={C.accentSoft} />
             </div>
           </Card>
                 </div>
@@ -278,11 +283,11 @@ export default function Overview() {
             case 'w_bug_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
-            <CardHeader title="缺陷概览" icon={<IconBell />} />
-            <Display size={isMobile ? 38 : 44}>{bugCritical}</Display>
-            <Label>致命</Label>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, flexWrap: 'nowrap' }}>
+          <Card style={{ height: '100%', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'flex-start' }}>
+            <CardHeader title="缺陷概览" icon={<IconBell />} style={{ marginBottom: 0 }} />
+            <Display size={36}>{bugOpen}</Display>
+            <Label>有效缺陷</Label>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'nowrap' }}>
               <MetricPill label={`致命 ${bugCritical}`} color={C.red} bg="rgba(248,113,113,.09)" />
               <MetricPill label={`严重 ${bugSevere}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>

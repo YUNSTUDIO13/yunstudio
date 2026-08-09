@@ -155,13 +155,15 @@ export function CardHeader({
   title,
   icon,
   action,
+  style,
 }: {
   title: string
   icon?: ReactNode
   action?: ReactNode
+  style?: CSSProperties
 }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, ...style }}>
       <span style={{ fontSize: 13, fontWeight: 500, color: C.textSub, letterSpacing: '.04em', textTransform: 'uppercase' }}>{title}</span>
       {icon && !action && <span style={{ color: C.textGhost }}>{icon}</span>}
       {action}
