@@ -246,7 +246,7 @@ export default function Todos() {
               ?
             </button>
             {helpOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-card border border-line bg-surface p-4 text-xs shadow-card-hover">
+              <div className="fixed left-4 right-4 top-20 z-50 mt-2 rounded-card border border-line bg-surface p-4 text-xs shadow-card-hover md:absolute md:right-0 md:left-auto md:top-full md:w-80">
                 <div className="mb-2 text-sm font-semibold text-ink-strong">
                   Score 评分说明
                 </div>
