@@ -96,7 +96,7 @@ export default function Overview() {
 
       {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片的"展示顺序"调序在此生效）；
           二维尺寸模型（手机 2 列 / 桌面 4 列，固定行高），按 config.sizes[id] 占 m×n 单元格。 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[168px] md:auto-rows-[200px]">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[192px] md:auto-rows-[200px]">
         {config.widgetIds.map((id) => {
           const size = config.sizes[id] ?? '1x1'
           switch (id) {
