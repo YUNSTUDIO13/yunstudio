@@ -455,15 +455,20 @@ export const OVERVIEW_CARD_IDS: string[] = [
  *   '1x1' 最小单元 · '2x1' 横向宽卡 · '1x2' 竖向高卡 · '2x2' 大卡
  * 渲染层用 SIZE_CLASS 映射到 grid 的 col-span / row-span（静态 class，避免 JIT 动态拼接丢类）。
  */
+/**
+ * 尺寸体系（PC 端按"宽×高"严格走 aspect-ratio 比例，1×1/2×2=正方形、2×1=2:1、1×2=自然撑高；
+ *   手机端 <768px 不加 md: 前缀，保留原 auto-rows-[168px] 横向卡片不变）。
+ * 渲染层映射到 grid 的 col-span / row-span + md: aspect-*（静态 class，避免 JIT 丢类）。
+ */
 export type WidgetSize = '1x1' | '2x1' | '1x2' | '2x2'
 
 export const SIZE_OPTIONS: WidgetSize[] = ['1x1', '2x1', '1x2', '2x2']
 
 export const SIZE_CLASS: Record<WidgetSize, string> = {
-  '1x1': 'col-span-1 row-span-1',
-  '2x1': 'col-span-2 row-span-1',
+  '1x1': 'col-span-1 row-span-1 md:aspect-square',
+  '2x1': 'col-span-2 row-span-1 md:aspect-[2/1]',
   '1x2': 'col-span-1 row-span-2',
-  '2x2': 'col-span-2 row-span-2',
+  '2x2': 'col-span-2 row-span-2 md:aspect-square',
 }
 
 /** 默认尺寸（从各 widget 的 defaultSize 派生；addWidget / reset 兜底用） */

@@ -122,9 +122,11 @@ export default function Overview() {
       </div>
 
       {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片的"展示顺序"调序在此生效）；
-          二维尺寸模型（手机 2 列 / 桌面 4 列，单元格严格按比例 aspect-ratio，
-          1×1/2×2 = 正方形、2×1 = 横卡、1×2 = 竖卡，真正 1:1）。 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[168px] md:auto-rows-[200px]">
+          二维尺寸模型（手机 2 列 / 桌面 4 列）。
+          · 手机：auto-rows-[168px]（高度不变，按用户要求不动手机端）
+          · PC：1×1/2×2 = 正方形（md:aspect-square）、2×1 = 2:1 横卡（md:aspect-[2/1]），
+                1×2 = 自然撑高（aspect 由内容决定）。严格按配置页"1×1=正方形"渲染。 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[168px] md:auto-rows-auto">
         {config.widgetIds.map((id) => {
           const size = config.sizes[id] ?? '1x1'
           switch (id) {
