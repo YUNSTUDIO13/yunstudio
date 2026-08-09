@@ -10,6 +10,14 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import type { Kpi, KpiInput } from '../types'
+import {
+  localAll,
+  localGet,
+  localPut,
+  localDelete,
+  type EntityTable,
+} from '../lib/localDb'
+import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 
 interface KpisContextValue {
   kpis: Kpi[]
@@ -23,7 +31,7 @@ interface KpisContextValue {
 
 const KpisContext = createContext<KpisContextValue | null>(null)
 
-const TABLE = 'kpis'
+const TABLE: EntityTable = 'kpis'
 
 export function KpisProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -39,19 +47,15 @@ export function KpisProvider({ children }: { children: ReactNode }) {
       return
     }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from(TABLE)
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    if (err) {
-      setError(err.message)
-      setKpis([])
-    } else {
-      setKpis((data as Kpi[]) ?? [])
-      setError(null)
-    }
+    setKpis(await localAll<Kpi>(TABLE, user.id))
     setLoading(false)
+    setError(null)
+    try {
+      await seedFromServer(TABLE, user.id)
+      setKpis(await localAll<Kpi>(TABLE, user.id))
+    } catch {
+      /* 离线：以本地为准 */
+    }
   }, [user])
 
   useEffect(() => {
@@ -70,17 +74,13 @@ export function KpisProvider({ children }: { children: ReactNode }) {
           table: TABLE,
           filter: `user_id=eq.${user.id}`,
         },
-        (payload: RealtimePostgresChangesPayload<Kpi>) => {
-          if (payload.eventType === 'INSERT') {
-            const row = payload.new as Kpi
-            setKpis((prev) => [row, ...prev.filter((x) => x.id !== row.id)])
-          } else if (payload.eventType === 'UPDATE') {
-            const row = payload.new as Kpi
-            setKpis((prev) => prev.map((x) => (x.id === row.id ? row : x)))
-          } else if (payload.eventType === 'DELETE') {
-            const old = payload.old as { id: string }
-            setKpis((prev) => prev.filter((x) => x.id !== old.id))
+        async (payload: RealtimePostgresChangesPayload<Kpi>) => {
+          if (payload.eventType === 'DELETE') {
+            await localDelete(TABLE, (payload.old as { id: string }).id)
+          } else {
+            await localPut(TABLE, payload.new as Kpi)
           }
+          setKpis(await localAll<Kpi>(TABLE, user.id))
         },
       )
       .subscribe()
@@ -89,10 +89,22 @@ export function KpisProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // 断网后恢复联网：重新从云端注水（拉取其它端数据）
+  useEffect(() => {
+    const onOnline = () => void load()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', onOnline)
+      return () => window.removeEventListener('online', onOnline)
+    }
+  }, [load])
+
   const addKpi = useCallback(
     async (input: KpiInput) => {
       if (!user) throw new Error('未登录')
-      const { error: err } = await supabase.from(TABLE).insert({
+      const id = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const row: Kpi = {
+        id,
         user_id: user.id,
         name: input.name.trim(),
         category: input.category,
@@ -101,41 +113,47 @@ export function KpisProvider({ children }: { children: ReactNode }) {
         target: input.target,
         trend: input.trend && input.trend.length ? input.trend : [input.value],
         lower_is_better: input.lower_is_better ?? false,
-      })
-      if (err) throw err
-      await load()
+        created_at: now,
+        updated_at: now,
+      }
+      await localPut(TABLE, row)
+      setKpis((prev) => [row, ...prev.filter((x) => x.id !== id)])
+      await enqueueAndMaybeFlush(TABLE, 'insert', id, row)
     },
-    [user, load],
+    [user],
   )
 
   const updateKpi = useCallback(
     async (id: string, patch: Partial<KpiInput>) => {
-      const { error: err } = await supabase
-        .from(TABLE)
-        .update({
-          ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
-          ...(patch.category !== undefined ? { category: patch.category } : {}),
-          ...(patch.value !== undefined ? { value: patch.value } : {}),
-          ...(patch.unit !== undefined ? { unit: patch.unit.trim() || '' } : {}),
-          ...(patch.target !== undefined ? { target: patch.target } : {}),
-          ...(patch.trend !== undefined
-            ? { trend: patch.trend && patch.trend.length ? patch.trend : [patch.value ?? 0] }
-            : {}),
-          ...(patch.lower_is_better !== undefined
-            ? { lower_is_better: patch.lower_is_better ?? false }
-            : {}),
-        })
-        .eq('id', id)
-      if (err) throw err
-      await load()
+      const current = await localGet<Kpi>(TABLE, id)
+      if (!current) return
+      const now = new Date().toISOString()
+      const row: Kpi = {
+        ...current,
+        ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+        ...(patch.category !== undefined ? { category: patch.category } : {}),
+        ...(patch.value !== undefined ? { value: patch.value } : {}),
+        ...(patch.unit !== undefined ? { unit: patch.unit.trim() || '' } : {}),
+        ...(patch.target !== undefined ? { target: patch.target } : {}),
+        ...(patch.trend !== undefined
+          ? { trend: patch.trend && patch.trend.length ? patch.trend : [patch.value ?? 0] }
+          : {}),
+        ...(patch.lower_is_better !== undefined
+          ? { lower_is_better: patch.lower_is_better ?? false }
+          : {}),
+        updated_at: now,
+      }
+      await localPut(TABLE, row)
+      setKpis((prev) => prev.map((x) => (x.id === id ? row : x)))
+      await enqueueAndMaybeFlush(TABLE, 'update', id, row)
     },
-    [load],
+    [],
   )
 
   const removeKpi = useCallback(async (id: string) => {
-    const { error: err } = await supabase.from(TABLE).delete().eq('id', id)
-    if (err) throw err
+    await localDelete(TABLE, id)
     setKpis((prev) => prev.filter((k) => k.id !== id))
+    await enqueueAndMaybeFlush(TABLE, 'delete', id)
   }, [])
 
   return (

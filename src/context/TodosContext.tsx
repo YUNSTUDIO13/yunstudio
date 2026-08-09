@@ -10,6 +10,14 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import type { Todo, TodoInput } from '../types'
+import {
+  localAll,
+  localGet,
+  localPut,
+  localDelete,
+  type EntityTable,
+} from '../lib/localDb'
+import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 
 interface TodosContextValue {
   todos: Todo[]
@@ -24,7 +32,7 @@ interface TodosContextValue {
 
 const TodosContext = createContext<TodosContextValue | null>(null)
 
-const TABLE = 'todos'
+const TABLE: EntityTable = 'todos'
 
 export function TodosProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -32,6 +40,7 @@ export function TodosProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // 本地优先：先读 Dexie（离线立即可用），联网时再把云端数据合并进本地。
   const load = useCallback(async () => {
     if (!user) {
       setTodos([])
@@ -40,26 +49,24 @@ export function TodosProvider({ children }: { children: ReactNode }) {
       return
     }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from(TABLE)
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    if (err) {
-      setError(err.message)
-      setTodos([])
-    } else {
-      setTodos((data as Todo[]) ?? [])
-      setError(null)
-    }
+    const local = await localAll<Todo>(TABLE, user.id)
+    setTodos(local)
     setLoading(false)
+    setError(null)
+    // 联网时把云端数据合并进本地（首次注水 / 多端同步）；失败（离线）忽略，以本地为准
+    try {
+      await seedFromServer(TABLE, user.id)
+      setTodos(await localAll<Todo>(TABLE, user.id))
+    } catch {
+      /* 离线或网络异常：本地数据已展示，无需报错 */
+    }
   }, [user])
 
   useEffect(() => {
     load()
   }, [load])
 
-  // Realtime：其它端改动后秒级刷新
+  // Realtime：其它端/云端改动 → 合并进本地 Dexie → 刷新视图。离线时本端改动不触发此通道。
   useEffect(() => {
     if (!user) return
     const channel = supabase
@@ -72,17 +79,13 @@ export function TodosProvider({ children }: { children: ReactNode }) {
           table: TABLE,
           filter: `user_id=eq.${user.id}`,
         },
-        (payload: RealtimePostgresChangesPayload<Todo>) => {
-          if (payload.eventType === 'INSERT') {
-            const row = payload.new as Todo
-            setTodos((prev) => [row, ...prev.filter((x) => x.id !== row.id)])
-          } else if (payload.eventType === 'UPDATE') {
-            const row = payload.new as Todo
-            setTodos((prev) => prev.map((x) => (x.id === row.id ? row : x)))
-          } else if (payload.eventType === 'DELETE') {
-            const old = payload.old as { id: string }
-            setTodos((prev) => prev.filter((x) => x.id !== old.id))
+        async (payload: RealtimePostgresChangesPayload<Todo>) => {
+          if (payload.eventType === 'DELETE') {
+            await localDelete(TABLE, (payload.old as { id: string }).id)
+          } else {
+            await localPut(TABLE, payload.new as Todo)
           }
+          setTodos(await localAll<Todo>(TABLE, user.id))
         },
       )
       .subscribe()
@@ -91,10 +94,22 @@ export function TodosProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // 断网后恢复联网：重新从云端注水（拉取其它端数据），与发件箱补传并行不冲突
+  useEffect(() => {
+    const onOnline = () => void load()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', onOnline)
+      return () => window.removeEventListener('online', onOnline)
+    }
+  }, [load])
+
   const addTodo = useCallback(
     async (input: TodoInput) => {
       if (!user) throw new Error('未登录')
-      const { error: err } = await supabase.from(TABLE).insert({
+      const id = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const row: Todo = {
+        id,
         user_id: user.id,
         title: input.title.trim(),
         source_url: input.source_url || null,
@@ -103,43 +118,60 @@ export function TodosProvider({ children }: { children: ReactNode }) {
         note: input.note || null,
         done: false,
         done_at: null,
-      })
-      if (err) throw err
-      await load()
+        created_at: now,
+        updated_at: now,
+      }
+      await localPut(TABLE, row) // 本地立即写入
+      setTodos((prev) => [row, ...prev.filter((x) => x.id !== id)]) // 乐观展示
+      await enqueueAndMaybeFlush(TABLE, 'insert', id, row) // 入发件箱，联网即补传
     },
-    [user, load],
+    [user],
   )
 
   const updateTodo = useCallback(
     async (id: string, patch: Partial<TodoInput>) => {
-      const { error: err } = await supabase
-        .from(TABLE)
-        .update({ ...patch })
-        .eq('id', id)
-      if (err) throw err
-      await load()
+      const current = await localGet<Todo>(TABLE, id)
+      if (!current) return
+      const now = new Date().toISOString()
+      const row: Todo = {
+        ...current,
+        ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
+        ...(patch.source_url !== undefined ? { source_url: patch.source_url || null } : {}),
+        ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
+        ...(patch.deadline_at !== undefined ? { deadline_at: patch.deadline_at || null } : {}),
+        ...(patch.note !== undefined ? { note: patch.note || null } : {}),
+        updated_at: now,
+      }
+      await localPut(TABLE, row)
+      setTodos((prev) => prev.map((x) => (x.id === id ? row : x)))
+      await enqueueAndMaybeFlush(TABLE, 'update', id, row)
     },
-    [load],
+    [],
   )
 
   const toggleDone = useCallback(
     async (id: string) => {
-      const current = todos.find((t) => t.id === id)
-      const next = !current?.done
-      const { error: err } = await supabase
-        .from(TABLE)
-        .update({ done: next, done_at: next ? new Date().toISOString() : null })
-        .eq('id', id)
-      if (err) throw err
-      await load()
+      const current = await localGet<Todo>(TABLE, id)
+      if (!current) return
+      const next = !current.done
+      const now = new Date().toISOString()
+      const row: Todo = {
+        ...current,
+        done: next,
+        done_at: next ? now : null,
+        updated_at: now,
+      }
+      await localPut(TABLE, row)
+      setTodos((prev) => prev.map((x) => (x.id === id ? row : x)))
+      await enqueueAndMaybeFlush(TABLE, 'update', id, row)
     },
-    [todos, load],
+    [],
   )
 
   const removeTodo = useCallback(async (id: string) => {
-    const { error: err } = await supabase.from(TABLE).delete().eq('id', id)
-    if (err) throw err
+    await localDelete(TABLE, id)
     setTodos((prev) => prev.filter((x) => x.id !== id))
+    await enqueueAndMaybeFlush(TABLE, 'delete', id)
   }, [])
 
   return (

@@ -10,6 +10,14 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import type { Sprint, SprintInput } from '../types'
+import {
+  localAll,
+  localGet,
+  localPut,
+  localDelete,
+  type EntityTable,
+} from '../lib/localDb'
+import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 
 interface SprintsContextValue {
   sprints: Sprint[]
@@ -23,7 +31,7 @@ interface SprintsContextValue {
 
 const SprintsContext = createContext<SprintsContextValue | null>(null)
 
-const TABLE = 'sprints'
+const TABLE: EntityTable = 'sprints'
 
 export function SprintsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -39,19 +47,15 @@ export function SprintsProvider({ children }: { children: ReactNode }) {
       return
     }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from(TABLE)
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    if (err) {
-      setError(err.message)
-      setSprints([])
-    } else {
-      setSprints((data as Sprint[]) ?? [])
-      setError(null)
-    }
+    setSprints(await localAll<Sprint>(TABLE, user.id))
     setLoading(false)
+    setError(null)
+    try {
+      await seedFromServer(TABLE, user.id)
+      setSprints(await localAll<Sprint>(TABLE, user.id))
+    } catch {
+      /* 离线：以本地为准 */
+    }
   }, [user])
 
   useEffect(() => {
@@ -70,17 +74,13 @@ export function SprintsProvider({ children }: { children: ReactNode }) {
           table: TABLE,
           filter: `user_id=eq.${user.id}`,
         },
-        (payload: RealtimePostgresChangesPayload<Sprint>) => {
-          if (payload.eventType === 'INSERT') {
-            const row = payload.new as Sprint
-            setSprints((prev) => [row, ...prev.filter((x) => x.id !== row.id)])
-          } else if (payload.eventType === 'UPDATE') {
-            const row = payload.new as Sprint
-            setSprints((prev) => prev.map((x) => (x.id === row.id ? row : x)))
-          } else if (payload.eventType === 'DELETE') {
-            const old = payload.old as { id: string }
-            setSprints((prev) => prev.filter((x) => x.id !== old.id))
+        async (payload: RealtimePostgresChangesPayload<Sprint>) => {
+          if (payload.eventType === 'DELETE') {
+            await localDelete(TABLE, (payload.old as { id: string }).id)
+          } else {
+            await localPut(TABLE, payload.new as Sprint)
           }
+          setSprints(await localAll<Sprint>(TABLE, user.id))
         },
       )
       .subscribe()
@@ -89,11 +89,23 @@ export function SprintsProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // 断网后恢复联网：重新从云端注水（拉取其它端数据）
+  useEffect(() => {
+    const onOnline = () => void load()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', onOnline)
+      return () => window.removeEventListener('online', onOnline)
+    }
+  }, [load])
+
   const addSprint = useCallback(
     async (input: SprintInput) => {
       if (!user) throw new Error('未登录')
+      const id = crypto.randomUUID()
+      const now = new Date().toISOString()
       const progress = Math.max(0, Math.min(100, input.progress))
-      const { error: err } = await supabase.from(TABLE).insert({
+      const row: Sprint = {
+        id,
         user_id: user.id,
         name: input.name.trim(),
         goal: input.goal.trim(),
@@ -102,38 +114,44 @@ export function SprintsProvider({ children }: { children: ReactNode }) {
         end_date: input.end_date || null,
         progress,
         burndown: [Math.max(1, Math.round(progress || 1))],
-      })
-      if (err) throw err
-      await load()
+        created_at: now,
+        updated_at: now,
+      }
+      await localPut(TABLE, row)
+      setSprints((prev) => [row, ...prev.filter((x) => x.id !== id)])
+      await enqueueAndMaybeFlush(TABLE, 'insert', id, row)
     },
-    [user, load],
+    [user],
   )
 
   const updateSprint = useCallback(
     async (id: string, patch: Partial<SprintInput>) => {
-      const { error: err } = await supabase
-        .from(TABLE)
-        .update({
-          ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
-          ...(patch.goal !== undefined ? { goal: patch.goal.trim() } : {}),
-          ...(patch.status !== undefined ? { status: patch.status } : {}),
-          ...(patch.start_date !== undefined ? { start_date: patch.start_date || null } : {}),
-          ...(patch.end_date !== undefined ? { end_date: patch.end_date || null } : {}),
-          ...(patch.progress != null
-            ? { progress: Math.max(0, Math.min(100, patch.progress)) }
-            : {}),
-        })
-        .eq('id', id)
-      if (err) throw err
-      await load()
+      const current = await localGet<Sprint>(TABLE, id)
+      if (!current) return
+      const now = new Date().toISOString()
+      const nextProgress =
+        patch.progress != null ? Math.max(0, Math.min(100, patch.progress)) : current.progress
+      const row: Sprint = {
+        ...current,
+        ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+        ...(patch.goal !== undefined ? { goal: patch.goal.trim() } : {}),
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.start_date !== undefined ? { start_date: patch.start_date || null } : {}),
+        ...(patch.end_date !== undefined ? { end_date: patch.end_date || null } : {}),
+        ...(patch.progress != null ? { progress: nextProgress } : {}),
+        updated_at: now,
+      }
+      await localPut(TABLE, row)
+      setSprints((prev) => prev.map((x) => (x.id === id ? row : x)))
+      await enqueueAndMaybeFlush(TABLE, 'update', id, row)
     },
-    [load],
+    [],
   )
 
   const removeSprint = useCallback(async (id: string) => {
-    const { error: err } = await supabase.from(TABLE).delete().eq('id', id)
-    if (err) throw err
+    await localDelete(TABLE, id)
     setSprints((prev) => prev.filter((s) => s.id !== id))
+    await enqueueAndMaybeFlush(TABLE, 'delete', id)
   }, [])
 
   return (

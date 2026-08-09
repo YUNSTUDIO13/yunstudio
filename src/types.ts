@@ -75,8 +75,8 @@ export interface Sprint {
   name: string
   goal: string // 迭代目标
   status: SprintStatus
-  start_date: string // ISO
-  end_date: string // ISO
+  start_date: string | null // ISO（规划阶段可无起止日期）
+  end_date: string | null // ISO
   progress: number // 完成百分比 0-100
   burndown: number[] // 剩余工作量序列（用于燃尽图）
   created_at: string

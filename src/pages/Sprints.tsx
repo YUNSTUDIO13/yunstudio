@@ -69,8 +69,8 @@ export default function Sprints() {
       name: s.name,
       goal: s.goal,
       status: s.status,
-      start_date: s.start_date,
-      end_date: s.end_date,
+      start_date: s.start_date ?? '',
+      end_date: s.end_date ?? '',
       progress: s.progress,
     })
     setNameError('')
@@ -232,7 +232,7 @@ export default function Sprints() {
               {/* 日期 + 进度 */}
               <div className="flex items-center justify-between text-xs text-ink-soft">
                 <span>
-                  {fmtDate(s.start_date)} → {fmtDate(s.end_date)}
+                  {fmtDate(s.start_date ?? undefined)} → {fmtDate(s.end_date ?? undefined)}
                 </span>
                 <span className="font-medium text-ink-strong">{s.progress}%</span>
               </div>

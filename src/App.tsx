@@ -9,6 +9,7 @@ import { KpisProvider } from './context/KpisContext'
 import { NewsProvider } from './context/NewsContext'
 import { NavProvider } from './context/NavContext'
 import { DashboardProvider } from './context/DashboardContext'
+import SyncEngine from './components/SyncEngine'
 import AuthGate from './components/AuthGate'
 import AppShell from './components/AppShell'
 import ModulePage from './pages/ModulePage'
@@ -17,6 +18,7 @@ import AccountPage from './pages/Account'
 export default function App() {
   return (
     <AuthProvider>
+      <SyncEngine />
       <ProfileProvider>
       <TodosProvider>
         <RequirementsProvider>

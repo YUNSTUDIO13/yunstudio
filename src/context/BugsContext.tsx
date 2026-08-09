@@ -10,6 +10,14 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import type { Bug, BugInput } from '../types'
+import {
+  localAll,
+  localGet,
+  localPut,
+  localDelete,
+  type EntityTable,
+} from '../lib/localDb'
+import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 
 interface BugsContextValue {
   bugs: Bug[]
@@ -24,7 +32,7 @@ interface BugsContextValue {
 
 const BugsContext = createContext<BugsContextValue | null>(null)
 
-const TABLE = 'bugs'
+const TABLE: EntityTable = 'bugs'
 
 export function BugsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -40,19 +48,15 @@ export function BugsProvider({ children }: { children: ReactNode }) {
       return
     }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from(TABLE)
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    if (err) {
-      setError(err.message)
-      setBugs([])
-    } else {
-      setBugs((data as Bug[]) ?? [])
-      setError(null)
-    }
+    setBugs(await localAll<Bug>(TABLE, user.id))
     setLoading(false)
+    setError(null)
+    try {
+      await seedFromServer(TABLE, user.id)
+      setBugs(await localAll<Bug>(TABLE, user.id))
+    } catch {
+      /* 离线：以本地为准 */
+    }
   }, [user])
 
   useEffect(() => {
@@ -71,17 +75,13 @@ export function BugsProvider({ children }: { children: ReactNode }) {
           table: TABLE,
           filter: `user_id=eq.${user.id}`,
         },
-        (payload: RealtimePostgresChangesPayload<Bug>) => {
-          if (payload.eventType === 'INSERT') {
-            const row = payload.new as Bug
-            setBugs((prev) => [row, ...prev.filter((x) => x.id !== row.id)])
-          } else if (payload.eventType === 'UPDATE') {
-            const row = payload.new as Bug
-            setBugs((prev) => prev.map((x) => (x.id === row.id ? row : x)))
-          } else if (payload.eventType === 'DELETE') {
-            const old = payload.old as { id: string }
-            setBugs((prev) => prev.filter((x) => x.id !== old.id))
+        async (payload: RealtimePostgresChangesPayload<Bug>) => {
+          if (payload.eventType === 'DELETE') {
+            await localDelete(TABLE, (payload.old as { id: string }).id)
+          } else {
+            await localPut(TABLE, payload.new as Bug)
           }
+          setBugs(await localAll<Bug>(TABLE, user.id))
         },
       )
       .subscribe()
@@ -90,10 +90,22 @@ export function BugsProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // 断网后恢复联网：重新从云端注水（拉取其它端数据）
+  useEffect(() => {
+    const onOnline = () => void load()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', onOnline)
+      return () => window.removeEventListener('online', onOnline)
+    }
+  }, [load])
+
   const addBug = useCallback(
     async (input: BugInput) => {
       if (!user) throw new Error('未登录')
-      const { error: err } = await supabase.from(TABLE).insert({
+      const id = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const row: Bug = {
+        id,
         user_id: user.id,
         title: input.title.trim(),
         severity: input.severity,
@@ -101,36 +113,42 @@ export function BugsProvider({ children }: { children: ReactNode }) {
         status: input.status,
         reporter: input.reporter?.trim() || null,
         source_url: input.source_url || null,
-      })
-      if (err) throw err
-      await load()
+        created_at: now,
+        updated_at: now,
+      }
+      await localPut(TABLE, row)
+      setBugs((prev) => [row, ...prev.filter((x) => x.id !== id)])
+      await enqueueAndMaybeFlush(TABLE, 'insert', id, row)
     },
-    [user, load],
+    [user],
   )
 
   const updateBug = useCallback(
     async (id: string, patch: Partial<BugInput>) => {
-      const { error: err } = await supabase
-        .from(TABLE)
-        .update({
-          ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
-          ...(patch.severity !== undefined ? { severity: patch.severity } : {}),
-          ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
-          ...(patch.status !== undefined ? { status: patch.status } : {}),
-          ...(patch.reporter !== undefined ? { reporter: patch.reporter?.trim() || null } : {}),
-          ...(patch.source_url !== undefined ? { source_url: patch.source_url || null } : {}),
-        })
-        .eq('id', id)
-      if (err) throw err
-      await load()
+      const current = await localGet<Bug>(TABLE, id)
+      if (!current) return
+      const now = new Date().toISOString()
+      const row: Bug = {
+        ...current,
+        ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
+        ...(patch.severity !== undefined ? { severity: patch.severity } : {}),
+        ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.reporter !== undefined ? { reporter: patch.reporter?.trim() || null } : {}),
+        ...(patch.source_url !== undefined ? { source_url: patch.source_url || null } : {}),
+        updated_at: now,
+      }
+      await localPut(TABLE, row)
+      setBugs((prev) => prev.map((x) => (x.id === id ? row : x)))
+      await enqueueAndMaybeFlush(TABLE, 'update', id, row)
     },
-    [load],
+    [],
   )
 
   const removeBug = useCallback(async (id: string) => {
-    const { error: err } = await supabase.from(TABLE).delete().eq('id', id)
-    if (err) throw err
+    await localDelete(TABLE, id)
     setBugs((prev) => prev.filter((b) => b.id !== id))
+    await enqueueAndMaybeFlush(TABLE, 'delete', id)
   }, [])
 
   // 拖拽排序：当前会话内的内存重排（无持久化列；刷新后回 created_at 顺序）。
