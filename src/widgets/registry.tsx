@@ -465,10 +465,10 @@ export type WidgetSize = '1x1' | '2x1' | '1x2' | '2x2'
 export const SIZE_OPTIONS: WidgetSize[] = ['1x1', '2x1', '1x2', '2x2']
 
 export const SIZE_CLASS: Record<WidgetSize, string> = {
-  '1x1': 'col-span-1 row-span-1 md:aspect-square',
-  '2x1': 'col-span-2 row-span-1 md:aspect-[2/1]',
-  '1x2': 'col-span-1 row-span-2',
-  '2x2': 'col-span-2 row-span-2 md:aspect-square',
+  '1x1': 'col-span-1 row-span-1 aspect-square',
+  '2x1': 'col-span-2 row-span-1 aspect-[2/1]',
+  '1x2': 'col-span-1 row-span-2 aspect-[1/2]',
+  '2x2': 'col-span-2 row-span-2 aspect-square',
 }
 
 /** 默认尺寸（从各 widget 的 defaultSize 派生；addWidget / reset 兜底用） */

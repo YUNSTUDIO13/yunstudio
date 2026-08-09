@@ -122,18 +122,18 @@ export default function Overview() {
       </div>
 
       {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片的"展示顺序"调序在此生效）；
-          二维尺寸模型（手机 2 列 / 桌面 4 列）。
-          · 手机：auto-rows-[168px]（高度不变，按用户要求不动手机端）
-          · PC：1×1/2×2 = 正方形（md:aspect-square）、2×1 = 2:1 横卡（md:aspect-[2/1]），
-                1×2 = 自然撑高（aspect 由内容决定）。严格按配置页"1×1=正方形"渲染。 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[168px] md:auto-rows-auto">
+          二维尺寸模型（手机 2 列 / 桌面 8 列，等比缩小一倍）。
+          · 手机 & PC 双端均加 aspect-square：1×1/2×2 真正正方形、2×1 真正 2:1（用户要求手机也是正方形）
+          · PC 改 4 列 → 8 列：每个单元格宽减半（≈266→125），1×1 正方形由 266² 缩到 125²，等比缩小一倍
+          · 行高由 aspect-ratio 决定（去掉 auto-rows 固定值），避免横长方形违反"1×1=正方形" */}
+      <div className="grid grid-cols-2 md:grid-cols-8 gap-3 md:gap-3 auto-rows-auto">
         {config.widgetIds.map((id) => {
           const size = config.sizes[id] ?? '1x1'
           switch (id) {
             case 'w_todo_ring':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
+          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
             <CardHeader
               title="今日完成"
               style={{ marginBottom: 0 }}
@@ -158,7 +158,7 @@ export default function Overview() {
                 )
               }
             />
-            <Display size={isMobile ? 32 : 40}>{doneTodos}</Display>
+            <Display size={isMobile ? 32 : 28}>{doneTodos}</Display>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
               <MetricPill label={`已完成 ${doneTodos}`} color={C.accent} bg={C.accentSoft} />
               <MetricPill label={`总完成度 ${todayPct}%`} color={C.green} bg="rgba(94,234,212,.09)" />
@@ -227,10 +227,10 @@ export default function Overview() {
             case 'w_todo_progress':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
+          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
             <CardHeader title="整体进度" style={{ marginBottom: 0 }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <Display size={isMobile ? 32 : 40}>{reqPct}%</Display>
+              <Display size={isMobile ? 32 : 28}>{reqPct}%</Display>
               <div style={{ flex: 1, position: 'relative', height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'visible' }}>
                 <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
               </div>
@@ -245,9 +245,9 @@ export default function Overview() {
             case 'w_req_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
+          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
             <CardHeader title="需求概览" icon={<IconFile />} style={{ marginBottom: 0 }} />
-            <Display size={isMobile ? 32 : 40}>{reqActive}</Display>
+            <Display size={isMobile ? 32 : 28}>{reqActive}</Display>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
               <MetricPill label={`待评审 ${reqInReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
               <MetricPill label={`研发中 ${reqInDev}`} color={C.accent} bg={C.accentSoft} />
@@ -258,7 +258,7 @@ export default function Overview() {
             case 'w_sprint_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column' }}>
             <CardHeader title="迭代概览" icon={<IconClock />} />
             {activeSprint ? (
               <>
@@ -284,9 +284,9 @@ export default function Overview() {
             case 'w_bug_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
+          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
             <CardHeader title="缺陷概览" icon={<IconBell />} style={{ marginBottom: 0 }} />
-            <Display size={isMobile ? 32 : 40}>{bugOpen}</Display>
+            <Display size={isMobile ? 32 : 28}>{bugOpen}</Display>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
               <MetricPill label={`致命 ${bugCritical}`} color={C.red} bg="rgba(248,113,113,.09)" />
               <MetricPill label={`严重 ${bugSevere}`} color={C.amber} bg="rgba(251,191,36,.09)" />
