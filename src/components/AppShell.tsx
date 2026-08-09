@@ -169,6 +169,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const sortedPrimaries = [...config.primaries].sort((a, b) => a.order - b.order)
   const openPrimary = sortedPrimaries.find((p) => p.id === openPrimaryId) ?? null
 
+  // 手机 dock 图标自适应档位：总元素数（含 Logo/齿轮/头像）越多 → 图标越小
+  // 一级模块少时撑大避免「图标分开太多」；多时收紧避免拥挤；PC 不变（hidden md:flex）
+  const mobileTotalSlots = sortedPrimaries.length + 3 // Logo + primaries + gear + avatar
+  const iconSizeCls =
+    mobileTotalSlots <= 3 ? 'h-12 w-12'
+    : mobileTotalSlots <= 5 ? 'h-10 w-10'
+    : mobileTotalSlots <= 7 ? 'h-9 w-9'
+    : 'h-8 w-8'
+
   return (
     <div className="relative min-h-screen bg-canvas text-ink-strong">
       <AuroraBackground />
@@ -260,11 +269,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <MobileMegaSheet primary={openPrimary} onClose={() => setOpenPrimaryId(null)} />
       )}
 
-      {/* ===== 移动：底部 tab bar（悬浮岛：左/右/底 1rem 安全岛 + iOS 底安全区） ===== */}
+      {/* ===== 移动：底部 tab bar（悬浮岛：左/右/底 1rem 安全岛 + iOS 底安全区） =====
+          自适应：所有 5+N 个元素均分宽度（flex-1），图标 wrapper 按总元素数分档
+          （少 → 撑大、多 → 收紧）。PC 端 hidden md:flex 不受此逻辑影响。 */}
       {isMobile && (
         <nav
           className="
-            fixed left-4 right-4 z-50 flex items-stretch justify-around
+            fixed left-4 right-4 z-50 flex items-stretch
             glass-panel rounded-3xl px-1
           "
           style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
@@ -274,14 +285,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
             title="主页"
             aria-label="主页"
             className="
-              flex h-14 w-12 items-center justify-center
-              overflow-hidden rounded-full transition active:scale-95
+              flex h-14 flex-1 items-center justify-center
+              overflow-hidden transition active:scale-95
             "
           >
             <img
               src={logoUrl}
               alt="YUN STUDIO"
-              className="h-9 w-9 rounded-full object-cover"
+              className={`${iconSizeCls} rounded-full object-cover`}
             />
           </Link>
 
@@ -298,9 +309,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 className="flex h-14 flex-1 flex-col items-center justify-center"
               >
                 <span
-                className={`grid h-9 w-9 place-items-center rounded-2xl transition ${
-                  active ? 'bg-accent/20 text-accent' : 'text-ink-soft'
-                }`}
+                  className={`grid ${iconSizeCls} place-items-center rounded-2xl transition ${
+                    active ? 'bg-accent/20 text-accent' : 'text-ink-soft'
+                  }`}
                 >
                   {renderIcon(p.iconKey)}
                 </span>
@@ -312,17 +323,21 @@ export default function AppShell({ children }: { children: ReactNode }) {
             to="/modules/nav-config"
             title="导航设置"
             aria-label="导航设置"
-            className="grid h-14 w-12 place-items-center text-ink-soft"
+            className="flex h-14 flex-1 flex-col items-center justify-center text-ink-soft"
           >
-            {renderIcon('gear')}
+            <span className={`grid ${iconSizeCls} place-items-center`}>
+              {renderIcon('gear')}
+            </span>
           </Link>
           <Link
             to="/account"
             title={`个人主页（${profile?.display_name || user?.email || ''}）`}
             aria-label="个人主页"
-            className="grid h-14 w-12 place-items-center"
+            className="flex h-14 flex-1 flex-col items-center justify-center"
           >
-            <span className="block h-9 w-9 overflow-hidden rounded-full border border-line">
+            <span
+              className={`${iconSizeCls} flex items-center justify-center overflow-hidden rounded-full border border-line`}
+            >
               <Avatar
                 url={profile?.avatar_url}
                 seed={user?.email}
