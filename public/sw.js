@@ -8,7 +8,7 @@
  *  - VERSION 由构建脚本注入（每次部署唯一，取 git short SHA），
  *    activate 时清空「所有」旧缓存，保证更新必生效、旧壳不再焊死客户端
  */
-const VERSION = 'yunstudio-b90d7b9';
+const VERSION = 'yunstudio-2dec765';
 const APP_SHELL = [
   './',
   './index.html',
