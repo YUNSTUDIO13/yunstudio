@@ -19,9 +19,7 @@ import {
   Display,
   Badge,
   Label,
-  Divider,
   PulseDot,
-  RingChart,
   IconFile,
   IconBell,
   IconClock,
@@ -49,10 +47,14 @@ export default function Overview() {
 
   const reqTotal = requirements.length
   const reqLaunched = requirements.filter((r) => r.status === 'launched').length
+  // 已排期待上线（scheduled/developing/testing）—— 整体进度卡「待上线」指标
+  const reqPendingLaunch = requirements.filter((r) =>
+    ['scheduled', 'developing', 'testing'].includes(r.status),
+  ).length
+  const reqReview = requirements.filter((r) => r.status === 'review').length
   const reqActive = requirements.filter(
     (r) => !['launched', 'void', 'hold'].includes(r.status),
   ).length
-  const reqReview = requirements.filter((r) => r.status === 'review').length
   const reqPct = reqTotal ? Math.round((reqLaunched / reqTotal) * 100) : 0
 
   // 待办 Top 4（按 Score 倒序、未完成优先）
@@ -65,10 +67,9 @@ export default function Overview() {
     [todos],
   )
 
-  // 缺陷：未关闭 / 致命 / 已关闭
-  const bugOpen = bugs.filter((b) => b.status !== 'closed').length
+  // 缺陷：致命 / 严重（核心指标）—— BugSeverity 类型：critical/major/normal/minor
   const bugCritical = bugs.filter((b) => b.severity === 'critical' && b.status !== 'closed').length
-  const bugFixed = bugs.filter((b) => b.status === 'closed').length
+  const bugSevere = bugs.filter((b) => b.severity === 'major' && b.status !== 'closed').length
 
   // 当前迭代：状态 active 的优先，其次第一条
   const activeSprint = useMemo(
@@ -104,55 +105,36 @@ export default function Overview() {
             case 'w_todo_ring':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <Card style={{ height: '100%', padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
             <CardHeader
               title="今日完成"
-          action={
-            isMobile ? undefined : (
-              <button
-                onClick={() => navigate('/modules/todos')}
-                style={{
-                  ...glass.pill,
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: C.accent,
-                  borderRadius: 7,
-                  padding: '4px 11px',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  letterSpacing: '.02em',
-                }}
-              >
-                查看今日
-              </button>
-            )
-          }
+              action={
+                isMobile ? null : (
+                  <button
+                    onClick={() => navigate('/modules/todos')}
+                    style={{
+                      ...glass.pill,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: C.accent,
+                      borderRadius: 7,
+                      padding: '4px 11px',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      letterSpacing: '.02em',
+                    }}
+                  >
+                    查看今日
+                  </button>
+                )
+              }
             />
-            {isMobile ? (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <RingChart pct={todayPct} goal={8} size={64} />
-                <div style={{ fontSize: 11, color: C.textGhost, textAlign: 'center', letterSpacing: '.04em' }}>
-                  已完成 <strong style={{ color: C.textPrimary }}>{doneTodos}</strong> · 总完成度 <strong style={{ color: C.textPrimary }}>{todayPct}%</strong>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginTop: 4 }}>
-                <RingChart pct={todayPct} goal={8} size={136} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <Display size={48}>{doneTodos}</Display>
-                    <div style={{ marginTop: 3 }}>
-                      <Label>已完成</Label>
-                    </div>
-                  </div>
-                  <Divider />
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    <Display size={32}>{todayPct}%</Display>
-                    <Label>总完成度</Label>
-                  </div>
-                </div>
-              </div>
-            )}
+            <Display size={isMobile ? 38 : 44}>{doneTodos}</Display>
+            <Label>已完成</Label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+              <Badge label={`已完成 ${doneTodos}`} color={C.accent} bg={C.accentSoft} />
+              <Badge label={`总完成度 ${todayPct}%`} color={C.green} bg="rgba(94,234,212,.09)" />
+            </div>
           </Card>
                 </div>
               )
@@ -217,23 +199,14 @@ export default function Overview() {
             case 'w_todo_progress':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <Card style={{ height: '100%', padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
             <CardHeader title="整体进度" />
-            <div style={{ marginBottom: isMobile ? 10 : 18 }}>
-              <Display size={isMobile ? 34 : 40}>{reqPct}%</Display>
-              <div style={{ marginTop: 2 }}>
-                <Label>Completed</Label>
-              </div>
-            </div>
-            <div style={{ position: 'relative', height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginBottom: isMobile ? 10 : 14, overflow: 'visible' }}>
+            <div style={{ position: 'relative', height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'visible' }}>
               <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ ...glass.pill, borderRadius: 6, padding: '2px 8px', fontSize: 11.5, color: C.accent, fontWeight: 600 }}>{reqLaunched}/{reqTotal}</span>
-                <Label>已上线</Label>
-              </div>
-              <Label>{reqActive} 个进行中</Label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+              <Badge label={`已上线 ${reqLaunched}`} color={C.green} bg="rgba(94,234,212,.09)" />
+              <Badge label={`待上线 ${reqPendingLaunch}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
           </Card>
                 </div>
@@ -241,13 +214,11 @@ export default function Overview() {
             case 'w_req_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <Card style={{ height: '100%', padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
             <CardHeader title="需求概览" icon={<IconFile />} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: isMobile ? 12 : 16 }}>
-              <Display size={isMobile ? 34 : 40}>{reqTotal}</Display>
-              <Label>条需求</Label>
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Display size={isMobile ? 38 : 44}>{reqReview}</Display>
+            <Label>待评审</Label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
               <Badge label={`进行中 ${reqActive}`} color={C.green} bg="rgba(94,234,212,.09)" />
               <Badge label={`待评审 ${reqReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
@@ -283,15 +254,13 @@ export default function Overview() {
             case 'w_bug_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <Card style={{ height: '100%', padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
             <CardHeader title="缺陷概览" icon={<IconBell />} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: isMobile ? 12 : 16 }}>
-              <Display size={isMobile ? 34 : 40}>{bugOpen}</Display>
-              <Label>个未关闭</Label>
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Display size={isMobile ? 38 : 44}>{bugCritical}</Display>
+            <Label>致命</Label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
               <Badge label={`致命 ${bugCritical}`} color={C.red} bg="rgba(248,113,113,.09)" />
-              <Badge label={`已关闭 ${bugFixed}`} color="rgba(255,255,255,0.22)" bg="rgba(255,255,255,0.04)" />
+              <Badge label={`严重 ${bugSevere}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
           </Card>
                 </div>
