@@ -95,58 +95,70 @@ export default function Overview() {
       </div>
 
       {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片的"展示顺序"调序在此生效）；
-          二维尺寸模型（手机 2 列 / 桌面 4 列，固定行高），按 config.sizes[id] 占 m×n 单元格。 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[216px] md:auto-rows-[200px]">
+          二维尺寸模型（手机 2 列 / 桌面 4 列，单元格严格按比例 aspect-ratio，
+          1×1/2×2 = 正方形、2×1 = 横卡、1×2 = 竖卡，真正 1:1）。 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {config.widgetIds.map((id) => {
           const size = config.sizes[id] ?? '1x1'
           switch (id) {
             case 'w_todo_ring':
               return (
-                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
-          <Card style={{ height: '100%' }}>
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
+          <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <CardHeader
               title="今日完成"
-              action={
-                <button
-                  onClick={() => navigate('/modules/todos')}
-                  style={{
-                    ...glass.pill,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: C.accent,
-                    borderRadius: 7,
-                    padding: '4px 11px',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    letterSpacing: '.02em',
-                  }}
-                >
-                  查看今日
-                </button>
-              }
+          action={
+            isMobile ? undefined : (
+              <button
+                onClick={() => navigate('/modules/todos')}
+                style={{
+                  ...glass.pill,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: C.accent,
+                  borderRadius: 7,
+                  padding: '4px 11px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  letterSpacing: '.02em',
+                }}
+              >
+                查看今日
+              </button>
+            )
+          }
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 32, marginTop: 4 }}>
-              <RingChart pct={todayPct} goal={8} size={isMobile ? 96 : 136} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 14 }}>
-                <div>
-                  <Display size={isMobile ? 32 : 48}>{doneTodos}</Display>
-                  <div style={{ marginTop: 3 }}>
-                    <Label>已完成</Label>
-                  </div>
-                </div>
-                {isMobile ? null : <Divider />}
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <Display size={isMobile ? 22 : 32}>{todayPct}%</Display>
-                  <Label>总完成度</Label>
+            {isMobile ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <RingChart pct={todayPct} goal={8} size={64} />
+                <div style={{ fontSize: 11, color: C.textGhost, textAlign: 'center', letterSpacing: '.04em' }}>
+                  已完成 <strong style={{ color: C.textPrimary }}>{doneTodos}</strong> · 总完成度 <strong style={{ color: C.textPrimary }}>{todayPct}%</strong>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginTop: 4 }}>
+                <RingChart pct={todayPct} goal={8} size={136} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <Display size={48}>{doneTodos}</Display>
+                    <div style={{ marginTop: 3 }}>
+                      <Label>已完成</Label>
+                    </div>
+                  </div>
+                  <Divider />
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <Display size={32}>{todayPct}%</Display>
+                    <Label>总完成度</Label>
+                  </div>
+                </div>
+              </div>
+            )}
           </Card>
                 </div>
               )
             case 'w_todo_stream':
               return (
-                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
           <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <CardHeader title="待办" icon={<PulseDot color="rgba(255,255,255,0.2)" />} />
             {topTodos.length === 0 ? (
@@ -204,8 +216,8 @@ export default function Overview() {
               )
             case 'w_todo_progress':
               return (
-                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
-          <Card style={{ height: '100%' }}>
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
+          <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <CardHeader title="整体进度" />
             <div style={{ marginBottom: isMobile ? 10 : 18 }}>
               <Display size={isMobile ? 34 : 40}>{reqPct}%</Display>
@@ -228,11 +240,11 @@ export default function Overview() {
               )
             case 'w_req_summary':
               return (
-                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
-          <Card style={{ height: '100%' }}>
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
+          <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <CardHeader title="需求概览" icon={<IconFile />} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-              <Display size={40}>{reqTotal}</Display>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: isMobile ? 12 : 16 }}>
+              <Display size={isMobile ? 34 : 40}>{reqTotal}</Display>
               <Label>条需求</Label>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -244,7 +256,7 @@ export default function Overview() {
               )
             case 'w_sprint_summary':
               return (
-                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
           <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <CardHeader title="迭代概览" icon={<IconClock />} />
             {activeSprint ? (
@@ -270,11 +282,11 @@ export default function Overview() {
               )
             case 'w_bug_summary':
               return (
-                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
-          <Card style={{ height: '100%' }}>
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
+          <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <CardHeader title="缺陷概览" icon={<IconBell />} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-              <Display size={40}>{bugOpen}</Display>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: isMobile ? 12 : 16 }}>
+              <Display size={isMobile ? 34 : 40}>{bugOpen}</Display>
               <Label>个未关闭</Label>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -286,7 +298,7 @@ export default function Overview() {
               )
             case 'w_kpi_summary':
               return (
-                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
           <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <CardHeader title="指标概览" icon={<IconChart />} />
             {topKpi ? (

@@ -34,26 +34,23 @@ export function Display({
 
 // ── ring chart ─────────────────────────────────────────────────────────────
 export function RingChart({ pct, goal, size = 136 }: { pct: number; goal: number; size?: number }) {
-  const r = 50
+  const stroke = Math.max(3, Math.round(size * 0.05))
+  const r = size / 2 - stroke - 2
   const circ = 2 * Math.PI * r
   const dash = (pct / 100) * circ
-  // 手机版专用尺寸（96）：保持视觉完整 + 适配 1×1 网格内可用 ≈140px
-  const innerSize = size
-  const centerOffset = innerSize / 2
-  const trackStroke = innerSize <= 100 ? 5 : 7
-  const centerFontSize = innerSize <= 100 ? 8 : 9.5
-  const centerNumberSize = innerSize <= 100 ? 22 : 30
+  const numSize = Math.max(14, Math.round(size * 0.22))
+  const goalSize = Math.max(7, Math.round(size * 0.07))
 
   return (
-    <div style={{ position: 'relative', width: innerSize, height: innerSize, flexShrink: 0 }}>
-      <svg width={innerSize} height={innerSize} viewBox={`0 0 ${innerSize} ${innerSize}`} style={{ transform: 'rotate(-90deg)', position: 'absolute', inset: 0 }}>
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', position: 'absolute', inset: 0 }}>
         <defs>
           <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#818cf8" />
             <stop offset="100%" stopColor="#c084fc" />
           </linearGradient>
           <filter id="glow">
-            <feGaussianBlur stdDeviation={innerSize <= 100 ? 1.6 : 2.5} result="blur" />
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -61,16 +58,16 @@ export function RingChart({ pct, goal, size = 136 }: { pct: number; goal: number
           </filter>
         </defs>
         {/* track */}
-        <circle cx={centerOffset} cy={centerOffset} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={trackStroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={stroke} />
         {/* progress */}
         {dash > 0 && (
           <circle
-            cx={centerOffset}
-            cy={centerOffset}
+            cx={size / 2}
+            cy={size / 2}
             r={r}
             fill="none"
             stroke="url(#rg)"
-            strokeWidth={trackStroke}
+            strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={`${dash} ${circ}`}
             filter="url(#glow)"
@@ -87,10 +84,10 @@ export function RingChart({ pct, goal, size = 136 }: { pct: number; goal: number
           justifyContent: 'center',
         }}
       >
-        <span style={{ fontSize: centerFontSize, color: C.textGhost, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 500, marginBottom: 2 }}>
+        <span style={{ fontSize: goalSize, color: C.textGhost, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 500, marginBottom: 2 }}>
           GOAL
         </span>
-        <Display size={centerNumberSize} color={C.textPrimary}>
+        <Display size={numSize} color={C.textPrimary}>
           {goal}
         </Display>
       </div>
