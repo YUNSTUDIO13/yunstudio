@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Modal, Button } from './ui'
 import { renderIcon } from '../lib/icon-library'
 import { useDashboard } from '../context/DashboardContext'
-import { WIDGET_LIST, OVERVIEW_CARD_IDS, type WidgetCategory, type WidgetDef } from '../widgets/registry'
+import { WIDGET_LIST, OVERVIEW_CARD_IDS, SIZE_OPTIONS, type WidgetCategory, type WidgetDef } from '../widgets/registry'
 
 const CATEGORY_ORDER: WidgetCategory[] = ['待办', '模块概览', '规划', '协作']
 
@@ -97,9 +97,27 @@ export default function DashboardConfig({ open, onClose }: { open: boolean; onCl
               const w = WIDGET_LIST.find((x) => x.id === id)
               if (!w) return null
               return (
-                <li key={id} className="flex items-center gap-2 rounded-lg bg-brand-soft px-3 py-2">
+                <li key={id} className="flex flex-wrap items-center gap-2 rounded-lg bg-brand-soft px-3 py-2">
                   <span className="w-5 text-center text-xs font-semibold text-ink-mute">{i + 1}</span>
                   <span className="flex-1 truncate text-sm text-ink-strong">{w.title}</span>
+                  {/* 尺寸选择器：1×1 / 2×1 / 1×2 / 2×2，点击即改并持久化 */}
+                  <div className="flex items-center gap-1">
+                    {SIZE_OPTIONS.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => actions.setWidgetSize(id, s)}
+                        className={`h-6 rounded px-1.5 text-[11px] font-medium transition ${
+                          (config.sizes[id] ?? '1x1') === s
+                            ? 'bg-accent text-white'
+                            : 'border border-line bg-surface text-ink-soft hover:text-ink-strong'
+                        }`}
+                        title={`尺寸 ${s}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"

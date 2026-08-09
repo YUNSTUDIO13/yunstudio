@@ -10,7 +10,7 @@ import { useTodos } from '../context/TodosContext'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { useDashboard } from '../context/DashboardContext'
 import DashboardConfig from '../components/DashboardConfig'
-import { SPAN_CLASS } from '../widgets/registry'
+import { SIZE_CLASS } from '../widgets/registry'
 import { C, glass } from '../design/tokens'
 import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
 import {
@@ -94,15 +94,16 @@ export default function Overview() {
         </div>
       </div>
 
-      {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片里的"展示顺序"调序即在此生效）；
-          隐藏任意卡片自动不留空洞。span 维持原视觉比例 5/7 · 4/4/4 · 6/6 */}
-      <div className="grid grid-cols-12 gap-3 md:gap-4">
+      {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片的"展示顺序"调序在此生效）；
+          二维尺寸模型（手机 2 列 / 桌面 4 列，固定行高），按 config.sizes[id] 占 m×n 单元格。 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[168px] md:auto-rows-[200px]">
         {config.widgetIds.map((id) => {
+          const size = config.sizes[id] ?? '1x1'
           switch (id) {
             case 'w_todo_ring':
               return (
-                <div key={id} className={SPAN_CLASS[5]}>
-          <Card>
+                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+          <Card style={{ height: '100%' }}>
             <CardHeader
               title="今日完成"
               action={
@@ -145,15 +146,15 @@ export default function Overview() {
               )
             case 'w_todo_stream':
               return (
-                <div key={id} className={SPAN_CLASS[7]}>
-          <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <CardHeader title="待办" icon={<PulseDot color="rgba(255,255,255,0.2)" />} />
             {topTodos.length === 0 ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
                 <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无活跃待办</span>
               </div>
             ) : (
-              <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+              <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4, flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 {topTodos.map((t) => {
                   const h = hoursToDeadline(t.deadline_at)
                   const risk = riskLevel(t)
@@ -203,8 +204,8 @@ export default function Overview() {
               )
             case 'w_todo_progress':
               return (
-                <div key={id} className={SPAN_CLASS[4]}>
-          <Card>
+                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+          <Card style={{ height: '100%' }}>
             <CardHeader title="整体进度" />
             <div style={{ marginBottom: 18 }}>
               <Display size={40}>{reqPct}%</Display>
@@ -227,8 +228,8 @@ export default function Overview() {
               )
             case 'w_req_summary':
               return (
-                <div key={id} className={SPAN_CLASS[4]}>
-          <Card>
+                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+          <Card style={{ height: '100%' }}>
             <CardHeader title="需求概览" icon={<IconFile />} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
               <Display size={40}>{reqTotal}</Display>
@@ -243,8 +244,8 @@ export default function Overview() {
               )
             case 'w_sprint_summary':
               return (
-                <div key={id} className={SPAN_CLASS[4]}>
-          <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <CardHeader title="迭代概览" icon={<IconClock />} />
             {activeSprint ? (
               <>
@@ -269,8 +270,8 @@ export default function Overview() {
               )
             case 'w_bug_summary':
               return (
-                <div key={id} className={SPAN_CLASS[6]}>
-          <Card>
+                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+          <Card style={{ height: '100%' }}>
             <CardHeader title="缺陷概览" icon={<IconBell />} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
               <Display size={40}>{bugOpen}</Display>
@@ -285,8 +286,8 @@ export default function Overview() {
               )
             case 'w_kpi_summary':
               return (
-                <div key={id} className={SPAN_CLASS[6]}>
-          <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
+          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <CardHeader title="指标概览" icon={<IconChart />} />
             {topKpi ? (
               <>

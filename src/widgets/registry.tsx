@@ -24,8 +24,10 @@ export interface WidgetMeta {
   developed: boolean
   /** 已开发卡片点击跳转的模块路由 */
   route?: string
-  /** 12 栅格列宽 */
+  /** 12 栅格列宽（历史字段，二维尺寸由 defaultSize/size 体系接管） */
   span: number
+  /** 默认二维尺寸：'1x1' | '2x1' | '1x2' | '2x2'（宽×高，单位=网格单元格） */
+  defaultSize?: WidgetSize
 }
 
 export interface WidgetDef extends WidgetMeta {
@@ -415,22 +417,22 @@ function KpiSummaryWidget() {
 // ============================================================
 export const WIDGETS: Record<string, WidgetDef> = {
   // —— 待办派生（5 张已开发） ——
-  w_todo_focus: { id: 'w_todo_focus', title: '待办聚焦', desc: '总数 / 进行中 / 紧急 三球概览', category: '待办', iconKey: 'flame', developed: false, route: '/modules/todos', span: 8, Render: TodoFocusWidget },
-  w_todo_calendar: { id: 'w_todo_calendar', title: '本月节奏', desc: '待办截止日期月历热力', category: '待办', iconKey: 'clock', developed: false, route: '/modules/todos', span: 4, Render: TodoCalendarWidget },
-  w_todo_ring: { id: 'w_todo_ring', title: '今日完成', desc: '完成度目标圆环', category: '待办', iconKey: 'check', developed: true, route: '/modules/todos', span: 5, Render: TodoRingWidget },
-  w_todo_stream: { id: 'w_todo_stream', title: '待办', desc: 'Score 排序的活跃项目', category: '待办', iconKey: 'list', developed: true, route: '/modules/todos', span: 7, Render: TodoStreamWidget },
-  w_todo_progress: { id: 'w_todo_progress', title: '整体进度', desc: '待办总完成进度条', category: '待办', iconKey: 'bar', developed: true, route: '/modules/todos', span: 5, Render: TodoProgressWidget },
+  w_todo_focus: { id: 'w_todo_focus', title: '待办聚焦', desc: '总数 / 进行中 / 紧急 三球概览', category: '待办', iconKey: 'flame', developed: false, route: '/modules/todos', span: 8, defaultSize: '2x1', Render: TodoFocusWidget },
+  w_todo_calendar: { id: 'w_todo_calendar', title: '本月节奏', desc: '待办截止日期月历热力', category: '待办', iconKey: 'clock', developed: false, route: '/modules/todos', span: 4, defaultSize: '2x1', Render: TodoCalendarWidget },
+  w_todo_ring: { id: 'w_todo_ring', title: '今日完成', desc: '完成度目标圆环', category: '待办', iconKey: 'check', developed: true, route: '/modules/todos', span: 5, defaultSize: '1x1', Render: TodoRingWidget },
+  w_todo_stream: { id: 'w_todo_stream', title: '待办', desc: 'Score 排序的活跃项目', category: '待办', iconKey: 'list', developed: true, route: '/modules/todos', span: 7, defaultSize: '2x1', Render: TodoStreamWidget },
+  w_todo_progress: { id: 'w_todo_progress', title: '整体进度', desc: '待办总完成进度条', category: '待办', iconKey: 'bar', developed: true, route: '/modules/todos', span: 5, defaultSize: '1x1', Render: TodoProgressWidget },
 
   // —— 模块概览（4 张已开发） ——
-  w_req_summary: { id: 'w_req_summary', title: '需求概览', desc: '需求总数 / 进行中 / 待评审', category: '模块概览', iconKey: 'doc', developed: true, route: '/modules/requirements', span: 3, Render: ReqSummaryWidget },
-  w_sprint_summary: { id: 'w_sprint_summary', title: '迭代概览', desc: '当前迭代进度', category: '模块概览', iconKey: 'clock', developed: true, route: '/modules/sprints', span: 3, Render: SprintSummaryWidget },
-  w_bug_summary: { id: 'w_bug_summary', title: '缺陷概览', desc: '未关闭 / 致命缺陷', category: '模块概览', iconKey: 'bell', developed: true, route: '/modules/bugs', span: 3, Render: BugSummaryWidget },
-  w_kpi_summary: { id: 'w_kpi_summary', title: '指标概览', desc: 'Top 指标与达标率', category: '模块概览', iconKey: 'bar', developed: true, route: '/modules/kpis', span: 3, Render: KpiSummaryWidget },
+  w_req_summary: { id: 'w_req_summary', title: '需求概览', desc: '需求总数 / 进行中 / 待评审', category: '模块概览', iconKey: 'doc', developed: true, route: '/modules/requirements', span: 3, defaultSize: '1x1', Render: ReqSummaryWidget },
+  w_sprint_summary: { id: 'w_sprint_summary', title: '迭代概览', desc: '当前迭代进度', category: '模块概览', iconKey: 'clock', developed: true, route: '/modules/sprints', span: 3, defaultSize: '1x1', Render: SprintSummaryWidget },
+  w_bug_summary: { id: 'w_bug_summary', title: '缺陷概览', desc: '未关闭 / 致命缺陷', category: '模块概览', iconKey: 'bell', developed: true, route: '/modules/bugs', span: 3, defaultSize: '1x1', Render: BugSummaryWidget },
+  w_kpi_summary: { id: 'w_kpi_summary', title: '指标概览', desc: 'Top 指标与达标率', category: '模块概览', iconKey: 'bar', developed: true, route: '/modules/kpis', span: 3, defaultSize: '1x1', Render: KpiSummaryWidget },
 
   // —— 建设中占位（3 张，仍可被增删） ——
-  w_goal: { id: 'w_goal', title: '目标 OKR', desc: '个人 / 团队目标跟踪', category: '规划', iconKey: 'target', developed: false, span: 4, Render: () => <></> },
-  w_team: { id: 'w_team', title: '团队负载', desc: '成员任务负载分布', category: '协作', iconKey: 'users', developed: false, span: 4, Render: () => <></> },
-  w_message: { id: 'w_message', title: '消息中心', desc: '待办 / @ 提醒聚合', category: '协作', iconKey: 'msg', developed: false, span: 4, Render: () => <></> },
+  w_goal: { id: 'w_goal', title: '目标 OKR', desc: '个人 / 团队目标跟踪', category: '规划', iconKey: 'target', developed: false, span: 4, defaultSize: '1x1', Render: () => <></> },
+  w_team: { id: 'w_team', title: '团队负载', desc: '成员任务负载分布', category: '协作', iconKey: 'users', developed: false, span: 4, defaultSize: '1x1', Render: () => <></> },
+  w_message: { id: 'w_message', title: '消息中心', desc: '待办 / @ 提醒聚合', category: '协作', iconKey: 'msg', developed: false, span: 4, defaultSize: '1x1', Render: () => <></> },
 }
 
 export const WIDGET_LIST: WidgetDef[] = Object.values(WIDGETS)
@@ -447,14 +449,24 @@ export const OVERVIEW_CARD_IDS: string[] = [
   'w_req_summary', 'w_sprint_summary', 'w_bug_summary', 'w_kpi_summary',
 ]
 
-/** 栅格列宽 → 静态 class（避免 Tailwind JIT 因动态拼接丢类） */
-// 移动端单列堆叠（col-span-12），桌面 ≥768px 恢复原始跨度（md:col-span-X）
-export const SPAN_CLASS: Record<number, string> = {
-  3: 'col-span-12 md:col-span-3',
-  4: 'col-span-12 md:col-span-4',
-  5: 'col-span-12 md:col-span-5',
-  6: 'col-span-12 md:col-span-6',
-  7: 'col-span-12 md:col-span-7',
-  8: 'col-span-12 md:col-span-8',
-  12: 'col-span-12',
+/**
+ * 二维尺寸体系（替代原 SPAN_CLASS 列宽模型）
+ * 语义：size = "宽×高"，单位为网格单元格（手机 2 列 / 桌面 4 列）。
+ *   '1x1' 最小单元 · '2x1' 横向宽卡 · '1x2' 竖向高卡 · '2x2' 大卡
+ * 渲染层用 SIZE_CLASS 映射到 grid 的 col-span / row-span（静态 class，避免 JIT 动态拼接丢类）。
+ */
+export type WidgetSize = '1x1' | '2x1' | '1x2' | '2x2'
+
+export const SIZE_OPTIONS: WidgetSize[] = ['1x1', '2x1', '1x2', '2x2']
+
+export const SIZE_CLASS: Record<WidgetSize, string> = {
+  '1x1': 'col-span-1 row-span-1',
+  '2x1': 'col-span-2 row-span-1',
+  '1x2': 'col-span-1 row-span-2',
+  '2x2': 'col-span-2 row-span-2',
 }
+
+/** 默认尺寸（从各 widget 的 defaultSize 派生；addWidget / reset 兜底用） */
+export const DEFAULT_SIZES: Record<string, WidgetSize> = Object.fromEntries(
+  WIDGET_LIST.map((w) => [w.id, w.defaultSize ?? '1x1']),
+)

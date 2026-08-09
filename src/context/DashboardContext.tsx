@@ -10,7 +10,7 @@ import {
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
-import { DEFAULT_DASHBOARD, WIDGETS, WIDGET_LIST, type WidgetDef } from '../widgets/registry'
+import { DEFAULT_DASHBOARD, WIDGETS, WIDGET_LIST, DEFAULT_SIZES, type WidgetDef, type WidgetSize } from '../widgets/registry'
 
 // ============================================================
 // 类型
@@ -19,12 +19,15 @@ interface DashboardConfig {
   version: number
   /** 启用的卡片 id，按展示顺序 */
   widgetIds: string[]
+  /** 每个卡片的二维尺寸（宽×高，单位=网格单元格）；缺失时回退默认尺寸 */
+  sizes: Record<string, WidgetSize>
 }
 
 interface DashboardActions {
   addWidget: (id: string) => void
   removeWidget: (id: string) => void
   moveWidget: (id: string, direction: 'up' | 'down') => void
+  setWidgetSize: (id: string, size: WidgetSize) => void
   resetToDefault: () => void
 }
 
@@ -88,16 +91,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<DashboardConfig>({
     version: 1,
     widgetIds: DEFAULT_DASHBOARD,
+    sizes: { ...DEFAULT_SIZES },
   })
 
   // ----- 加载：云端优先，localStorage 兜底，无则默认 -----
   useEffect(() => {
     let cancelled = false
     async function load() {
-      if (!user) {
-        setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD })
-        return
-      }
+    if (!user) {
+      setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } })
+      return
+    }
       const { data, error } = await supabase
         .from(TABLE)
         .select('config')
@@ -106,10 +110,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         .maybeSingle()
       if (cancelled) return
       if (data?.config && isDashboardConfig(data.config)) {
-        setConfig(data.config)
+        const loaded = data.config
+        setConfig({ ...loaded, sizes: { ...DEFAULT_SIZES, ...(loaded.sizes ?? {}) } })
       } else {
         const local = loadFromStorage(user.id)
-        setConfig(local ?? { version: 1, widgetIds: DEFAULT_DASHBOARD })
+        const base = local ?? { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
+        setConfig({ ...base, sizes: { ...DEFAULT_SIZES, ...(base.sizes ?? {}) } })
         if (error) {
           console.warn('[dashboard] 云端读取失败，已用本地兜底：', error.message)
         }
@@ -187,7 +193,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     () => ({
       addWidget(id) {
         if (config.widgetIds.includes(id) || !WIDGETS[id]) return
-        void persist({ ...config, widgetIds: [...config.widgetIds, id] })
+        void persist({
+          ...config,
+          widgetIds: [...config.widgetIds, id],
+          sizes: { ...config.sizes, [id]: config.sizes[id] ?? WIDGETS[id].defaultSize ?? '1x1' },
+        })
       },
       removeWidget(id) {
         void persist({ ...config, widgetIds: config.widgetIds.filter((x) => x !== id) })
@@ -201,8 +211,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         ;[next[idx], next[target]] = [next[target], next[idx]]
         void persist({ ...config, widgetIds: next })
       },
+      setWidgetSize(id, size) {
+        void persist({ ...config, sizes: { ...config.sizes, [id]: size } })
+      },
       resetToDefault() {
-        void persist({ version: 1, widgetIds: DEFAULT_DASHBOARD })
+        void persist({ version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } })
       },
     }),
     [config, persist],
