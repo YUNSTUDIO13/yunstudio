@@ -224,7 +224,7 @@ export default function Todos() {
             Todos
           </div>
           <h1 className="mt-1 text-2xl font-semibold text-ink-strong">待办</h1>
-          <p className="mt-1 text-sm text-ink-soft">
+          <p className="mt-1 hidden text-sm text-ink-soft md:block">
             用 Score 排序：优先级越高 / 越接近截止，越靠前
           </p>
         </div>

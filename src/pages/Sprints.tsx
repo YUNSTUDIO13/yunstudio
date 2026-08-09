@@ -142,7 +142,7 @@ export default function Sprints() {
             Sprints
           </div>
           <h1 className="mt-1 text-2xl font-semibold text-ink-strong">迭代</h1>
-          <p className="mt-1 text-sm text-ink-soft">Sprint 周期 · 燃尽图 · 交付节奏</p>
+          <p className="mt-1 hidden text-sm text-ink-soft md:block">Sprint 周期 · 燃尽图 · 交付节奏</p>
         </div>
         <Button onClick={openCreate}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">

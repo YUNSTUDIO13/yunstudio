@@ -293,7 +293,7 @@ export default function Requirements() {
             Requirements
           </div>
           <h1 className="mt-1 text-2xl font-semibold text-ink-strong">需求</h1>
-          <p className="mt-1 text-sm text-ink-soft">
+          <p className="mt-1 hidden text-sm text-ink-soft md:block">
             需求池 · 8 态状态机 · 业务价值跟踪
           </p>
         </div>

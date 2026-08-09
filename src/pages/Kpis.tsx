@@ -148,7 +148,7 @@ export default function Kpis() {
             KPIs
           </div>
           <h1 className="mt-1 text-2xl font-semibold text-ink-strong">指标</h1>
-          <p className="mt-1 text-sm text-ink-soft">KPI 指标卡 · 趋势洞察 · 达标跟踪</p>
+          <p className="mt-1 hidden text-sm text-ink-soft md:block">KPI 指标卡 · 趋势洞察 · 达标跟踪</p>
         </div>
         <Button onClick={openCreate}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
