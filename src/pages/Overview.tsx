@@ -96,7 +96,7 @@ export default function Overview() {
 
       {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片的"展示顺序"调序在此生效）；
           二维尺寸模型（手机 2 列 / 桌面 4 列，固定行高），按 config.sizes[id] 占 m×n 单元格。 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[192px] md:auto-rows-[200px]">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[216px] md:auto-rows-[200px]">
         {config.widgetIds.map((id) => {
           const size = config.sizes[id] ?? '1x1'
           switch (id) {
@@ -125,18 +125,18 @@ export default function Overview() {
                 </button>
               }
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginTop: 4 }}>
-              <RingChart pct={todayPct} goal={8} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 32, marginTop: 4 }}>
+              <RingChart pct={todayPct} goal={8} size={isMobile ? 96 : 136} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 14 }}>
                 <div>
-                  <Display size={48}>{doneTodos}</Display>
+                  <Display size={isMobile ? 32 : 48}>{doneTodos}</Display>
                   <div style={{ marginTop: 3 }}>
                     <Label>已完成</Label>
                   </div>
                 </div>
-                <Divider />
+                {isMobile ? null : <Divider />}
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <Display size={32}>{todayPct}%</Display>
+                  <Display size={isMobile ? 22 : 32}>{todayPct}%</Display>
                   <Label>总完成度</Label>
                 </div>
               </div>
@@ -207,17 +207,17 @@ export default function Overview() {
                 <div key={id} className={`${SIZE_CLASS[size]} h-full`}>
           <Card style={{ height: '100%' }}>
             <CardHeader title="整体进度" />
-            <div style={{ marginBottom: 18 }}>
-              <Display size={40}>{reqPct}%</Display>
+            <div style={{ marginBottom: isMobile ? 10 : 18 }}>
+              <Display size={isMobile ? 34 : 40}>{reqPct}%</Display>
               <div style={{ marginTop: 2 }}>
                 <Label>Completed</Label>
               </div>
             </div>
-            <div style={{ position: 'relative', height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginBottom: 14, overflow: 'visible' }}>
+            <div style={{ position: 'relative', height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginBottom: isMobile ? 10 : 14, overflow: 'visible' }}>
               <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ ...glass.pill, borderRadius: 6, padding: '2px 8px', fontSize: 11.5, color: C.accent, fontWeight: 600 }}>{reqLaunched}/{reqTotal}</span>
                 <Label>已上线</Label>
               </div>
