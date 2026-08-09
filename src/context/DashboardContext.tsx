@@ -52,6 +52,26 @@ function storageKey(userId: string): string {
   return `pw.dash.${userId}`
 }
 
+// 记录「上次登录的 userId」，用于在首帧同步读出其自定义布局，
+// 消除「默认布局 → 自定义布局」的闪屏（FOUC）。
+const LAST_USER_KEY = 'pw.lastUserId'
+function readLastUserId(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(LAST_USER_KEY)
+  } catch {
+    return null
+  }
+}
+function writeLastUserId(id: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(LAST_USER_KEY, id)
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 function isDashboardConfig(x: unknown): x is DashboardConfig {
   return (
     !!x &&
@@ -88,10 +108,16 @@ function saveToStorage(userId: string, config: DashboardConfig): void {
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const userId = user?.id ?? 'anonymous'
-  const [config, setConfig] = useState<DashboardConfig>({
-    version: 1,
-    widgetIds: DEFAULT_DASHBOARD,
-    sizes: { ...DEFAULT_SIZES },
+  // 首帧同步读出上次布局，避免先渲染默认态再闪回自定义态（FOUC）
+  const [config, setConfig] = useState<DashboardConfig>(() => {
+    const last = readLastUserId()
+    if (last) {
+      const local = loadFromStorage(last)
+      if (local) {
+        return { ...local, sizes: { ...DEFAULT_SIZES, ...(local.sizes ?? {}) } }
+      }
+    }
+    return { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
   })
 
   // ----- 加载：云端优先，localStorage 兜底，无则默认 -----
@@ -102,6 +128,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } })
       return
     }
+    writeLastUserId(user.id)
       const { data, error } = await supabase
         .from(TABLE)
         .select('config')
@@ -131,7 +158,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const persist = useCallback(
     async (next: DashboardConfig) => {
       setConfig(next)
-      if (user && userId !== 'anonymous') saveToStorage(user.id, next)
+      if (user && userId !== 'anonymous') {
+        saveToStorage(user.id, next)
+        writeLastUserId(user.id)
+      }
       if (user) {
         const { error } = await supabase
           .from(TABLE)
