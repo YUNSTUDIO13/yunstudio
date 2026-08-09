@@ -17,7 +17,6 @@ import {
   Card,
   CardHeader,
   Display,
-  Badge,
   Label,
   PulseDot,
   IconFile,
@@ -25,6 +24,31 @@ import {
   IconClock,
   IconChart,
 } from '../design/primitives'
+
+// 紧凑 MetricPill（仅 Overview 用）—— 比 Badge 原语窄一档，
+// 防止手机 2 列（内可用 129px）flex-wrap 换行截断第二 pill。
+function MetricPill({ label, color, bg }: { label: string; color: string; bg: string }) {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 500,
+        color,
+        background: bg,
+        border: `1px solid ${color}35`,
+        borderRadius: 5,
+        padding: '2px 7px',
+        letterSpacing: '.02em',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </span>
+  )
+}
 
 export default function Overview() {
   const { user } = useAuth()
@@ -131,9 +155,9 @@ export default function Overview() {
             />
             <Display size={isMobile ? 38 : 44}>{doneTodos}</Display>
             <Label>已完成</Label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              <Badge label={`已完成 ${doneTodos}`} color={C.accent} bg={C.accentSoft} />
-              <Badge label={`总完成度 ${todayPct}%`} color={C.green} bg="rgba(94,234,212,.09)" />
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, flexWrap: 'nowrap' }}>
+              <MetricPill label={`已完成 ${doneTodos}`} color={C.accent} bg={C.accentSoft} />
+              <MetricPill label={`总完成度 ${todayPct}%`} color={C.green} bg="rgba(94,234,212,.09)" />
             </div>
           </Card>
                 </div>
@@ -204,9 +228,9 @@ export default function Overview() {
             <div style={{ position: 'relative', height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'visible' }}>
               <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              <Badge label={`已上线 ${reqLaunched}`} color={C.green} bg="rgba(94,234,212,.09)" />
-              <Badge label={`待上线 ${reqPendingLaunch}`} color={C.amber} bg="rgba(251,191,36,.09)" />
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, flexWrap: 'nowrap' }}>
+              <MetricPill label={`已上线 ${reqLaunched}`} color={C.green} bg="rgba(94,234,212,.09)" />
+              <MetricPill label={`待上线 ${reqPendingLaunch}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
           </Card>
                 </div>
@@ -218,9 +242,9 @@ export default function Overview() {
             <CardHeader title="需求概览" icon={<IconFile />} />
             <Display size={isMobile ? 38 : 44}>{reqReview}</Display>
             <Label>待评审</Label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              <Badge label={`进行中 ${reqActive}`} color={C.green} bg="rgba(94,234,212,.09)" />
-              <Badge label={`待评审 ${reqReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, flexWrap: 'nowrap' }}>
+              <MetricPill label={`进行中 ${reqActive}`} color={C.green} bg="rgba(94,234,212,.09)" />
+              <MetricPill label={`待评审 ${reqReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
           </Card>
                 </div>
@@ -258,9 +282,9 @@ export default function Overview() {
             <CardHeader title="缺陷概览" icon={<IconBell />} />
             <Display size={isMobile ? 38 : 44}>{bugCritical}</Display>
             <Label>致命</Label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              <Badge label={`致命 ${bugCritical}`} color={C.red} bg="rgba(248,113,113,.09)" />
-              <Badge label={`严重 ${bugSevere}`} color={C.amber} bg="rgba(251,191,36,.09)" />
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, flexWrap: 'nowrap' }}>
+              <MetricPill label={`致命 ${bugCritical}`} color={C.red} bg="rgba(248,113,113,.09)" />
+              <MetricPill label={`严重 ${bugSevere}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
           </Card>
                 </div>
