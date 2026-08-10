@@ -501,7 +501,12 @@ export default function Requirements() {
         <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
           <Select
             value={filterStatus}
-            onChange={(v) => setFilterStatus(v as ReqStatus | 'all')}
+            onChange={(v) => {
+              const s = v as ReqStatus | 'all'
+              setFilterStatus(s)
+              // 选到归档态（终态）时，归档筛选自动切「已归档」，避免空白
+              if (s !== 'all' && ARCHIVED.includes(s)) setFilterArchived('yes')
+            }}
             className="!w-auto min-w-[120px] max-w-[180px] flex-1 basis-[120px] md:flex-none md:basis-auto"
             aria-label="按状态筛选"
           >
