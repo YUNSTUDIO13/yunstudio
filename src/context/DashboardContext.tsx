@@ -102,25 +102,49 @@ function saveToStorage(userId: string, config: DashboardConfig): void {
   }
 }
 
+// 首帧兜底：扫描所有 pw.dash.* 键，命中任一合法自定义布局。
+// 用于「旧版本从未写入 pw.lastUserId、但 pw.dash.{userId} 已存在」的回访场景，
+// 确保首帧直接渲染自定义布局而不经默认态中间帧。
+function loadAnyStoredConfig(): DashboardConfig | null {
+  if (typeof window === 'undefined') return null
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i)
+      if (key && key.startsWith('pw.dash.') && key !== LAST_USER_KEY) {
+        const parsed = JSON.parse(window.localStorage.getItem(key) || 'null')
+        if (isDashboardConfig(parsed)) return parsed
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 // ============================================================
 // Provider
 // ============================================================
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const userId = user?.id ?? 'anonymous'
-  // 首帧同步读出上次布局，避免先渲染默认态再闪回自定义态（FOUC）
+  // 首帧同步读出自定义布局，避免先渲染默认态再闪回自定义态（FOUC）
   const [config, setConfig] = useState<DashboardConfig>(() => {
+    const hydrate = (c: DashboardConfig): DashboardConfig => ({
+      ...c,
+      sizes: { ...DEFAULT_SIZES, ...(c.sizes ?? {}) },
+    })
     const last = readLastUserId()
     if (last) {
       const local = loadFromStorage(last)
-      if (local) {
-        return { ...local, sizes: { ...DEFAULT_SIZES, ...(local.sizes ?? {}) } }
-      }
+      if (local) return hydrate(local)
     }
+    // 兜底：旧版未写 lastUserId，但 pw.dash.{userId} 已存在的回访场景
+    const any = loadAnyStoredConfig()
+    if (any) return hydrate(any)
     return { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
   })
 
-  // ----- 加载：云端优先，localStorage 兜底，无则默认 -----
+  // ----- 加载：本地优先（首帧已同步渲染），本地为空才问云端，无则默认 -----
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -129,6 +153,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       return
     }
     writeLastUserId(user.id)
+      // 本地已有自定义布局 → 直接采用，不让云端旧默认值覆盖（避免回退闪屏）
+      const local = loadFromStorage(user.id)
+      if (local) {
+        if (cancelled) return
+        setConfig({ ...local, sizes: { ...DEFAULT_SIZES, ...(local.sizes ?? {}) } })
+        return
+      }
       const { data, error } = await supabase
         .from(TABLE)
         .select('config')
@@ -140,11 +171,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         const loaded = data.config
         setConfig({ ...loaded, sizes: { ...DEFAULT_SIZES, ...(loaded.sizes ?? {}) } })
       } else {
-        const local = loadFromStorage(user.id)
-        const base = local ?? { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
-        setConfig({ ...base, sizes: { ...DEFAULT_SIZES, ...(base.sizes ?? {}) } })
+        const base = { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
+        setConfig(base)
         if (error) {
-          console.warn('[dashboard] 云端读取失败，已用本地兜底：', error.message)
+          console.warn('[dashboard] 云端读取失败，已用默认：', error.message)
         }
       }
     }
