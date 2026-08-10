@@ -9,6 +9,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -60,11 +61,21 @@ export function TagsProvider({ children }: { children: ReactNode }) {
   const [values, setValues] = useState<TagValue[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 清理同名类目重复（StrictMode 双调用 / 多标签页并发会建出多个同名「标签」类目）。
-  // 把重复类目下的枚举值归并到保留类目，再删掉多余类目本身（含其 outbox 任务，防回网重建）。
+  // 清理字典脏数据：
+  //  ① 同名类目重复（StrictMode 双调用 / 多标签页并发）
+  //  ② 「标签」空类目孤儿（用户把「标签」改名为「标签2」后，自动建类目 effect 因依赖变更
+  //     被错误重触，复制出一个空的「标签」类目——若用户已有别的非空类目则一并清理）。
   const dedupeCategories = useCallback(async () => {
     if (!user) return
     const cats = await localAll<TagCategory>(TABLE_CAT, user.id)
+    if (cats.length === 0) return
+    const vals = await db.tag_values.toArray()
+    const valueCountByCat = new Map<string, number>()
+    for (const v of vals) {
+      valueCountByCat.set(v.category_id, (valueCountByCat.get(v.category_id) ?? 0) + 1)
+    }
+
+    // ① 同名去重
     const byName = new Map<string, TagCategory[]>()
     for (const c of cats) {
       const arr = byName.get(c.name) ?? []
@@ -73,24 +84,42 @@ export function TagsProvider({ children }: { children: ReactNode }) {
     }
     for (const group of byName.values()) {
       if (group.length <= 1) continue
-      // 保留最早创建的类目为主，其余合并进来
       const sorted = [...group].sort((a, b) => a.created_at.localeCompare(b.created_at))
       const keep = sorted[0]
       const dups = sorted.slice(1)
       for (const d of dups) {
-        // 枚举值改挂到主类目（保留业务引用，不丢数据）
         await db.tag_values.where('category_id').equals(d.id).modify({ category_id: keep.id })
-        // 删多余类目本地行
         await localDelete(TABLE_CAT, d.id)
-        // 去掉可能还 pending 的 insert，避免回网后重建
         await db.outbox
           .where('table')
           .equals(TABLE_CAT)
           .and((o: { rowId: string; op: string }) => o.rowId === d.id && o.op === 'insert')
           .delete()
-        // 若已上云（SQL 已执行），补一条 delete 清理云端残留
         await enqueueAndMaybeFlush(TABLE_CAT, 'delete', d.id)
       }
+    }
+
+    // ② 「标签」空类目孤儿清理：仅在用户已有别的非空类目时清理，避免误删新建用户的默认类目。
+    const freshCats = await localAll<TagCategory>(TABLE_CAT, user.id)
+    const freshVals = await db.tag_values.toArray()
+    const freshCount = new Map<string, number>()
+    for (const v of freshVals) {
+      freshCount.set(v.category_id, (freshCount.get(v.category_id) ?? 0) + 1)
+    }
+    const emptyTagCat = freshCats.find(
+      (c) => c.name === '标签' && (freshCount.get(c.id) ?? 0) === 0,
+    )
+    const hasOtherNonEmpty = freshCats.some(
+      (c) => c.id !== emptyTagCat?.id && (freshCount.get(c.id) ?? 0) > 0,
+    )
+    if (emptyTagCat && hasOtherNonEmpty) {
+      await localDelete(TABLE_CAT, emptyTagCat.id)
+      await db.outbox
+        .where('table')
+        .equals(TABLE_CAT)
+        .and((o: { rowId: string; op: string }) => o.rowId === emptyTagCat.id && o.op === 'insert')
+        .delete()
+      await enqueueAndMaybeFlush(TABLE_CAT, 'delete', emptyTagCat.id)
     }
   }, [user])
 
@@ -362,24 +391,25 @@ export function TagsProvider({ children }: { children: ReactNode }) {
 
   // 首次使用自动建「标签」类目：以「查库判重」代替易失的 state 判重，
   // 避免 StrictMode 双调用 / 多标签页并发创建多个同名「标签」类目。
+  // 用 ref 记 user.id 实现"每用户一次性"：防止 rename 后 addCategory 重建触发本 effect 重新建「标签」类目，
+  // 留下空「标签」孤儿（用户把「标签」改名「标签2」后，就会出现空「标签」+「标签2」并存）。
+  const autoCreatedForUserRef = useRef<string | null>(null)
   useEffect(() => {
     if (!user || loading) return
-    let cancelled = false
+    if (autoCreatedForUserRef.current === user.id) return
+    autoCreatedForUserRef.current = user.id
     void (async () => {
       const existing = await db.tag_categories
         .where('user_id')
         .equals(user.id)
         .filter((c) => c.name === '标签')
         .first()
-      if (cancelled || existing) return
+      if (existing) return
       // 自动建"标签"类目，避免业务模块首次新增标签时阻塞
       await addCategory({ name: '标签' }).catch(() => {
         /* 极端并发下仍可能重名，忽略即可（刷新时 dedupe 兜底） */
       })
     })()
-    return () => {
-      cancelled = true
-    }
   }, [user, loading, addCategory])
 
   const ctx = useMemo<TagsContextValue>(
