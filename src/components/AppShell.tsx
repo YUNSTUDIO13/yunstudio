@@ -213,7 +213,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
-      {/* ===== 桌面：左下悬浮 dock（导航设置 + 账号头像） ===== */}
+      {/* ===== 桌面：左下悬浮 dock（系统设置 + 账号头像） ===== */}
       <aside
         className="
           fixed left-6 bottom-6 z-40 hidden w-[72px] flex-col items-center gap-3
@@ -222,7 +222,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       >
         <Link
           to="/modules/nav-config"
-          title="导航设置"
+          title="系统设置"
           className={`
             grid h-11 w-11 place-items-center rounded-2xl border transition
             ${
@@ -321,8 +321,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
           <Link
             to="/modules/nav-config"
-            title="导航设置"
-            aria-label="导航设置"
+            title="系统设置"
+            aria-label="系统设置"
             className="flex h-14 flex-1 flex-col items-center justify-center text-ink-soft"
           >
             <span className={`grid ${iconSizeCls} place-items-center`}>
