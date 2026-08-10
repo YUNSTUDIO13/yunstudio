@@ -2,7 +2,8 @@
 -- 个人工作台 · 应用（Apps）SQL
 -- 适配依赖：schema.sql（已建 profiles + set_updated_at()）
 -- 与 tags-dict.sql/business-tables.sql/news.sql 互不冲突，均使用 if not exists
--- 作用：存储用户个人应用导航（图标 / 名称 / 目标 URL / 功能说明），云端持久化供多端同步
+-- 作用：存储用户个人应用导航（名称 / 目标 URL / 功能说明），云端持久化供多端同步
+-- 注意：图标不落库，运行期由前端按 target_url 抓取原站 favicon，本地缓存，失败回退首字
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -11,7 +12,7 @@
 --   - name：应用名称
 --   - target_url：点击图标跳转的目标地址
 --   - description：功能说明
---   - icon_url：抓取到的图标地址（原站 favicon）；为空则前端用名称首字兜底
+--   （图标不落库：前端按 target_url 抓取原站 favicon，本地缓存，失败回退名称首字）
 -- ------------------------------------------------------------
 create table if not exists public.apps (
   id            uuid primary key default gen_random_uuid(),
@@ -19,7 +20,6 @@ create table if not exists public.apps (
   name          text not null,                       -- 应用名称
   target_url    text not null,                       -- 目标 URL
   description   text not null default '',            -- 功能说明
-  icon_url      text,                                -- 图标地址（原站 favicon）；空→前端首字兜底
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );

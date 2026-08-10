@@ -27,7 +27,6 @@ interface Draft {
   name: string
   targetUrl: string
   description: string
-  iconUrl: string
 }
 
 /** 由目标 URL 推导原站 favicon 地址 */
@@ -40,32 +39,43 @@ function faviconFor(url: string): string {
   }
 }
 
-/** 图标：优先 icon_url，加载失败回退名称首字 */
+// 模块级本地图标缓存：appId -> true(已成功) / false(失败回退首字)
+// 刷新即清空 → 重新按目标 URL 抓取 favicon；符合「图标不落库、本地缓存、清空则重新获取」
+const iconCache = new Map<string, boolean>()
+
+/** 图标：运行时按 target_url 取原站 favicon；成功存本地缓存，失败回退名称首字 */
 function AppIcon({ app, size = 'h-12 w-12' }: { app: App; size?: string }) {
-  const [err, setErr] = useState(false)
-  const icon = app.icon_url?.trim()
-  if (icon && !err) {
+  const faviconUrl = useMemo(() => faviconFor(app.target_url), [app.target_url])
+  const [failed, setFailed] = useState(() => iconCache.get(app.id) === false)
+  if (!faviconUrl || failed) {
     return (
-      <img
-        src={icon}
-        alt={app.name}
-        onError={() => setErr(true)}
-        className={`${size} shrink-0 rounded-xl object-cover`}
-      />
+      <div
+        className={`${size} grid shrink-0 place-items-center rounded-xl bg-accent/15 text-lg font-semibold text-accent`}
+      >
+        {app.name.slice(0, 1).toUpperCase()}
+      </div>
     )
   }
   return (
-    <div
-      className={`${size} grid shrink-0 place-items-center rounded-xl bg-accent/15 text-lg font-semibold text-accent`}
-    >
-      {app.name.slice(0, 1).toUpperCase()}
-    </div>
+    <img
+      src={faviconUrl}
+      alt={app.name}
+      className={`${size} shrink-0 rounded-xl object-cover`}
+      onError={() => {
+        iconCache.set(app.id, false)
+        setFailed(true)
+      }}
+      onLoad={() => {
+        iconCache.set(app.id, true)
+      }}
+    />
   )
 }
 
-/** 预览图标（编辑弹窗内） */
+/** 预览图标（编辑弹窗内，按目标 URL 实时取 favicon） */
 function PreviewIcon({ url, name, size = 'h-16 w-16' }: { url: string; name: string; size?: string }) {
   const [err, setErr] = useState(false)
+  useEffect(() => setErr(false), [url])
   if (url && !err) {
     return (
       <img
@@ -157,7 +167,7 @@ export default function AppsPage() {
 
   function openCreate() {
     setGlobalError(null)
-    setEdit({ id: null, name: '', targetUrl: '', description: '', iconUrl: '' })
+    setEdit({ id: null, name: '', targetUrl: '', description: '' })
   }
   function openEdit(a: App) {
     setGlobalError(null)
@@ -166,11 +176,10 @@ export default function AppsPage() {
       name: a.name,
       targetUrl: a.target_url,
       description: a.description || '',
-      iconUrl: a.icon_url || '',
     })
   }
 
-  const previewIcon = edit ? edit.iconUrl.trim() || faviconFor(edit.targetUrl) : ''
+  const previewIcon = edit ? faviconFor(edit.targetUrl) : ''
 
   async function submit() {
     if (!edit || !user) return
@@ -187,7 +196,6 @@ export default function AppsPage() {
         throw new Error('目标 URL 格式不合法（需含 http/https）')
       }
       const now = new Date().toISOString()
-      const icon = edit.iconUrl.trim() || faviconFor(url) || null
       let payload: App
       if (edit.id) {
         const existing = apps.find((a) => a.id === edit.id)
@@ -197,7 +205,6 @@ export default function AppsPage() {
           name,
           target_url: url,
           description: edit.description.trim(),
-          icon_url: icon,
           created_at: existing?.created_at ?? now,
           updated_at: now,
         }
@@ -208,7 +215,6 @@ export default function AppsPage() {
           name,
           target_url: url,
           description: edit.description.trim(),
-          icon_url: icon,
           created_at: now,
           updated_at: now,
         }
@@ -371,16 +377,7 @@ export default function AppsPage() {
               <PreviewIcon url={previewIcon} name={edit.name || '应用'} />
               <div className="min-w-0 text-xs text-ink-mute">
                 <div className="font-medium text-ink-soft">图标预览</div>
-                优先取目标网站 favicon；加载失败自动显示「{edit.name.slice(0, 1).toUpperCase() || '首字'}」兜底。
-                {edit.iconUrl.trim() ? (
-                  <button
-                    type="button"
-                    onClick={() => setEdit({ ...edit, iconUrl: '' })}
-                    className="ml-2 text-accent hover:underline"
-                  >
-                    清除自定义图标
-                  </button>
-                ) : null}
+                自动取目标网站 favicon；加载失败自动显示「{edit.name.slice(0, 1).toUpperCase() || '首字'}」兜底。图标不落库，仅本地缓存。
               </div>
             </div>
 
@@ -406,14 +403,6 @@ export default function AppsPage() {
                 onChange={(e) => setEdit({ ...edit, description: e.target.value })}
                 placeholder="如：团队协作与任务跟踪"
                 rows={3}
-              />
-            </Field>
-
-            <Field label="图标地址（可选）" hint="留空则自动取目标网站 favicon；也可手动填入任意图片 URL">
-              <Input
-                value={edit.iconUrl}
-                onChange={(e) => setEdit({ ...edit, iconUrl: e.target.value })}
-                placeholder="https://example.com/icon.png"
               />
             </Field>
           </div>
