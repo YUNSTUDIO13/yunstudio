@@ -121,35 +121,6 @@ export type BugInput = {
 }
 
 // ============================================================
-// 指标（KPI）
-// ============================================================
-export type KpiCategory = 'business' | 'efficiency' | 'quality' | 'growth' // 业务/效率/质量/增长
-
-export interface Kpi {
-  id: string
-  user_id: string
-  name: string
-  category: KpiCategory
-  value: number
-  unit: string
-  target: number
-  trend: number[] // 近期数值序列（用于迷你趋势线）
-  lower_is_better?: boolean // true 时数值越低越好（如缺陷修复时长）
-  created_at: string
-  updated_at: string
-}
-
-export type KpiInput = {
-  name: string
-  category: KpiCategory
-  value: number
-  unit: string
-  target: number
-  trend: number[]
-  lower_is_better?: boolean
-}
-
-// ============================================================
 // 新闻 / 资讯（News）—— Supabase 云端表（首张真实业务表）
 // 由「每周全球消费趋势数据更新报表」等任务推送，或手动新增
 // ============================================================

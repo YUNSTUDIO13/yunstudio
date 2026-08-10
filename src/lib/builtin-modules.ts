@@ -1,4 +1,4 @@
-// 内置模块枚举（预置库）。用户从这 7 个里选，自己不能造新模块。
+// 内置模块枚举（预置库）。用户从这 6 个里选，自己不能造新模块。
 // 后续真接 Supabase 时，每个模块对应一张或多张业务表 + 视图。
 export const BUILTIN_MODULE_IDS = [
   'overview',
@@ -6,7 +6,6 @@ export const BUILTIN_MODULE_IDS = [
   'requirements',
   'sprints',
   'bugs',
-  'kpis',
   'news', // 新闻/资讯（Supabase 云端表，支持外部推送）
   'nav-config', // 导航配置本身是个内置模块（角色「配置后台」）
 ] as const
@@ -27,7 +26,7 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
   overview: {
     id: 'overview',
     title: '总览',
-    desc: '5 卡概览（KPI · 待办 · 优先级 · 完成度）',
+    desc: '总览卡片（待办 · 需求 · 缺陷 · 完成度）',
     route: '/modules/overview',
     defaultEnabled: true,
   },
@@ -57,13 +56,6 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
     title: '缺陷',
     desc: 'Bug 跟踪 · 修复闭环',
     route: '/modules/bugs',
-    defaultEnabled: true,
-  },
-  kpis: {
-    id: 'kpis',
-    title: '指标',
-    desc: 'KPI 指标卡 · 趋势',
-    route: '/modules/kpis',
     defaultEnabled: true,
   },
   'nav-config': {

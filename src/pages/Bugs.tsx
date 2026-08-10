@@ -476,8 +476,8 @@ export default function Bugs() {
             onChange={(v) => {
               const s = v as BugStatus | 'all'
               setFilterStatus(s)
-              // 选到归档态（已关闭）→ 自动「已归档」；选到其它具体状态（如待处理/处理中）→ 自动「未归档」
-              if (s !== 'all') setFilterArchived(ARCHIVED.includes(s) ? 'yes' : 'no')
+              // 双向联动：归档态（已关闭）→ 已归档；其它具体态或「全部状态」→ 未归档
+              setFilterArchived(s !== 'all' && ARCHIVED.includes(s) ? 'yes' : 'no')
             }}
             className="!w-auto min-w-[120px] max-w-[180px] flex-1 basis-[120px] md:flex-none md:basis-auto"
             aria-label="按状态筛选"

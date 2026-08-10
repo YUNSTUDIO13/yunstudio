@@ -3,9 +3,9 @@
 // 联网后由 sync.ts 把本地"发件箱(outbox)"逐条补传到 Supabase。
 // 手机 / PC 共用同一套浏览器代码，一次实现两端生效。
 import Dexie, { type Table } from 'dexie'
-import type { Todo, Requirement, Bug, Sprint, Kpi, Notification } from '../types'
+import type { Todo, Requirement, Bug, Sprint, Notification } from '../types'
 
-export type EntityTable = 'todos' | 'requirements' | 'bugs' | 'sprints' | 'kpis' | 'notifications'
+export type EntityTable = 'todos' | 'requirements' | 'bugs' | 'sprints' | 'notifications'
 
 export type SyncOpType = 'insert' | 'update' | 'delete'
 
@@ -25,7 +25,6 @@ interface LocalDB extends Dexie {
   requirements: Table<Requirement, string>
   bugs: Table<Bug, string>
   sprints: Table<Sprint, string>
-  kpis: Table<Kpi, string>
   notifications: Table<Notification, string>
   /** 用户已"一键清除"过的通知唯一键（entity_type:entity_id:deadline_at）
    *  用于阻断 60s 兜底扫描把刚清掉的通知又建回来。仅本机语义，不上云。 */
@@ -41,7 +40,6 @@ db.version(2).stores({
   requirements: 'id, user_id, updated_at',
   bugs: 'id, user_id, updated_at',
   sprints: 'id, user_id, updated_at',
-  kpis: 'id, user_id, updated_at',
   notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
   outbox: 'id, table, rowId, createdAt',
 })
@@ -52,7 +50,17 @@ db.version(3).stores({
   requirements: 'id, user_id, updated_at',
   bugs: 'id, user_id, updated_at',
   sprints: 'id, user_id, updated_at',
-  kpis: 'id, user_id, updated_at',
+  notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
+  cleared_notif_keys: 'key, cleared_at',
+  outbox: 'id, table, rowId, createdAt',
+})
+
+// v4：移除 kpis 表（指标模块已下线，2026-08-10）
+db.version(4).stores({
+  todos: 'id, user_id, updated_at',
+  requirements: 'id, user_id, updated_at',
+  bugs: 'id, user_id, updated_at',
+  sprints: 'id, user_id, updated_at',
   notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
   cleared_notif_keys: 'key, cleared_at',
   outbox: 'id, table, rowId, createdAt',
@@ -69,8 +77,6 @@ function tableRef<T>(table: EntityTable): Table<T> {
       return db.bugs as unknown as Table<T>
     case 'sprints':
       return db.sprints as unknown as Table<T>
-    case 'kpis':
-      return db.kpis as unknown as Table<T>
     case 'notifications':
       return db.notifications as unknown as Table<T>
   }

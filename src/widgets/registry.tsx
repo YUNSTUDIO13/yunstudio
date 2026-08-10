@@ -4,7 +4,6 @@ import { useTodos } from '../context/TodosContext'
 import { useRequirements } from '../context/RequirementsContext'
 import { useSprints } from '../context/SprintsContext'
 import { useBugs } from '../context/BugsContext'
-import { useKpis } from '../context/KpisContext'
 import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
 import { renderIcon } from '../lib/icon-library'
 import type { IconKey } from '../lib/icon-library'
@@ -384,34 +383,6 @@ function BugSummaryWidget() {
   )
 }
 
-function KpiSummaryWidget() {
-  const { kpis } = useKpis()
-  const top = [...kpis].sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0]
-
-  return (
-    <div className="h-full rounded-card bg-surface p-6 shadow-card">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-ink-strong">指标概览</h2>
-        <span className="text-ink-mute">{renderIcon('bar')}</span>
-      </div>
-      {top ? (
-        <>
-          <div className="mt-4 truncate text-sm font-semibold text-ink-strong">{top.name}</div>
-          <div className="mt-1 flex items-end gap-1.5">
-            <span className="text-3xl font-bold text-ink-strong">{top.value}</span>
-            <span className="pb-1 text-xs text-ink-soft">{top.unit}</span>
-          </div>
-          <div className="mt-3 text-xs text-ink-soft">
-            目标 {top.target}{top.unit} · {Math.round((top.value / top.target) * 100)}%
-          </div>
-        </>
-      ) : (
-        <div className="mt-8 text-center text-sm text-ink-mute">暂无指标</div>
-      )}
-    </div>
-  )
-}
-
 // ============================================================
 // 注册表（含"建设中"占位卡 —— 体现"含未开发需求"）
 // ============================================================
@@ -427,7 +398,6 @@ export const WIDGETS: Record<string, WidgetDef> = {
   w_req_summary: { id: 'w_req_summary', title: '需求概览', desc: '需求总数 / 进行中 / 待评审', category: '模块概览', iconKey: 'doc', developed: true, route: '/modules/requirements', span: 3, defaultSize: '1x1', Render: ReqSummaryWidget },
   w_sprint_summary: { id: 'w_sprint_summary', title: '迭代概览', desc: '当前迭代进度', category: '模块概览', iconKey: 'clock', developed: true, route: '/modules/sprints', span: 3, defaultSize: '1x1', Render: SprintSummaryWidget },
   w_bug_summary: { id: 'w_bug_summary', title: '缺陷概览', desc: '未关闭 / 致命缺陷', category: '模块概览', iconKey: 'bell', developed: true, route: '/modules/bugs', span: 3, defaultSize: '1x1', Render: BugSummaryWidget },
-  w_kpi_summary: { id: 'w_kpi_summary', title: '指标概览', desc: 'Top 指标与达标率', category: '模块概览', iconKey: 'bar', developed: true, route: '/modules/kpis', span: 3, defaultSize: '1x1', Render: KpiSummaryWidget },
 
   // —— 建设中占位（3 张，仍可被增删） ——
   w_goal: { id: 'w_goal', title: '目标 OKR', desc: '个人 / 团队目标跟踪', category: '规划', iconKey: 'target', developed: false, span: 4, defaultSize: '1x1', Render: () => <></> },

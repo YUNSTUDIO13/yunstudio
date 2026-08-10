@@ -5,7 +5,6 @@ import { useProfile } from '../context/ProfileContext'
 import { useRequirements } from '../context/RequirementsContext'
 import { useSprints } from '../context/SprintsContext'
 import { useBugs } from '../context/BugsContext'
-import { useKpis } from '../context/KpisContext'
 import { useTodos } from '../context/TodosContext'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { useDashboard } from '../context/DashboardContext'
@@ -18,12 +17,10 @@ import {
   Card,
   CardHeader,
   Display,
-  Label,
   PulseDot,
   IconFile,
   IconBell,
   IconClock,
-  IconChart,
 } from '../design/primitives'
 
 // 紧凑 MetricPill（仅 Overview 用）—— 比 Badge 原语窄一档，
@@ -57,7 +54,6 @@ export default function Overview() {
   const { requirements } = useRequirements()
   const { sprints } = useSprints()
   const { bugs } = useBugs()
-  const { kpis } = useKpis()
   const { todos } = useTodos()
   const navigate = useNavigate()
   const isMobile = useMediaQuery('(max-width: 767px)')
@@ -104,11 +100,7 @@ export default function Overview() {
     [sprints],
   )
 
-  // Top 指标：按 |value| 取绝对值最大的
-  const topKpi = useMemo(
-    () => (kpis.length === 0 ? null : [...kpis].sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0]),
-    [kpis],
-  )
+  // Top 指标已下线（指标模块移除）
 
   return (
     <div style={{ padding: isMobile ? '16px 16px 24px' : '40px 44px 56px', display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
@@ -296,32 +288,6 @@ export default function Overview() {
               <MetricPill label={`致命 ${bugCritical}`} color={C.red} bg="rgba(248,113,113,.09)" />
               <MetricPill label={`严重 ${bugSevere}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
-          </Card>
-                </div>
-              )
-            case 'w_kpi_summary':
-              return (
-                <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <CardHeader title="指标概览" icon={<IconChart />} />
-            {topKpi ? (
-              <>
-                <div className="min-w-0 break-words text-sm font-semibold leading-snug" style={{ color: C.textPrimary, marginTop: 4 }}>
-                  {topKpi.name}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-                  <Display size={32}>{topKpi.value}</Display>
-                  <Label>{topKpi.unit}</Label>
-                </div>
-                <div style={{ fontSize: 11.5, color: C.textSub, marginTop: 6 }}>
-                  目标 {topKpi.target}{topKpi.unit} · {Math.round((topKpi.value / topKpi.target) * 100)}%
-                </div>
-              </>
-            ) : (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
-                <span style={{ fontSize: 12, color: C.textGhost, letterSpacing: '.04em' }}>暂无指标</span>
-              </div>
-            )}
           </Card>
                 </div>
               )

@@ -10,7 +10,6 @@ function moduleIcon(m: string): string {
   if (m === 'requirements') return 'doc'
   if (m === 'sprints') return 'clock'
   if (m === 'bugs') return 'bell'
-  if (m === 'kpis') return 'bar'
   if (m === 'nav-config') return 'gear'
   return 'gear'
 }

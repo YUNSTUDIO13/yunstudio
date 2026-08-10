@@ -5,7 +5,6 @@ import { TodosProvider } from './context/TodosContext'
 import { RequirementsProvider } from './context/RequirementsContext'
 import { SprintsProvider } from './context/SprintsContext'
 import { BugsProvider } from './context/BugsContext'
-import { KpisProvider } from './context/KpisContext'
 import { NewsProvider } from './context/NewsContext'
 import { NotificationsProvider } from './context/NotificationsContext'
 import { NavProvider } from './context/NavContext'
@@ -21,36 +20,34 @@ export default function App() {
     <AuthProvider>
       <SyncEngine />
       <ProfileProvider>
-      <TodosProvider>
-        <RequirementsProvider>
-          <SprintsProvider>
-            <NotificationsProvider>
-            <BugsProvider>
-              <KpisProvider>
-                <NewsProvider>
-                <DashboardProvider>
-                  <NavProvider>
-                    <HashRouter>
-                    <AuthGate>
-                      <AppShell>
-                        <Routes>
-                          <Route path="/" element={<Navigate to="/modules/overview" replace />} />
-                          <Route path="/modules/:id" element={<ModulePage />} />
-                          <Route path="/account" element={<AccountPage />} />
-                          <Route path="*" element={<Navigate to="/modules/overview" replace />} />
-                        </Routes>
-                      </AppShell>
-                    </AuthGate>
-                  </HashRouter>
-                  </NavProvider>
-                  </DashboardProvider>
-                </NewsProvider>
-                </KpisProvider>
-            </BugsProvider>
-            </NotificationsProvider>
-          </SprintsProvider>
-        </RequirementsProvider>
-      </TodosProvider>
+        <TodosProvider>
+          <RequirementsProvider>
+            <SprintsProvider>
+              <NotificationsProvider>
+                <BugsProvider>
+                  <NewsProvider>
+                    <DashboardProvider>
+                      <NavProvider>
+                        <HashRouter>
+                          <AuthGate>
+                            <AppShell>
+                              <Routes>
+                                <Route path="/" element={<Navigate to="/modules/overview" replace />} />
+                                <Route path="/modules/:id" element={<ModulePage />} />
+                                <Route path="/account" element={<AccountPage />} />
+                                <Route path="*" element={<Navigate to="/modules/overview" replace />} />
+                              </Routes>
+                            </AppShell>
+                          </AuthGate>
+                        </HashRouter>
+                      </NavProvider>
+                    </DashboardProvider>
+                  </NewsProvider>
+                </BugsProvider>
+              </NotificationsProvider>
+            </SprintsProvider>
+          </RequirementsProvider>
+        </TodosProvider>
       </ProfileProvider>
     </AuthProvider>
   )

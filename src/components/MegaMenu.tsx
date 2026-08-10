@@ -69,7 +69,7 @@ export default function MegaMenu({ primary }: MegaMenuProps) {
                         "
                       >
                         <span className="grid h-6 w-6 place-items-center rounded-md bg-brand-soft text-ink-strong">
-                          {renderIcon(m === 'overview' ? 'home' : m === 'todos' ? 'check' : m === 'requirements' ? 'doc' : m === 'sprints' ? 'clock' : m === 'bugs' ? 'bell' : m === 'kpis' ? 'bar' : 'gear')}
+                          {renderIcon(m === 'overview' ? 'home' : m === 'todos' ? 'check' : m === 'requirements' ? 'doc' : m === 'sprints' ? 'clock' : m === 'bugs' ? 'bell' : 'gear')}
                         </span>
                         <span>{meta.title}</span>
                       </Link>

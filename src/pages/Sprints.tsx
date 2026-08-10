@@ -249,8 +249,8 @@ export default function Sprints() {
             onChange={(v) => {
               const s = v as SprintStatus | 'all'
               setFilterStatus(s)
-              // 选到归档态（已完成/已取消）→ 自动「已归档」；选到其它具体状态（如规划中/进行中）→ 自动「未归档」
-              if (s !== 'all') setFilterArchived(ARCHIVED.includes(s) ? 'yes' : 'no')
+              // 双向联动：归档态（已完成/已取消）→ 已归档；其它具体态或「全部状态」→ 未归档
+              setFilterArchived(s !== 'all' && ARCHIVED.includes(s) ? 'yes' : 'no')
             }}
             className="!w-auto min-w-[140px] max-w-[220px] flex-1 basis-[140px] md:flex-none md:basis-auto"
             aria-label="按状态筛选"

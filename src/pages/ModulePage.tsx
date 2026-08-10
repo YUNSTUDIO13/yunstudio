@@ -4,7 +4,6 @@ import Todos from './Todos'
 import Requirements from './Requirements'
 import Sprints from './Sprints'
 import Bugs from './Bugs'
-import Kpis from './Kpis'
 import News from './News'
 import NavConfig from './NavConfig'
 
@@ -26,8 +25,6 @@ export default function ModulePage() {
       return <Sprints />
     case 'bugs':
       return <Bugs />
-    case 'kpis':
-      return <Kpis />
     case 'news':
       return <News />
     case 'nav-config':
