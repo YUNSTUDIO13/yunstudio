@@ -519,49 +519,53 @@ export default function Todos() {
                       return (
                         <li
                           key={t.id}
-                          className={`flex flex-wrap items-center gap-2 px-1 py-2.5 md:flex-nowrap ${t.done ? 'opacity-60' : ''}`}
+                          className={`rounded-xl border border-line bg-canvas/40 p-3 ${t.done ? 'opacity-60' : ''}`}
                         >
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="checkbox"
-                              checked={t.done}
-                              onChange={() => toggleDone(t.id)}
-                              className="h-4 w-4 accent-ink-strong"
-                            />
-                            <PriorityTag priority={t.priority} />
-                            <TagChip tagId={t.tag_id} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`break-words text-sm leading-snug ${
-                                  t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
-                                }`}
-                              >
-                                {t.title}
-                              </span>
-                              {t.source_url && (
-                                <a
-                                  href={t.source_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-accent hover:text-accent/80"
-                                  title="打开来源链接"
+                          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={t.done}
+                                  onChange={() => toggleDone(t.id)}
+                                  className="h-4 w-4 shrink-0 accent-ink-strong"
+                                />
+                                <PriorityTag priority={t.priority} />
+                                <TagChip tagId={t.tag_id} />
+                              </div>
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`break-words text-sm font-medium leading-snug ${
+                                    t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
+                                  }`}
                                 >
-                                  ↗
-                                </a>
-                              )}
+                                  {t.title}
+                                </span>
+                                {t.source_url && (
+                                  <a
+                                    href={t.source_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-accent hover:text-accent/80"
+                                    title="打开来源链接"
+                                  >
+                                    ↗
+                                  </a>
+                                )}
+                              </div>
+                              <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">
+                                Score {computeScore(t)}
+                                {risk === 'overdue'
+                                  ? ' · 逾期'
+                                  : risk === 'urgent'
+                                    ? ' · 紧急'
+                                    : ''}
+                              </div>
                             </div>
-                            <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">
-                              Score {computeScore(t)}
-                              {risk === 'overdue'
-                                ? ' · 逾期'
-                                : risk === 'urgent'
-                                  ? ' · 紧急'
-                                  : ''}
+                            <div className="flex items-center justify-end md:justify-end">
+                              <TodoActions onEdit={() => openEdit(t)} onDelete={() => setToDelete(t)} />
                             </div>
                           </div>
-                          <TodoActions onEdit={() => openEdit(t)} onDelete={() => setToDelete(t)} />
                         </li>
                       )
                     })}

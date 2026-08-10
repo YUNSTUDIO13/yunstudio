@@ -417,7 +417,7 @@ export default function Requirements() {
                 {qitems.map((r) => (
                   <li
                     key={r.id}
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', borderRadius: 12, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}
+                    className="rounded-xl border border-line bg-canvas/40 p-3"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                       <div className="min-w-0 flex-1">
@@ -444,7 +444,9 @@ export default function Requirements() {
                           )}
                         </div>
                       </div>
-                      <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
+                      <div className="flex items-center justify-end md:justify-end">
+                        <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
+                      </div>
                     </div>
                   </li>
                 ))}
