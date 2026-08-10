@@ -160,6 +160,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       closeTimerRef.current = null
     }
     setOpenPrimaryId(id)
+    setSettingsOpen(false) // 与「系统设置」互斥
   }
   function scheduleClose() {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
@@ -175,6 +176,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }
   function togglePrimary(id: string) {
+    setSettingsOpen(false) // 与「系统设置」互斥
     setOpenPrimaryId((cur) => (cur === id ? null : id))
   }
 
@@ -257,8 +259,21 @@ export default function AppShell({ children }: { children: ReactNode }) {
           data-settings-trigger
           onMouseEnter={() => {
             if (isMobileRef.current) return
+            if (closeTimerRef.current) {
+              clearTimeout(closeTimerRef.current)
+              closeTimerRef.current = null
+            }
             setSettingsOpen(true)
             setOpenPrimaryId(null)
+          }}
+          onMouseLeave={() => {
+            if (isMobileRef.current) return
+            // 齿轮 → 浮层之间的间隙：留 140ms 让浮层 onMouseEnter 抢先取消
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+            closeTimerRef.current = setTimeout(() => {
+              setSettingsOpen(false)
+              closeTimerRef.current = null
+            }, 140)
           }}
         >
           <button
@@ -310,11 +325,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* ===== 桌面：系统设置 浮层（齿轮右侧展开，hover 触发） ===== */}
+      {/* ===== 桌面：系统设置 浮层（齿轮右侧展开，hover 触发） =====
+          间距与一级 Tab MegaMenu 镜像对齐：
+          一级 Tab MegaMenu 用 left-[120px] top-[88px]（面板顶到一级 Tab 中心 +8px）
+          本面板用 left-[120px] bottom-[88px]（面板底到齿轮中心 -8px）→ 镜像对称 */}
       {!isMobile && settingsOpen && (
         <div
           data-settings-panel
-          className="fixed left-[88px] bottom-[24px] z-50"
+          className="fixed left-[120px] bottom-[88px] z-50"
           onMouseEnter={() => {
             if (closeTimerRef.current) {
               clearTimeout(closeTimerRef.current)
