@@ -60,6 +60,40 @@ export function TagsProvider({ children }: { children: ReactNode }) {
   const [values, setValues] = useState<TagValue[]>([])
   const [loading, setLoading] = useState(true)
 
+  // 清理同名类目重复（StrictMode 双调用 / 多标签页并发会建出多个同名「标签」类目）。
+  // 把重复类目下的枚举值归并到保留类目，再删掉多余类目本身（含其 outbox 任务，防回网重建）。
+  const dedupeCategories = useCallback(async () => {
+    if (!user) return
+    const cats = await localAll<TagCategory>(TABLE_CAT, user.id)
+    const byName = new Map<string, TagCategory[]>()
+    for (const c of cats) {
+      const arr = byName.get(c.name) ?? []
+      arr.push(c)
+      byName.set(c.name, arr)
+    }
+    for (const group of byName.values()) {
+      if (group.length <= 1) continue
+      // 保留最早创建的类目为主，其余合并进来
+      const sorted = [...group].sort((a, b) => a.created_at.localeCompare(b.created_at))
+      const keep = sorted[0]
+      const dups = sorted.slice(1)
+      for (const d of dups) {
+        // 枚举值改挂到主类目（保留业务引用，不丢数据）
+        await db.tag_values.where('category_id').equals(d.id).modify({ category_id: keep.id })
+        // 删多余类目本地行
+        await localDelete(TABLE_CAT, d.id)
+        // 去掉可能还 pending 的 insert，避免回网后重建
+        await db.outbox
+          .where('table')
+          .equals(TABLE_CAT)
+          .and((o: { rowId: string; op: string }) => o.rowId === d.id && o.op === 'insert')
+          .delete()
+        // 若已上云（SQL 已执行），补一条 delete 清理云端残留
+        await enqueueAndMaybeFlush(TABLE_CAT, 'delete', d.id)
+      }
+    }
+  }, [user])
+
   const refresh = useCallback(async () => {
     if (!user) {
       setCategories([])
@@ -68,6 +102,8 @@ export function TagsProvider({ children }: { children: ReactNode }) {
       return
     }
     setLoading(true)
+    // 先清理历史上因竞态产生的同名「标签」重复类目
+    await dedupeCategories()
     // 本地先读
     const [cats, vals] = await Promise.all([
       localAll<TagCategory>(TABLE_CAT, user.id),
@@ -96,7 +132,7 @@ export function TagsProvider({ children }: { children: ReactNode }) {
     } catch {
       /* 离线或网络异常忽略 */
     }
-  }, [user])
+  }, [user, dedupeCategories])
 
   const seedValues = useCallback(async () => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return
@@ -324,16 +360,27 @@ export function TagsProvider({ children }: { children: ReactNode }) {
     [values],
   )
 
-  // 默认 category（首次使用"标签"字段时若不存在则建）
+  // 首次使用自动建「标签」类目：以「查库判重」代替易失的 state 判重，
+  // 避免 StrictMode 双调用 / 多标签页并发创建多个同名「标签」类目。
   useEffect(() => {
     if (!user || loading) return
-    if (categories.length === 0) {
+    let cancelled = false
+    void (async () => {
+      const existing = await db.tag_categories
+        .where('user_id')
+        .equals(user.id)
+        .filter((c) => c.name === '标签')
+        .first()
+      if (cancelled || existing) return
       // 自动建"标签"类目，避免业务模块首次新增标签时阻塞
-      void addCategory({ name: '标签' }).catch(() => {
-        /* 可能并发触发 addCategory 时第二个会因重名报错，忽略 */
+      await addCategory({ name: '标签' }).catch(() => {
+        /* 极端并发下仍可能重名，忽略即可（刷新时 dedupe 兜底） */
       })
+    })()
+    return () => {
+      cancelled = true
     }
-  }, [user, loading, categories.length, addCategory])
+  }, [user, loading, addCategory])
 
   const ctx = useMemo<TagsContextValue>(
     () => ({
