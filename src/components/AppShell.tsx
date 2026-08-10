@@ -105,6 +105,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const isMobile = useMediaQuery('(max-width: 767px)')
 
   const [openPrimaryId, setOpenPrimaryId] = useState<string | null>(null)
+  // 系统设置（固定 dock 入口）的独立展开状态；与 openPrimaryId 互斥
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // 同步 isMobile 给 window 级事件回调（避免闭包读到旧值）
   const isMobileRef = useRef(isMobile)
@@ -113,19 +115,29 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // 当前路径所属的 module + primary（用于 dock 高亮）
   const activeModuleId = moduleIdFromPath(location.pathname)
   const activePrimary = activeModuleId ? findPrimaryByModule(activeModuleId) : null
-  const isNavConfigActive = activeModuleId === 'nav-config'
+  // 「系统设置」下挂的二级页（字典管理 / 导航配置）激活时，dock 齿轮也亮
+  const isSettingsActive = activeModuleId === 'nav-config' || activeModuleId === 'tag-dict'
 
   // Esc / 点空白：关闭（移动端由 sheet 遮罩自行关闭，故跳过）
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpenPrimaryId(null)
+      if (e.key === 'Escape') {
+        setOpenPrimaryId(null)
+        setSettingsOpen(false)
+      }
     }
     function onClick(e: MouseEvent) {
       if (isMobileRef.current) return
       const target = e.target as HTMLElement | null
       if (!target) return
-      if (!target.closest('[data-mega-trigger]') && !target.closest('[data-mega-panel]')) {
+      if (
+        !target.closest('[data-mega-trigger]') &&
+        !target.closest('[data-mega-panel]') &&
+        !target.closest('[data-settings-trigger]') &&
+        !target.closest('[data-settings-panel]')
+      ) {
         setOpenPrimaryId(null)
+        setSettingsOpen(false)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -136,10 +148,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // 路由变化时强制关闭 MegaMenu / Sheet
-  // 解决：切到其它页（如导航配置/个人主页/主页）后底部 sheet 仍浮着挡住内容
+  // 路由变化时强制关闭 MegaMenu / Sheet / 系统设置面板
   useEffect(() => {
     setOpenPrimaryId(null)
+    setSettingsOpen(false)
   }, [location.pathname])
 
   function openMenu(id: string) {
@@ -168,6 +180,26 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const sortedPrimaries = [...config.primaries].sort((a, b) => a.order - b.order)
   const openPrimary = sortedPrimaries.find((p) => p.id === openPrimaryId) ?? null
+
+  // 「系统设置」伪 primary：复用 MegaMenu / MobileMegaSheet 渲染其下的字典管理、导航配置
+  const settingsPrimary: import('../lib/nav-types').NavPrimary = {
+    id: 'p_settings_dock',
+    title: '系统设置',
+    iconKey: 'gear',
+    order: 9999,
+    groups: [
+      { id: 'g_settings_tag', title: '字典管理', modules: ['tag-dict'] },
+      { id: 'g_settings_nav', title: '导航配置', modules: ['nav-config'] },
+    ],
+  }
+
+  function toggleSettings() {
+    setSettingsOpen((cur) => {
+      const next = !cur
+      if (next) setOpenPrimaryId(null) // 与一级 Tab 互斥
+      return next
+    })
+  }
 
   // 手机 dock 图标自适应档位：总元素数（含 Logo/齿轮/头像）越多 → 图标越小
   // 一级模块少时撑大避免「图标分开太多」；多时收紧避免拥挤；PC 不变（hidden md:flex）
@@ -220,20 +252,34 @@ export default function AppShell({ children }: { children: ReactNode }) {
           rounded-3xl glass-panel p-3 md:flex
         "
       >
-        <Link
-          to="/modules/nav-config"
-          title="系统设置"
-          className={`
-            grid h-11 w-11 place-items-center rounded-2xl border transition
-            ${
-              isNavConfigActive
-                ? 'border-accent bg-accent/15 text-accent'
-                : 'border-white/10 bg-white/5 text-ink-soft hover:bg-white/10 hover:text-ink-strong'
-            }
-          `}
+        <div
+          className="relative"
+          data-settings-trigger
+          onMouseEnter={() => {
+            if (isMobileRef.current) return
+            setSettingsOpen(true)
+            setOpenPrimaryId(null)
+          }}
         >
-          {renderIcon('gear')}
-        </Link>
+          <button
+            type="button"
+            onClick={toggleSettings}
+            title="系统设置"
+            aria-label="系统设置"
+            aria-haspopup="menu"
+            aria-expanded={settingsOpen}
+            className={`
+              grid h-11 w-11 place-items-center rounded-2xl border transition
+              ${
+                isSettingsActive || settingsOpen
+                  ? 'border-accent bg-accent/15 text-accent'
+                  : 'border-white/10 bg-white/5 text-ink-soft hover:bg-white/10 hover:text-ink-strong'
+              }
+            `}
+          >
+            {renderIcon('gear')}
+          </button>
+        </div>
         <Link
           to="/account"
           title={`个人主页（${profile?.display_name || user?.email || ''}）`}
@@ -264,9 +310,37 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      {/* ===== 桌面：系统设置 浮层（齿轮右侧展开，hover 触发） ===== */}
+      {!isMobile && settingsOpen && (
+        <div
+          data-settings-panel
+          className="fixed left-[88px] bottom-[24px] z-50"
+          onMouseEnter={() => {
+            if (closeTimerRef.current) {
+              clearTimeout(closeTimerRef.current)
+              closeTimerRef.current = null
+            }
+          }}
+          onMouseLeave={() => {
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+            closeTimerRef.current = setTimeout(() => {
+              setSettingsOpen(false)
+              closeTimerRef.current = null
+            }, 140)
+          }}
+        >
+          <MegaMenu primary={settingsPrimary} />
+        </div>
+      )}
+
       {/* ===== 移动：Mega Menu 底部 sheet（点击触发） ===== */}
       {isMobile && openPrimary && (
         <MobileMegaSheet primary={openPrimary} onClose={() => setOpenPrimaryId(null)} />
+      )}
+
+      {/* ===== 移动：系统设置底部 sheet（齿轮点击触发） ===== */}
+      {isMobile && settingsOpen && (
+        <MobileMegaSheet primary={settingsPrimary} onClose={() => setSettingsOpen(false)} />
       )}
 
       {/* ===== 移动：底部 tab bar（悬浮岛：左/右/底 1rem 安全岛 + iOS 底安全区） =====
@@ -319,16 +393,30 @@ export default function AppShell({ children }: { children: ReactNode }) {
             )
           })}
 
-          <Link
-            to="/modules/nav-config"
-            title="系统设置"
-            aria-label="系统设置"
-            className="flex h-14 flex-1 flex-col items-center justify-center text-ink-soft"
+          <div
+            className="relative flex h-14 flex-1 flex-col items-center justify-center"
+            data-settings-trigger
           >
-            <span className={`grid ${iconSizeCls} place-items-center`}>
-              {renderIcon('gear')}
-            </span>
-          </Link>
+            <button
+              type="button"
+              onClick={toggleSettings}
+              title="系统设置"
+              aria-label="系统设置"
+              aria-expanded={settingsOpen}
+              className={`
+                flex h-14 flex-1 flex-col items-center justify-center transition active:scale-95
+                ${isSettingsActive || settingsOpen ? 'text-accent' : 'text-ink-soft'}
+              `}
+            >
+              <span
+                className={`grid ${iconSizeCls} place-items-center rounded-2xl transition ${
+                  isSettingsActive || settingsOpen ? 'bg-accent/20' : ''
+                }`}
+              >
+                {renderIcon('gear')}
+              </span>
+            </button>
+          </div>
           <Link
             to="/account"
             title={`个人主页（${profile?.display_name || user?.email || ''}）`}
