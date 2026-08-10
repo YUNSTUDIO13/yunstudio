@@ -410,13 +410,13 @@ export const WIDGET_LIST: WidgetDef[] = Object.values(WIDGETS)
 /** 默认启用的卡片（顺序即展示顺序）—— 仅含 Overview 实际渲染的 7 段 */
 export const DEFAULT_DASHBOARD: string[] = [
   'w_todo_ring', 'w_todo_stream', 'w_todo_progress',
-  'w_req_summary', 'w_sprint_summary', 'w_bug_summary', 'w_kpi_summary',
+  'w_req_summary', 'w_sprint_summary', 'w_bug_summary',
 ]
 
 /** Overview 首页实际可渲染/可管理的卡片 id（弹窗只列这些，避免勾选无对应渲染段的卡片） */
 export const OVERVIEW_CARD_IDS: string[] = [
   'w_todo_ring', 'w_todo_stream', 'w_todo_progress',
-  'w_req_summary', 'w_sprint_summary', 'w_bug_summary', 'w_kpi_summary',
+  'w_req_summary', 'w_sprint_summary', 'w_bug_summary',
 ]
 
 /**
