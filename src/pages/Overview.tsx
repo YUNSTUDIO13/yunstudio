@@ -113,12 +113,7 @@ export default function Overview() {
     <div style={{ padding: isMobile ? '16px 16px 24px' : '40px 44px 56px', display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
       {/* 个性化 Header（保留 M3.8 昵称显示） */}
       <div style={{ marginBottom: 8 }}>
-        <h1 style={{ fontSize: 13, fontWeight: 500, color: C.textGhost, letterSpacing: '.1em', textTransform: 'uppercase', margin: 0 }}>
-          Overview
-        </h1>
-        <div style={{ marginTop: 8 }}>
-          <Display size={42} color={C.textPrimary}>{`Hi, ${name}`}</Display>
-        </div>
+        <Display size={42} color={C.textPrimary}>{`Hi, ${name}`}</Display>
       </div>
 
       {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片的"展示顺序"调序在此生效）；
