@@ -138,14 +138,43 @@ export async function localDelete(table: EntityTable, id: string): Promise<void>
   await tableRef(table).delete(id)
 }
 
-/** 把云端行合并进本地（按 id upsert）。skipIds 里的本地未同步行不覆盖，保留用户离线编辑。 */
+// 带 user_id 列的实体表：拉取时可安全按 user_id 回收孤儿行（云端已删除、本地残留）。
+// tag_values 无 user_id（归属 category_id），不参与回收，避免误删他人数据。
+const TABLES_WITH_USER_ID = new Set<EntityTable>([
+  'todos',
+  'requirements',
+  'sprints',
+  'bugs',
+  'tag_categories',
+  'notifications',
+])
+
+/**
+ * 把云端行合并进本地（按 id upsert）。skipIds 里的本地未同步行不覆盖，保留用户离线编辑。
+ *
+ * 关键修复：同时删除「本地存在、云端已不存在、且非待同步」的孤儿行 —— 即回收被其它端删除的数据。
+ * 否则一旦 Realtime 删除事件漏收（移动端后台挂起 / 网络抖动 / 重连间隙，极常见），
+ * 刷新后本地脏行会永久残留，表现为"另一台设备删了，这台刷新还在"。
+ */
 export async function mergeServerIntoLocal(
   table: EntityTable,
   serverRows: Record<string, unknown>[],
   skipIds: Set<string>,
+  userId: string,
 ): Promise<void> {
   const toPut = serverRows.filter((r) => !skipIds.has(String(r.id)))
   if (toPut.length) await tableRef(table).bulkPut(toPut as never)
+
+  if (!TABLES_WITH_USER_ID.has(table)) return
+  const serverIds = new Set(serverRows.map((r) => String(r.id)))
+  const localRows = await localAll<Record<string, unknown>>(table, userId)
+  const orphans = localRows
+    .filter(
+      (r) =>
+        !serverIds.has(String(r.id)) && !skipIds.has(String(r.id)),
+    )
+    .map((r) => String(r.id))
+  if (orphans.length) await tableRef(table).bulkDelete(orphans as never)
 }
 
 /** 入队一条待同步操作 */
