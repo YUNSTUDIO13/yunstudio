@@ -198,8 +198,10 @@ export function NavProvider({ children }: { children: ReactNode }) {
     return !!(last && loadFromStorage(last))
   })
 
-  // ----- 加载：首帧已用本地同步渲染（无 FOUC）；挂载后回云端校正 -----
-  // hydrated：本地有数据则同步放行（无默认闪屏）；本地无数据（清缓存/首次）则等云端拉到再放行（避免默认态闪现）
+  // ----- 加载：首帧已由种子同步渲染本地（无 FOUC）；挂载回云端校正 -----
+  // 同步时序铁律（与看板一致）：本地有数据 → 首帧直接渲染本地（零闪）；
+  // 挂载后回云端按「云端优先」校正——云端有则以云端为准（多端一致 + 可从云端恢复本地污染），
+  // 绝不在 user=null 时强行 setConfig(DEFAULT) 吞噬种子。
   useEffect(() => {
     let cancelled = false
     let settled = false
@@ -211,33 +213,15 @@ export function NavProvider({ children }: { children: ReactNode }) {
     }
     async function load() {
       if (!user) {
-        setConfig(DEFAULT_NAV_CONFIG)
+        // 认证解析窗口：种子已渲染（真实或默认），绝不强行覆盖为 DEFAULT，避免 FOUC / 吞噬本地
         finish()
         return
       }
       writeLastUserId(user.id)
       const local = loadFromStorage(user.id)
-      if (local) {
-        // 本地已有 → 首帧已渲染本地，无需等云端，立即放行（刷新不闪默认）
-        finish()
-        // 异步校正：拉云端，仅当云端与本地不一致才覆盖（导航改动低频，二者通常一致，避免无意义重渲染）
-        const { data } = await supabase
-          .from(TABLE)
-          .select('config')
-          .eq('user_id', user.id)
-          .eq('kind', NAV_KIND)
-          .maybeSingle()
-        if (cancelled) return
-        const cloud = data?.config ? (data.config as NavConfig) : null
-        if (!cloud) return
-        const merged = migrateConfig(cloud)
-        if (JSON.stringify(merged) !== JSON.stringify(local)) {
-          setConfig(merged)
-          saveToStorage(user.id, merged)
-        }
-        return
-      }
-      // 本地无数据 → 必须等云端返回后再放行（否则先渲染默认再跳联网最新）
+      // 先把本地落盘（与种子一致），避免后续被误判
+      if (local) saveToStorage(user.id, local)
+      // 云端优先：拉云端配置
       const { data, error } = await supabase
         .from(TABLE)
         .select('config')
@@ -246,14 +230,19 @@ export function NavProvider({ children }: { children: ReactNode }) {
         .maybeSingle()
       if (cancelled) return
       if (data?.config) {
-        setConfig(migrateConfig(data.config as NavConfig))
+        // 云端有 → 以云端为准（多端一致；若本地被污染也能从云端恢复）
+        const merged = migrateConfig(data.config as NavConfig)
+        setConfig(merged)
+        saveToStorage(user.id, merged)
       } else if (!error) {
-        // 云端无记录 → 维持默认（首次用户默认态即正确，无闪）
-        setConfig(DEFAULT_NAV_CONFIG)
+        // 云端无记录 → 用本地（若有）或默认
+        if (local) setConfig(migrateConfig(local))
+        else setConfig(DEFAULT_NAV_CONFIG)
       } else {
-        // 云端异常（多见于表未创建）→ 维持默认，控制台提示
-        setConfig(DEFAULT_NAV_CONFIG)
-        console.warn('[nav] 云端读取失败，已用默认兜底：', error.message)
+        // 云端异常（多见于表未创建）→ 本地兜底
+        if (local) setConfig(migrateConfig(local))
+        else setConfig(DEFAULT_NAV_CONFIG)
+        console.warn('[nav] 云端读取失败，已用本地兜底：', error.message)
       }
       finish()
     }
