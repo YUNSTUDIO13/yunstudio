@@ -58,6 +58,7 @@ export default function MegaMenu({ primary }: MegaMenuProps) {
               <ul className="flex flex-col gap-1">
                 {g.modules.map((m) => {
                   const meta = BUILTIN_MODULES[m]
+                  if (!meta) return null // 防御：跳过已下线的模块（如 KPI），避免整屏崩溃
                   return (
                     <li key={m}>
                       <Link

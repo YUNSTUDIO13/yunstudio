@@ -9,7 +9,7 @@ import {
 } from 'react'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { BuiltinModuleId } from '../lib/builtin-modules'
+import { BUILTIN_MODULE_IDS, type BuiltinModuleId } from '../lib/builtin-modules'
 import type { IconKey } from '../lib/icon-library'
 import { DEFAULT_NAV_CONFIG } from '../lib/default-nav'
 import type { NavConfig, NavPrimary, SecondaryColumn } from '../lib/nav-types'
@@ -65,7 +65,33 @@ function storageKey(userId: string): string {
  *  - 'p_settings' → 'p_nav_settings'（M2.2 升级：设置 → 导航设置）
  */
 function migrateConfig(cfg: NavConfig): NavConfig {
-  let primaries = cfg.primaries.map((p) => {
+  // 诊断：若旧配置含已下线的模块（如 KPI 刚下线），记录便于排查「hover 导航整屏清除」根因
+  const invalid: string[] = []
+  for (const p of cfg.primaries) {
+    for (const g of p.groups) {
+      for (const m of g.modules) {
+        if (!(BUILTIN_MODULE_IDS as readonly string[]).includes(m)) invalid.push(m)
+      }
+    }
+  }
+  if (invalid.length) {
+    console.warn('[nav] 已剔除旧配置中的无效模块（可能已下线的模块如 KPI）：', [...new Set(invalid)])
+  }
+
+  // 1) 剔除已下线的模块引用（如 KPI 下线后旧配置仍含 'kpis'），
+  //    否则 MegaMenu 渲染 BUILTIN_MODULES[m].route 会因 undefined 而整屏崩溃
+  const sanitized = {
+    ...cfg,
+    primaries: cfg.primaries.map((p) => ({
+      ...p,
+      groups: p.groups.map((g) => ({
+        ...g,
+        modules: g.modules.filter((m) => (BUILTIN_MODULE_IDS as readonly string[]).includes(m)),
+      })),
+    })),
+  }
+
+  let primaries = sanitized.primaries.map((p) => {
     if (p.id === 'p_settings') {
       return { ...p, id: 'p_nav_settings', title: p.title === '设置' ? '导航设置' : p.title }
     }
