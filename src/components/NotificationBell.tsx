@@ -164,7 +164,15 @@ export default function NotificationBell() {
           data-notif-panel
           role="menu"
           aria-label="通知列表"
-          className="absolute right-0 top-[52px] md:top-[60px] z-50 w-[340px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl"
+          className={`
+            z-50 overflow-hidden rounded-2xl
+            // 手机端：脱离铃铛、视口居中
+            fixed left-1/2 top-16 -translate-x-1/2
+            w-[calc(100vw-32px)] max-w-[360px]
+            // 桌面端：回到 absolute、贴铃铛右下
+            md:absolute md:left-auto md:top-[60px] md:translate-x-0 md:right-0
+            md:w-[340px] md:max-w-[calc(100vw-32px)]
+          `}
           style={{
             ...glass.card,
             background: 'rgba(20,20,28,0.72)',

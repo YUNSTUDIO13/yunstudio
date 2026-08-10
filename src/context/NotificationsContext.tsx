@@ -23,6 +23,8 @@ import {
   localDelete,
   localGet,
   localPut,
+  getClearedNotifKeys,
+  addClearedNotifKeys,
   type EntityTable,
 } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
@@ -148,7 +150,23 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         },
         async (payload: RealtimePostgresChangesPayload<Notification>) => {
           if (payload.eventType === 'DELETE') {
-            const id = (payload.old as { id: string }).id
+            const oldRow = payload.old as Partial<Notification>
+            const id = oldRow.id
+            // 跨端"清除"语义同步：任何设备一键清除后，云端删除事件会广播到所有设备，
+            // 收方在本地 cleared_notif_keys 补一条该键，本机的 60s 扫描就不会再把它建回来。
+            if (oldRow.entity_type && oldRow.entity_id && oldRow.deadline_at) {
+              try {
+                await addClearedNotifKeys([
+                  notifKey({
+                    entity_type: oldRow.entity_type,
+                    entity_id: oldRow.entity_id,
+                    deadline_at: oldRow.deadline_at,
+                  }),
+                ])
+              } catch {
+                /* 写 cleared 失败不影响主流程 */
+              }
+            }
             // 直接从内存里删（不依赖 db）——避免冲突
             setNotifications((prev) => prev.filter((n) => n.id !== id))
           } else {
@@ -180,10 +198,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   /**
    * 扫描 todos（deadline_at ≤ now 且未完成）+ sprints（end_date ≤ now 且非终态）
-   * 去重契约（用户要求：读过就别再吵）：
+   * 去重契约（用户要求：读过就别再吵；清掉就别再回）：
    *   唯一键 = entity_type:entity_id:deadline_at
-   *   只要该键**已存在任意一条通知（无论已读未读）**，就不再新建。
-   *   ⇒ 同一待办的同一截止时间，全生命周期只通知一次；点开已读后不会被 60s 扫描重新建出来。
+   *   1) 命中「本地已有通知（含已读）」→ 跳过；
+   *   2) 命中「cleared_notif_keys（用户已一键清除）」→ 跳过；
+   *   ⇒ 同一待办的同一截止时间，全生命周期只通知一次；
+   *      标记已读后不会重新建；一键清除后 60s 扫描也不会再把它建回来。
    *   ⇒ 若用户改了截止时间，键变化，属于新的到期事件，允许再提醒一次（符合直觉）。
    * 返回新建数量（供调试 / 测试）。
    */
@@ -198,6 +218,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       const removed = await dedupeExisting(user.id)
       if (removed > 0) setNotifications(await loadLocal(user.id))
       const localExisting = await localAll<Notification>(TABLE, user.id)
+      // 用户已"一键清除"过的键集合（持久化在 Dexie，跨刷新、跨会话都生效）
+      const clearedKeys = await getClearedNotifKeys()
 
       // 已通知过的键集合（含已读）——命中即跳过，杜绝重复轰炸
       const notifiedKeys = new Set<string>(localExisting.map(notifKey))
@@ -241,6 +263,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       let created = 0
       for (const e of due) {
         const key = notifKey(e)
+        if (clearedKeys.has(key)) continue // 用户已一键清除过 → 永不重建
         if (notifiedKeys.has(key)) continue // 已通知过（含已读）→ 永不重复
         const row: Notification = {
           id: crypto.randomUUID(),
@@ -344,11 +367,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     [notifications],
   )
 
-  /** 一键清空：本地逐条删除并入队补传，内存态同步清空 */
+  /** 一键清空：本地逐条删除并入队补传；同时把"已清键"持久化到 cleared_notif_keys，
+   *  阻断 60s 兜底扫描把刚清掉的通知又建回来。 */
   const clearAll = useCallback(async () => {
     if (!user) return
     const all = await localAll<Notification>(TABLE, user.id)
     if (!all.length) return
+    // 先把要清的键全部记录（不依赖后面的删除是否成功，确保扫描不会重建）
+    const keys = all.map(notifKey)
+    await addClearedNotifKeys(keys)
     for (const n of all) {
       await localDelete(TABLE, n.id)
       await enqueueAndMaybeFlush(TABLE, 'delete', n.id)
