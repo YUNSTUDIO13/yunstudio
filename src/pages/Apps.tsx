@@ -319,16 +319,6 @@ export default function AppsPage() {
                 <AppIcon app={a} size="h-12 w-12" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-base font-medium text-ink-strong">{a.name}</div>
-                  <a
-                    href={a.target_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="block truncate text-xs text-ink-mute transition hover:text-accent"
-                    title={a.target_url}
-                  >
-                    {a.target_url}
-                  </a>
                   {a.description ? (
                     <p className="mt-1.5 line-clamp-2 text-sm text-ink-soft">{a.description}</p>
                   ) : null}
