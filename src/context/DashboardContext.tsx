@@ -21,6 +21,8 @@ interface DashboardConfig {
   widgetIds: string[]
   /** 每个卡片的二维尺寸（宽×高，单位=网格单元格）；缺失时回退默认尺寸 */
   sizes: Record<string, WidgetSize>
+  /** 编辑时间戳（ISO）；多端按"最后编辑胜"收敛，刷新时仅云端更新于本地才覆盖 */
+  updated_at?: string
 }
 
 interface DashboardActions {
@@ -163,17 +165,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       if (data?.config && isDashboardConfig(data.config)) {
         const loaded = data.config
         const merged = { ...loaded, sizes: { ...DEFAULT_SIZES, ...(loaded.sizes ?? {}) } }
-        // 云端有自定义布局 → 采纳（多设备收敛到最新同步态）
-        // 仅当云端仍是默认、而本地已有自定义时，保留本地以避免回退闪屏 / 丢编辑
         const localCustom = loadFromStorage(user.id)
-        const cloudIsDefault =
-          JSON.stringify(merged.widgetIds) === JSON.stringify(DEFAULT_DASHBOARD) &&
-          JSON.stringify(merged.sizes) === JSON.stringify(DEFAULT_SIZES)
-        const localIsDefault =
-          !localCustom ||
-          (JSON.stringify(localCustom.widgetIds) === JSON.stringify(DEFAULT_DASHBOARD) &&
-            JSON.stringify(localCustom.sizes ?? {}) === JSON.stringify(DEFAULT_SIZES))
-        if (cloudIsDefault && !localIsDefault) return
+        // 多端 last-write-wins：仅当云端比本地"更新"才覆盖，否则保持本地现状 → 刷新不闪屏
+        // 缺时间戳（旧数据）时以云端为准，触发一次性收敛
+        const localTs = localCustom?.updated_at
+        const cloudTs = merged.updated_at
+        const cloudNewer =
+          !localCustom || (cloudTs && localTs ? cloudTs > localTs : true)
+        if (!cloudNewer) return // 本地已是最新/更新 → 保持本地，不闪
         setConfig(merged)
         return
       }
@@ -188,19 +187,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  // ----- 持久化：云端 upsert + localStorage 双写 -----
+  // ----- 持久化：云端 upsert + localStorage 双写；每次编辑打 updated_at 时间戳 -----
   const persist = useCallback(
     async (next: DashboardConfig) => {
-      setConfig(next)
+      const stamped: DashboardConfig = { ...next, updated_at: new Date().toISOString() }
+      setConfig(stamped)
       if (user && userId !== 'anonymous') {
-        saveToStorage(user.id, next)
+        saveToStorage(user.id, stamped)
         writeLastUserId(user.id)
       }
       if (user) {
         const { error } = await supabase
           .from(TABLE)
           .upsert(
-            { user_id: user.id, kind: DASHBOARD_KIND, config: next },
+            { user_id: user.id, kind: DASHBOARD_KIND, config: stamped },
             { onConflict: 'user_id,kind' },
           )
         if (error) {
@@ -234,7 +234,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           if (kind !== DASHBOARD_KIND) return
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const cfg = (payload.new as { config?: DashboardConfig }).config
-            if (cfg && isDashboardConfig(cfg)) setConfig(cfg)
+            if (cfg && isDashboardConfig(cfg)) {
+              // 仅当云端变更更新（或等于）本地才采纳，防陈旧回声覆盖本地新编辑
+              setConfig((prev) => {
+                const curTs = prev.updated_at
+                const newTs = cfg.updated_at
+                return !curTs || !newTs || newTs >= curTs ? cfg : prev
+              })
+            }
           }
         },
       )
