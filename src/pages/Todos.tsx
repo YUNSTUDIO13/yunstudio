@@ -147,6 +147,8 @@ export default function Todos() {
     todos.forEach((t) => {
       if (filterStatus === 'active' && t.done) return
       if (filterStatus === 'done' && !t.done) return
+      if (filterPriority !== 'all' && t.priority !== filterPriority) return
+      if (filterTag !== ALL_TAGS && t.tag_id !== filterTag) return
       if (q && !t.title.toLowerCase().includes(q)) return
       map[t.priority].push(t)
     })
@@ -154,7 +156,7 @@ export default function Todos() {
       map[p] = map[p].sort((a, b) => computeScore(b) - computeScore(a))
     })
     return map
-  }, [todos, filterStatus, query])
+  }, [todos, filterStatus, filterPriority, filterTag, query])
 
   function openCreate() {
     setEditing(null)
@@ -426,8 +428,8 @@ export default function Todos() {
                     key={t.id}
                     className={`flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:gap-3 ${t.done ? 'opacity-60' : ''}`}
                   >
-                    {/* 紧凑头：checkbox + PriorityTag 合并为一个 wrapper，避免「勾选框 / P0 / 标题」被 gap 拆成三段独立块 */}
-                    <div className="flex items-center gap-2 self-start md:self-auto">
+                    {/* 紧凑头：checkbox + PriorityTag + TagChip 合并为一个 chip 行，避免「勾选框 / P0 / 标签」被 gap 拆成三段独立块 */}
+                    <div className="flex items-center gap-1.5 self-start md:self-auto">
                       <input
                         type="checkbox"
                         checked={t.done}
@@ -435,6 +437,7 @@ export default function Todos() {
                         className="h-4 w-4 shrink-0 accent-ink-strong"
                       />
                       <PriorityTag priority={t.priority} />
+                      <TagChip tagId={t.tag_id} />
                     </div>
                     {/* 标题段：占满剩余宽度，标题与 note 自由换行 */}
                     <div className="min-w-0 flex-1">
@@ -457,7 +460,6 @@ export default function Todos() {
                             ↗
                           </a>
                         )}
-                        <TagChip tagId={t.tag_id} />
                       </div>
                       {t.note && (
                         <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">{t.note}</div>
@@ -519,12 +521,16 @@ export default function Todos() {
                           key={t.id}
                           className={`flex flex-wrap items-center gap-2 px-1 py-2.5 md:flex-nowrap ${t.done ? 'opacity-60' : ''}`}
                         >
-                          <input
-                            type="checkbox"
-                            checked={t.done}
-                            onChange={() => toggleDone(t.id)}
-                            className="h-4 w-4 accent-ink-strong"
-                          />
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={t.done}
+                              onChange={() => toggleDone(t.id)}
+                              className="h-4 w-4 accent-ink-strong"
+                            />
+                            <PriorityTag priority={t.priority} />
+                            <TagChip tagId={t.tag_id} />
+                          </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <span
@@ -545,7 +551,6 @@ export default function Todos() {
                                   ↗
                                 </a>
                               )}
-                              <TagChip tagId={t.tag_id} />
                             </div>
                             <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">
                               Score {computeScore(t)}

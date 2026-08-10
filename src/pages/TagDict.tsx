@@ -316,15 +316,36 @@ export default function TagDictPage() {
       >
         {edit && (
           <div className="space-y-2">
-            <Field label="字段名">
+            <Field
+              label="字段名"
+              hint={edit.categoryId ? '可重命名，保存即生效' : '可从下拉选已有字段名，或自定义'}
+            >
               {edit.categoryId ? (
-                <Input
-                  value={edit.draftName}
-                  onChange={(e) =>
-                    setEdit({ ...edit, draftName: e.target.value })
-                  }
-                  placeholder="如：标签 / 优先级 / 受理人"
-                />
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-mute">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-3.5 w-3.5"
+                      aria-hidden
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                    </svg>
+                  </span>
+                  <Input
+                    value={edit.draftName}
+                    onChange={(e) =>
+                      setEdit({ ...edit, draftName: e.target.value })
+                    }
+                    placeholder="如：标签 / 优先级 / 受理人"
+                    className="!border-white/15 !bg-white/[0.06] pl-8 hover:!border-accent/50 focus:!border-accent"
+                  />
+                </div>
               ) : (
                 <Select
                   value={edit.draftName}

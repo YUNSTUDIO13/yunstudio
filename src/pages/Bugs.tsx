@@ -325,7 +325,7 @@ export default function Bugs() {
                   : ''
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {draggable && (
                   <button
                     type="button"
@@ -347,6 +347,7 @@ export default function Bugs() {
                   {BUG_STATUS_META[b.status].label}
                 </StatusTag>
                 <PriorityTag priority={b.priority} />
+                <TagChip tagId={b.tag_id} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium leading-snug text-ink-strong break-words">
@@ -354,9 +355,6 @@ export default function Bugs() {
                 </div>
                 <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
                   {b.reporter ?? '未指派'}
-                </div>
-                <div className="mt-1">
-                  <TagChip tagId={b.tag_id} />
                 </div>
               </div>
               <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
@@ -389,26 +387,24 @@ export default function Bugs() {
                 {qitems.map((b) => (
                   <li key={b.id} className="rounded-xl border border-line bg-canvas/40 p-3">
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
-                            {BUG_SEVERITY_META[b.severity].label}
-                          </StatusTag>
-                          <StatusTag tone={BUG_STATUS_META[b.status].tone}>
-                            {BUG_STATUS_META[b.status].label}
-                          </StatusTag>
-                          <PriorityTag priority={b.priority} />
-                        </div>
-                        <div className="mt-1.5 text-sm font-medium leading-snug text-ink-strong break-words">
-                          {b.title}
-                        </div>
-                        <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
-                          {b.reporter ?? '未指派'}
-                        </div>
-                        <div className="mt-1">
-                          <TagChip tagId={b.tag_id} />
-                        </div>
+<div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
+                          {BUG_SEVERITY_META[b.severity].label}
+                        </StatusTag>
+                        <StatusTag tone={BUG_STATUS_META[b.status].tone}>
+                          {BUG_STATUS_META[b.status].label}
+                        </StatusTag>
+                        <PriorityTag priority={b.priority} />
+                        <TagChip tagId={b.tag_id} />
                       </div>
+                      <div className="mt-1.5 text-sm font-medium leading-snug text-ink-strong break-words">
+                        {b.title}
+                      </div>
+                      <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
+                        {b.reporter ?? '未指派'}
+                      </div>
+                    </div>
                       <div className="flex items-center justify-end md:justify-end">
                         <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
                       </div>

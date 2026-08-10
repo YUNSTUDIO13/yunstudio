@@ -357,16 +357,16 @@ export default function Requirements() {
                   {gripIcon}
                 </button>
               )}
-              <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+              <div className="flex flex-wrap items-center gap-1.5 self-start md:self-auto">
                 <StatusTag tone={REQ_STATUS_META[r.status].tone}>
                   {REQ_STATUS_META[r.status].label}
                 </StatusTag>
                 <PriorityTag priority={r.priority} />
+                <TagChip tagId={r.tag_id} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 text-sm font-medium leading-snug text-ink-strong break-words">
-                  <span>{r.title}</span>
-                  <TagChip tagId={r.tag_id} />
+                <div className="text-sm font-medium leading-snug text-ink-strong break-words">
+                  {r.title}
                 </div>
                 <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
                   <div className="break-words">
@@ -421,12 +421,15 @@ export default function Requirements() {
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <StatusTag tone={REQ_STATUS_META[r.status].tone}>
                             {REQ_STATUS_META[r.status].label}
                           </StatusTag>
-                          <span className="break-words text-sm font-medium leading-snug text-ink-strong">{r.title}</span>
+                          <PriorityTag priority={r.priority} />
                           <TagChip tagId={r.tag_id} />
+                        </div>
+                        <div className="mt-1 break-words text-sm font-medium leading-snug text-ink-strong">
+                          {r.title}
                         </div>
                         <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
                           <div className="break-words">
