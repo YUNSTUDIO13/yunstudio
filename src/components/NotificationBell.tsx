@@ -51,19 +51,45 @@ function entityLabel(t: Notification['entity_type']): string {
 export default function NotificationBell() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
   const [open, setOpen] = useState(false)
+  // 打开面板瞬间即全部已读（用户要求：点了通知按钮就代表看过了）。
+  // 但为了让用户仍能一眼分辨"这次新来的是哪几条"，把打开那一刻的未读 id 快照下来，
+  // 仅用于本次面板内的视觉高亮；关闭后清空。
+  const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set())
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const navigate = useNavigate()
+
+  function toggleOpen() {
+    setOpen((prev) => {
+      const next = !prev
+      if (next) {
+        setHighlightIds(
+          new Set(notifications.filter((n) => !n.read_at).map((n) => n.id)),
+        )
+        // 点击通知按钮 = 已读，红点即刻消失，60s 扫描也不会再把它们建回来
+        if (unreadCount > 0) void markAllRead()
+      } else {
+        setHighlightIds(new Set())
+      }
+      return next
+    })
+  }
 
   // 点击外部 / Esc 关闭
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') {
+        setOpen(false)
+        setHighlightIds(new Set())
+      }
     }
     function onClick(e: MouseEvent) {
       const t = e.target as HTMLElement | null
       if (!t) return
-      if (wrapRef.current && !wrapRef.current.contains(t)) setOpen(false)
+      if (wrapRef.current && !wrapRef.current.contains(t)) {
+        setOpen(false)
+        setHighlightIds(new Set())
+      }
     }
     window.addEventListener('keydown', onKey)
     window.addEventListener('click', onClick)
@@ -77,19 +103,17 @@ export default function NotificationBell() {
     void markRead(n.id)
     const route = n.entity_type === 'todo' ? '/modules/todos' : '/modules/sprints'
     setOpen(false)
+    setHighlightIds(new Set())
     navigate(route)
   }
 
   return (
-    <div
-      ref={wrapRef}
-      className="fixed right-4 top-4 z-40 md:right-6 md:top-6"
-      data-notif-trigger
-    >
+    // 内联定位：由调用方（Overview 标题行）决定摆放位置，这里只负责自身与气泡的相对定位
+    <div ref={wrapRef} className="relative z-40 shrink-0" data-notif-trigger>
       {/* Bell 按钮 */}
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
         title="通知"
         aria-label={unreadCount > 0 ? `通知（${unreadCount} 条未读）` : '通知'}
         aria-expanded={open}
@@ -159,7 +183,7 @@ export default function NotificationBell() {
               <span style={{ fontSize: 14, fontWeight: 600, color: C.textPrimary }}>
                 通知
               </span>
-              {unreadCount > 0 && (
+              {highlightIds.size > 0 && (
                 <span
                   className="rounded-full px-1.5 text-[10px] font-semibold"
                   style={{
@@ -169,19 +193,14 @@ export default function NotificationBell() {
                     lineHeight: '16px',
                   }}
                 >
-                  {unreadCount} 未读
+                  {highlightIds.size} 条新
                 </span>
               )}
             </div>
-            {notifications.length > 0 && unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={() => void markAllRead()}
-                className="text-[11px] transition hover:text-accent"
-                style={{ color: C.textSub, padding: '2px 6px' }}
-              >
-                全部已读
-              </button>
+            {notifications.length > 0 && (
+              <span className="text-[11px]" style={{ color: C.textGhost }}>
+                已全部标记为已读
+              </span>
             )}
           </div>
 
@@ -200,7 +219,8 @@ export default function NotificationBell() {
               </div>
             ) : (
               notifications.map((n) => {
-                const unread = !n.read_at
+                // 打开面板时已整体置为已读，故高亮以"本次打开前的未读快照"为准
+                const unread = highlightIds.has(n.id) || !n.read_at
                 return (
                   <button
                     type="button"
@@ -278,7 +298,7 @@ export default function NotificationBell() {
               className="px-4 py-2.5 text-center text-[10px]"
               style={{ borderTop: `1px solid ${C.border}`, color: C.textGhost }}
             >
-              显示所有通知；标记已读可减少噪音
+              同一事项的同一截止时间只提醒一次
             </div>
           )}
         </div>

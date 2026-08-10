@@ -20,6 +20,7 @@ import { useSprints } from './SprintsContext'
 import type { Notification } from '../types'
 import {
   localAll,
+  localDelete,
   localGet,
   localPut,
   type EntityTable,
@@ -44,6 +45,59 @@ const TABLE: EntityTable = 'notifications'
 async function loadLocal(userId: string): Promise<Notification[]> {
   const all = await localAll<Notification>(TABLE, userId)
   return all.sort((a, b) => b.created_at.localeCompare(a.created_at))
+}
+
+/**
+ * 通知去重唯一键：实体类型 + 实体 id + 该次截止时间快照。
+ * 同一条待办、同一个截止时间，全生命周期只应存在一条通知。
+ */
+function notifKey(n: {
+  entity_type: Notification['entity_type']
+  entity_id: string
+  deadline_at: string
+}): string {
+  return `${n.entity_type}:${n.entity_id}:${n.deadline_at}`
+}
+
+/**
+ * 清理历史遗留重复：旧扫描逻辑「已读后再次到期重建未读」会让同一待办堆出多条。
+ * 同键仅保留最早的一条（即首次提醒），已读状态在同键内合并（任一已读 ⇒ 保留条已读）。
+ * 其余条目本地删除并入队 delete 补传云端，保证多端一致。
+ */
+async function dedupeExisting(userId: string): Promise<number> {
+  const all = await localAll<Notification>(TABLE, userId)
+  const groups = new Map<string, Notification[]>()
+  for (const n of all) {
+    const key = notifKey(n)
+    const arr = groups.get(key)
+    if (arr) arr.push(n)
+    else groups.set(key, [n])
+  }
+  let removed = 0
+  for (const list of groups.values()) {
+    if (list.length < 2) continue
+    // 最早创建的一条作为保留项
+    list.sort((a, b) => a.created_at.localeCompare(b.created_at))
+    const [keep, ...dups] = list
+    // 已读状态合并：组内任一已读则保留条视为已读（取最早的 read_at）
+    const readTimes = list.map((n) => n.read_at).filter((v): v is string => !!v)
+    if (readTimes.length > 0 && !keep.read_at) {
+      readTimes.sort()
+      const merged: Notification = {
+        ...keep,
+        read_at: readTimes[0],
+        updated_at: new Date().toISOString(),
+      }
+      await localPut(TABLE, merged)
+      await enqueueAndMaybeFlush(TABLE, 'update', merged.id, merged)
+    }
+    for (const d of dups) {
+      await localDelete(TABLE, d.id)
+      await enqueueAndMaybeFlush(TABLE, 'delete', d.id)
+      removed++
+    }
+  }
+  return removed
 }
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
@@ -124,8 +178,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   /**
    * 扫描 todos（deadline_at ≤ now 且未完成）+ sprints（end_date ≤ now 且非终态）
-   * 对每个"已到期且未通知"的实体建一条未读通知；同一实体至多一条未读（标记已读后可再次到期再建）。
-   * 返回新建数量（供调试 / 测试）。已读→取消已读状态由 UI 层处理（markRead）。
+   * 去重契约（用户要求：读过就别再吵）：
+   *   唯一键 = entity_type:entity_id:deadline_at
+   *   只要该键**已存在任意一条通知（无论已读未读）**，就不再新建。
+   *   ⇒ 同一待办的同一截止时间，全生命周期只通知一次；点开已读后不会被 60s 扫描重新建出来。
+   *   ⇒ 若用户改了截止时间，键变化，属于新的到期事件，允许再提醒一次（符合直觉）。
+   * 返回新建数量（供调试 / 测试）。
    */
   const scanDueEntities = useCallback(async (): Promise<number> => {
     if (!user) return 0
@@ -134,16 +192,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     try {
       const now = Date.now()
       const nowIso = new Date(now).toISOString()
+      // 先清理历史遗留的重复条目（旧逻辑「已读后重建」制造的噪音）
+      const removed = await dedupeExisting(user.id)
+      if (removed > 0) setNotifications(await loadLocal(user.id))
       const localExisting = await localAll<Notification>(TABLE, user.id)
 
-      // 按实体键去重：已有未读同实体 → 跳过；已有已读同实体 → 重建未读（用户已读后再次到期）
-      const hasUnreadKey = new Set<string>()
-      const hasReadKey = new Set<string>()
-      for (const n of localExisting) {
-        const key = `${n.entity_type}:${n.entity_id}`
-        if (n.read_at) hasReadKey.add(key)
-        else hasUnreadKey.add(key)
-      }
+      // 已通知过的键集合（含已读）——命中即跳过，杜绝重复轰炸
+      const notifiedKeys = new Set<string>(localExisting.map(notifKey))
 
       // 收集到期实体
       const due: Array<{
@@ -183,9 +238,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
       let created = 0
       for (const e of due) {
-        const key = `${e.entity_type}:${e.entity_id}`
-        if (hasUnreadKey.has(key)) continue // 已有未读 → 不重复
-        // 若该实体之前已经被通知过（即在已读列表中），本次到期重新建一条
+        const key = notifKey(e)
+        if (notifiedKeys.has(key)) continue // 已通知过（含已读）→ 永不重复
         const row: Notification = {
           id: crypto.randomUUID(),
           user_id: user.id,
@@ -206,7 +260,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           ),
         )
         created++
-        hasUnreadKey.add(key)
+        notifiedKeys.add(key)
       }
       return created
     } finally {

@@ -10,6 +10,7 @@ import { useTodos } from '../context/TodosContext'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { useDashboard } from '../context/DashboardContext'
 import DashboardConfig from '../components/DashboardConfig'
+import NotificationBell from '../components/NotificationBell'
 import { SIZE_CLASS } from '../widgets/registry'
 import { C, glass } from '../design/tokens'
 import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
@@ -111,9 +112,18 @@ export default function Overview() {
 
   return (
     <div style={{ padding: isMobile ? '16px 16px 24px' : '40px 44px 56px', display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
-      {/* 个性化 Header（保留 M3.8 昵称显示） */}
-      <div style={{ marginBottom: 8 }}>
+      {/* 个性化 Header（保留 M3.8 昵称显示）；通知铃铛与标题同行右对齐，仅主页展示 */}
+      <div
+        style={{
+          marginBottom: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
         <Display size={42} color={C.textPrimary}>{`Hi, ${name}`}</Display>
+        <NotificationBell />
       </div>
 
       {/* 首页卡片：按 config.widgetIds 顺序渲染（管理卡片的"展示顺序"调序在此生效）；
