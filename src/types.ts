@@ -208,3 +208,24 @@ export type ProfileInput = {
   department?: string | null
   bio?: string | null
 }
+
+// ============================================================
+// 通知（Notification）—— 到期通知
+// 触发：实体（todo/sprint）填写了截止时间且到达该时间点，
+//       在通知列表增加一条。已读后该实体再次到期才再建。
+// ============================================================
+export type NotificationEntity = 'todo' | 'sprint'
+export type NotificationKind = 'expired'
+
+export interface Notification {
+  id: string
+  user_id: string
+  entity_type: NotificationEntity
+  entity_id: string
+  entity_title: string // 实体标题快照（即使实体被删/改名也保留历史记录）
+  deadline_at: string // 截止时间快照
+  kind: NotificationKind
+  read_at: string | null // null = 未读
+  created_at: string
+  updated_at: string
+}

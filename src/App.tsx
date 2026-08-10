@@ -7,6 +7,7 @@ import { SprintsProvider } from './context/SprintsContext'
 import { BugsProvider } from './context/BugsContext'
 import { KpisProvider } from './context/KpisContext'
 import { NewsProvider } from './context/NewsContext'
+import { NotificationsProvider } from './context/NotificationsContext'
 import { NavProvider } from './context/NavContext'
 import { DashboardProvider } from './context/DashboardContext'
 import SyncEngine from './components/SyncEngine'
@@ -23,6 +24,7 @@ export default function App() {
       <TodosProvider>
         <RequirementsProvider>
           <SprintsProvider>
+            <NotificationsProvider>
             <BugsProvider>
               <KpisProvider>
                 <NewsProvider>
@@ -45,6 +47,7 @@ export default function App() {
                 </NewsProvider>
                 </KpisProvider>
             </BugsProvider>
+            </NotificationsProvider>
           </SprintsProvider>
         </RequirementsProvider>
       </TodosProvider>

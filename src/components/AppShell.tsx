@@ -9,6 +9,7 @@ import { useMediaQuery } from '../lib/useMediaQuery'
 import MegaMenu from './MegaMenu'
 import MobileMegaSheet from './MobileMegaSheet'
 import Avatar from './Avatar'
+import NotificationBell from './NotificationBell'
 import type { BuiltinModuleId } from '../lib/builtin-modules'
 import AuroraBackground from '../design/AuroraBackground'
 
@@ -359,6 +360,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       >
         {children}
       </div>
+
+      {/* 通知中心（右上浮岛，所有页面都可访问，玻璃风格深色一致） */}
+      <NotificationBell />
     </div>
   )
 }

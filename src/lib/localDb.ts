@@ -3,9 +3,9 @@
 // 联网后由 sync.ts 把本地"发件箱(outbox)"逐条补传到 Supabase。
 // 手机 / PC 共用同一套浏览器代码，一次实现两端生效。
 import Dexie, { type Table } from 'dexie'
-import type { Todo, Requirement, Bug, Sprint, Kpi } from '../types'
+import type { Todo, Requirement, Bug, Sprint, Kpi, Notification } from '../types'
 
-export type EntityTable = 'todos' | 'requirements' | 'bugs' | 'sprints' | 'kpis'
+export type EntityTable = 'todos' | 'requirements' | 'bugs' | 'sprints' | 'kpis' | 'notifications'
 
 export type SyncOpType = 'insert' | 'update' | 'delete'
 
@@ -26,18 +26,20 @@ interface LocalDB extends Dexie {
   bugs: Table<Bug, string>
   sprints: Table<Sprint, string>
   kpis: Table<Kpi, string>
+  notifications: Table<Notification, string>
   outbox: Table<OutboxOp, string>
 }
 
 export const db = new Dexie('yunstudio-local') as LocalDB
 
-db.version(1).stores({
+db.version(2).stores({
   // 主键 id；user_id / updated_at 建索引便于按用户过滤与排序
   todos: 'id, user_id, updated_at',
   requirements: 'id, user_id, updated_at',
   bugs: 'id, user_id, updated_at',
   sprints: 'id, user_id, updated_at',
   kpis: 'id, user_id, updated_at',
+  notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
   outbox: 'id, table, rowId, createdAt',
 })
 
@@ -54,6 +56,8 @@ function tableRef<T>(table: EntityTable): Table<T> {
       return db.sprints as unknown as Table<T>
     case 'kpis':
       return db.kpis as unknown as Table<T>
+    case 'notifications':
+      return db.notifications as unknown as Table<T>
   }
 }
 
