@@ -24,7 +24,7 @@ export const SPRINT_STATUS_META: Record<SprintStatus, { label: string; tone: Ton
 }
 
 const STATUS_ORDER: SprintStatus[] = ['planning', 'active', 'closing', 'done', 'cancelled']
-// 归档态：已完成 / 已取消（满足即划入归档板块，主网格不再展示）
+// 归档态：已完成 / 已取消（满足即定义为"归档"，通过筛选栏「归档」字段筛选）
 const ARCHIVED: SprintStatus[] = ['done', 'cancelled']
 
 const EMPTY = {
@@ -41,24 +41,6 @@ function fmtDate(s?: string): string {
   const [, m, d] = s.split('-')
   return `${m}/${d}`
 }
-
-// 归档图标（内联 SVG，与需求/缺陷/铃铛同风格）
-const archiveIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="h-4 w-4 text-ink-soft"
-    aria-hidden
-  >
-    <rect x="3" y="4" width="18" height="4" rx="1" />
-    <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
-    <path d="M10 12h4" />
-  </svg>
-)
 
 // 迭代卡片（主网格与归档网格共用）
 function SprintCard({
@@ -133,28 +115,26 @@ function SprintCard({
 export default function Sprints() {
   const { sprints, loading, error, refresh, addSprint, updateSprint, removeSprint } = useSprints()
   const [filterStatus, setFilterStatus] = useState<SprintStatus | 'all'>('all')
+  const [filterArchived, setFilterArchived] = useState<'no' | 'yes'>('no')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Sprint | null>(null)
   const [draft, setDraft] = useState(EMPTY)
   const [nameError, setNameError] = useState('')
   const [toDelete, setToDelete] = useState<Sprint | null>(null)
 
-  const visible = useMemo(
-    () =>
-      sprints
-        .filter((s) => !ARCHIVED.includes(s.status)) // 归档项仅在归档板块展示
-        .filter((s) => (filterStatus === 'all' ? true : s.status === filterStatus)),
-    [sprints, filterStatus],
-  )
-
-  // 归档项：满足归档态，按 updated_at 倒序（最新归档排最前）
-  const archived = useMemo(
-    () =>
-      sprints
-        .filter((s) => ARCHIVED.includes(s.status))
-        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
-    [sprints],
-  )
+  const visible = useMemo(() => {
+    const base = sprints.filter((s) => {
+      // 归档筛选：否 → 排除归档态；是 → 仅含归档态
+      const isArchived = ARCHIVED.includes(s.status)
+      if (filterArchived === 'no' && isArchived) return false
+      if (filterArchived === 'yes' && !isArchived) return false
+      if (filterStatus !== 'all' && s.status !== filterStatus) return false
+      return true
+    })
+    // 筛选「已归档」时按 updated_at 倒序（最新归档排最前）
+    if (filterArchived === 'yes') base.sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    return base
+  }, [sprints, filterStatus, filterArchived])
 
   const openCreate = () => {
     setEditing(null)
@@ -277,6 +257,15 @@ export default function Sprints() {
               </option>
             ))}
           </Select>
+          <Select
+            value={filterArchived}
+            onChange={(v) => setFilterArchived(v as 'no' | 'yes')}
+            className="!w-auto min-w-[110px] max-w-[160px] flex-1 basis-[110px] md:flex-none md:basis-auto"
+            aria-label="按归档筛选"
+          >
+            <option value="no">未归档</option>
+            <option value="yes">已归档</option>
+          </Select>
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <span className="hidden text-xs text-ink-mute sm:inline">
               共 {visible.length} 个迭代
@@ -288,7 +277,7 @@ export default function Sprints() {
         </div>
       </Card>
 
-      {/* 主网格：卡片（归档项已在 visible 中排除，仅在归档板块展示） */}
+      {/* 主网格：卡片（归档态通过筛选栏「归档」字段筛选） */}
       {visible.length === 0 ? (
         <Card>
           <p className="py-12 text-center text-sm text-ink-mute">没有符合条件的迭代</p>
@@ -299,24 +288,6 @@ export default function Sprints() {
             <SprintCard key={s.id} s={s} onEdit={openEdit} onDelete={setToDelete} />
           ))}
         </div>
-      )}
-
-      {/* 归档板块：卡片网格；按 updated_at 倒序，最新归档排最前 */}
-      {archived.length > 0 && (
-        <section className="space-y-3">
-          <header className="flex items-center gap-2 px-1">
-            {archiveIcon}
-            <h2 className="text-base font-semibold text-ink-strong">归档</h2>
-            <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-ink-mute">
-              {archived.length}
-            </span>
-          </header>
-          <div className="grid gap-5 lg:grid-cols-2">
-            {archived.map((s) => (
-              <SprintCard key={s.id} s={s} onEdit={openEdit} onDelete={setToDelete} />
-            ))}
-          </div>
-        </section>
       )}
 
       {/* 新建/编辑 Modal */}

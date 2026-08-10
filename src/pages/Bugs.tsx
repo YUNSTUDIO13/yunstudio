@@ -31,7 +31,7 @@ export const BUG_STATUS_META: Record<BugStatus, { label: string; tone: Tone }> =
 
 const SEVERITY_ORDER: BugSeverity[] = ['critical', 'major', 'normal', 'minor']
 const STATUS_ORDER: BugStatus[] = ['open', 'in_progress', 'verifying', 'closed']
-// 归档态：已关闭（满足即划入归档板块，主视图不再展示）
+// 归档态：已关闭（满足即定义为"归档"，通过筛选栏「归档」字段筛选）
 const ARCHIVED: BugStatus[] = ['closed']
 
 const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
@@ -85,24 +85,6 @@ const delIcon = (
     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
   </svg>
 )
-// 归档图标（内联 SVG，与需求/铃铛同风格）
-const archiveIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="h-4 w-4 text-ink-soft"
-    aria-hidden
-  >
-    <rect x="3" y="4" width="18" height="4" rx="1" />
-    <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
-    <path d="M10 12h4" />
-  </svg>
-)
-
 // 行内操作簇：链接跳转（左） / 编辑 / 删除
 function BugActions({
   b,
@@ -186,6 +168,7 @@ export default function Bugs() {
   const [filterStatus, setFilterStatus] = useState<BugStatus | 'all'>('all')
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all')
   const [keyword, setKeyword] = useState('')
+  const [filterArchived, setFilterArchived] = useState<'no' | 'yes'>('no')
   const [view, setView] = useState<'list' | 'quadrant'>('quadrant')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Bug | null>(null)
@@ -198,34 +181,28 @@ export default function Bugs() {
   const [overId, setOverId] = useState<string | null>(null)
   const dragAllowed = useRef(false)
 
-  const visible = useMemo(
-    () =>
-      bugs
-        .filter((b) => !ARCHIVED.includes(b.status)) // 归档项仅在归档板块展示
-        .filter((b) => {
-          if (filterSeverity !== 'all' && b.severity !== filterSeverity) return false
-          if (filterStatus !== 'all' && b.status !== filterStatus) return false
-          if (filterPriority !== 'all' && b.priority !== filterPriority) return false
-          const kw = keyword.trim().toLowerCase()
-          if (
-            kw &&
-            !b.title.toLowerCase().includes(kw) &&
-            !(b.reporter ?? '').toLowerCase().includes(kw)
-          )
-            return false
-          return true
-        }),
-    [bugs, filterSeverity, filterStatus, filterPriority, keyword],
-  )
-
-  // 归档项：满足归档态，按 updated_at 倒序（最新归档排最前）
-  const archived = useMemo(
-    () =>
-      bugs
-        .filter((b) => ARCHIVED.includes(b.status))
-        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
-    [bugs],
-  )
+  const visible = useMemo(() => {
+    const kw = keyword.trim().toLowerCase()
+    const base = bugs.filter((b) => {
+      // 归档筛选：否 → 排除归档态；是 → 仅含归档态
+      const isArchived = ARCHIVED.includes(b.status)
+      if (filterArchived === 'no' && isArchived) return false
+      if (filterArchived === 'yes' && !isArchived) return false
+      if (filterSeverity !== 'all' && b.severity !== filterSeverity) return false
+      if (filterStatus !== 'all' && b.status !== filterStatus) return false
+      if (filterPriority !== 'all' && b.priority !== filterPriority) return false
+      if (
+        kw &&
+        !b.title.toLowerCase().includes(kw) &&
+        !(b.reporter ?? '').toLowerCase().includes(kw)
+      )
+        return false
+      return true
+    })
+    // 筛选「已归档」时按 updated_at 倒序（最新归档排最前）
+    if (filterArchived === 'yes') base.sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    return base
+  }, [bugs, filterSeverity, filterStatus, filterPriority, keyword, filterArchived])
 
   const openCreate = () => {
     setEditing(null)
@@ -520,6 +497,15 @@ export default function Bugs() {
               </option>
             ))}
           </Select>
+          <Select
+            value={filterArchived}
+            onChange={(v) => setFilterArchived(v as 'no' | 'yes')}
+            className="!w-auto min-w-[110px] max-w-[160px] flex-1 basis-[110px] md:flex-none md:basis-auto"
+            aria-label="按归档筛选"
+          >
+            <option value="no">未归档</option>
+            <option value="yes">已归档</option>
+          </Select>
           <Input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -536,22 +522,8 @@ export default function Bugs() {
         <div className="mt-1 text-[11px] text-ink-mute sm:hidden">共 {visible.length} 条</div>
       </Card>
 
-      {/* 主视图：列表 / 四象限（归档项已在 visible 中排除，仅在归档板块展示） */}
+      {/* 主视图：列表 / 四象限（归档态通过筛选栏「归档」字段筛选） */}
       {view === 'list' ? renderBugList(visible, true) : renderBugQuadrant(visible)}
-
-      {/* 归档板块：随主视图模式（列表 / 四象限）；按 updated_at 倒序，最新归档排最前 */}
-      {archived.length > 0 && (
-        <section className="space-y-3">
-          <header className="flex items-center gap-2 px-1">
-            {archiveIcon}
-            <h2 className="text-base font-semibold text-ink-strong">归档</h2>
-            <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-ink-mute">
-              {archived.length}
-            </span>
-          </header>
-          {view === 'list' ? renderBugList(archived, false) : renderBugQuadrant(archived)}
-        </section>
-      )}
 
       {/* 新建/编辑 Modal */}
       <Modal
