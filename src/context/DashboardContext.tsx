@@ -144,22 +144,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     return { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
   })
 
-  // ----- 加载：本地优先（首帧已同步渲染），本地为空才问云端，无则默认 -----
+  // ----- 加载：首帧已用本地同步渲染（无 FOUC）；挂载后 Always 回云端对齐，多设备收敛 -----
   useEffect(() => {
     let cancelled = false
     async function load() {
-    if (!user) {
-      setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } })
-      return
-    }
-    writeLastUserId(user.id)
-      // 本地已有自定义布局 → 直接采用，不让云端旧默认值覆盖（避免回退闪屏）
-      const local = loadFromStorage(user.id)
-      if (local) {
-        if (cancelled) return
-        setConfig({ ...local, sizes: { ...DEFAULT_SIZES, ...(local.sizes ?? {}) } })
+      if (!user) {
+        setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } })
         return
       }
+      writeLastUserId(user.id)
       const { data, error } = await supabase
         .from(TABLE)
         .select('config')
@@ -169,13 +162,24 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       if (cancelled) return
       if (data?.config && isDashboardConfig(data.config)) {
         const loaded = data.config
-        setConfig({ ...loaded, sizes: { ...DEFAULT_SIZES, ...(loaded.sizes ?? {}) } })
-      } else {
-        const base = { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
-        setConfig(base)
-        if (error) {
-          console.warn('[dashboard] 云端读取失败，已用默认：', error.message)
-        }
+        const merged = { ...loaded, sizes: { ...DEFAULT_SIZES, ...(loaded.sizes ?? {}) } }
+        // 云端有自定义布局 → 采纳（多设备收敛到最新同步态）
+        // 仅当云端仍是默认、而本地已有自定义时，保留本地以避免回退闪屏 / 丢编辑
+        const localCustom = loadFromStorage(user.id)
+        const cloudIsDefault =
+          JSON.stringify(merged.widgetIds) === JSON.stringify(DEFAULT_DASHBOARD) &&
+          JSON.stringify(merged.sizes) === JSON.stringify(DEFAULT_SIZES)
+        const localIsDefault =
+          !localCustom ||
+          (JSON.stringify(localCustom.widgetIds) === JSON.stringify(DEFAULT_DASHBOARD) &&
+            JSON.stringify(localCustom.sizes ?? {}) === JSON.stringify(DEFAULT_SIZES))
+        if (cloudIsDefault && !localIsDefault) return
+        setConfig(merged)
+        return
+      }
+      // 云端无数据 / 读取失败：保留首帧已渲染的本地布局（若本地也无则维持默认）
+      if (error) {
+        console.warn('[dashboard] 云端读取失败，已用本地兜底：', error.message)
       }
     }
     load()
