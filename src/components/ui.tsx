@@ -194,7 +194,10 @@ export function Select({
         triggerRef.current?.focus()
       }
     }
-    function onScroll() {
+    function onScroll(e: Event) {
+      // 浮层内部自身的滚动（如 max-h-64 超出）不应关闭；只在滚动源在 popover 之外时才关
+      const t = e.target as Node | null
+      if (t && popRef.current?.contains(t)) return
       setOpen(false)
     }
     document.addEventListener('mousedown', onDoc)
