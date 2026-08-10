@@ -504,8 +504,8 @@ export default function Requirements() {
             onChange={(v) => {
               const s = v as ReqStatus | 'all'
               setFilterStatus(s)
-              // 选到归档态（终态）时，归档筛选自动切「已归档」，避免空白
-              if (s !== 'all' && ARCHIVED.includes(s)) setFilterArchived('yes')
+              // 选到归档态（已上线/作废）→ 自动「已归档」；选到其它具体状态（如待评审/草稿）→ 自动「未归档」
+              if (s !== 'all') setFilterArchived(ARCHIVED.includes(s) ? 'yes' : 'no')
             }}
             className="!w-auto min-w-[120px] max-w-[180px] flex-1 basis-[120px] md:flex-none md:basis-auto"
             aria-label="按状态筛选"
