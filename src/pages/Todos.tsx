@@ -311,13 +311,6 @@ export default function Todos() {
       {/* 筛选栏（一排：搜索 / 状态 / 优先级 / 排序 / [ml-auto] 共 N 条 / 视图切换） */}
       <Card className="!p-3">
         <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索标题"
-            className="min-w-[140px] flex-1 basis-[180px] md:flex-1 md:basis-auto"
-            aria-label="搜索待办"
-          />
           <Select
             value={filterStatus}
             onChange={(v) => setFilterStatus(v as FilterStatus)}
@@ -363,6 +356,13 @@ export default function Todos() {
             <option value="deadline">按截止时间</option>
             <option value="created">按创建时间</option>
           </Select>
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索标题"
+            className="min-w-[140px] flex-1 basis-[180px] md:flex-1 md:basis-auto"
+            aria-label="搜索待办"
+          />
 
           {/* 最右侧：共 N 条 + 视图切换 */}
           <div className="ml-auto flex shrink-0 items-center gap-3">
