@@ -325,7 +325,7 @@ export default function Bugs() {
                   : ''
               }`}
             >
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 self-start md:self-auto">
                 {draggable && (
                   <button
                     type="button"
@@ -357,7 +357,10 @@ export default function Bugs() {
                   {b.reporter ?? '未指派'}
                 </div>
               </div>
-              <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
+              {/* 行内操作簇：移动端钉到右下角，与需求模块列表视图一致 */}
+              <div className="flex items-center justify-end self-end md:self-auto">
+                <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
+              </div>
             </li>
           ))}
         </ul>
