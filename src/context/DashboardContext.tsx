@@ -38,6 +38,8 @@ interface DashboardContextValue {
   /** 已启用的卡片定义（按 config.widgetIds 顺序，过滤掉不存在的 id） */
   widgets: WidgetDef[]
   actions: DashboardActions
+  /** 是否已加载/确认（本地有数据则同步 true，无数据则等云端拉到才 true）；用于 AuthGate 放行前等待，消除首屏默认态闪现 */
+  hydrated: boolean
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null)
@@ -153,6 +155,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     return { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
   })
 
+  // 是否已加载/确认：本地有数据则同步置 true（首屏直接渲染本地，不闪）；
+  // 本地无数据（清缓存/首次）则等云端拉到才 true，期间 AuthGate 显示加载中而非默认布局。
+  const [hydrated, setHydrated] = useState(false)
+
   // ----- 持久化：云端 upsert + localStorage 双写；每次编辑打 updated_at 时间戳 -----
   const persist = useCallback(
     async (next: DashboardConfig) => {
@@ -177,15 +183,50 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [user, userId],
   )
 
-  // ----- 加载：首帧已用本地同步渲染（无 FOUC）；挂载后回云端，仅云端更新于本地才覆盖 -----
+  // ----- 加载：首帧已用本地同步渲染（无 FOUC）；挂载后回云端按时间戳收敛 -----
+  // hydrated：本地有数据则同步放行（无默认闪屏）；本地无数据则等云端拉到再放行（避免默认闪现）
   useEffect(() => {
     let cancelled = false
+    let settled = false
+    const finish = () => {
+      if (!cancelled && !settled) {
+        settled = true
+        setHydrated(true)
+      }
+    }
     async function load() {
       if (!user) {
-        setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } })
+        finish()
         return
       }
       writeLastUserId(user.id)
+      const local = loadFromStorage(user.id) ?? loadAnyStoredConfig()
+      if (local && isDashboardConfig(local)) {
+        // 本地已有布局 → 首帧已渲染本地，无需等云端，立即放行（刷新不闪默认）
+        finish()
+        // 异步校正：仅当云端更新于本地才覆盖（按编辑时间 last-write-wins）
+        const { data } = await supabase
+          .from(TABLE)
+          .select('config')
+          .eq('user_id', user.id)
+          .eq('kind', DASHBOARD_KIND)
+          .maybeSingle()
+        if (cancelled) return
+        const cloud = data?.config && isDashboardConfig(data.config) ? data.config : null
+        if (!cloud) return
+        const localTs = local.updated_at ?? null
+        const cloudTs = cloud.updated_at ?? null
+        if (!cloudTs && !localTs) {
+          if (isDefaultConfig(cloud) && !isDefaultConfig(local)) return
+        } else if (cloudTs && localTs && cloudTs <= localTs) {
+          return // 云端不更新 → 保持本地现状
+        }
+        const merged = { ...cloud, sizes: { ...DEFAULT_SIZES, ...(cloud.sizes ?? {}) } }
+        setConfig(merged)
+        saveToStorage(user.id, merged)
+        return
+      }
+      // 本地无数据 → 必须等云端返回后再放行（否则先渲染默认再跳联网最新）
       const { data, error } = await supabase
         .from(TABLE)
         .select('config')
@@ -193,32 +234,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         .eq('kind', DASHBOARD_KIND)
         .maybeSingle()
       if (cancelled) return
-      const local = loadFromStorage(user.id)
       const cloud = data?.config && isDashboardConfig(data.config) ? data.config : null
-      const localTs = local?.updated_at ?? null
-      const cloudTs = cloud?.updated_at ?? null
-      // 本地有自定义、云端无 → 把本地推上云端，保证跨端可见（首次初始化）
-      if (!cloud && local && isDashboardConfig(local)) {
-        void persist(local)
-        return
+      if (cloud) {
+        const merged = { ...cloud, sizes: { ...DEFAULT_SIZES, ...(cloud.sizes ?? {}) } }
+        setConfig(merged)
+        saveToStorage(user.id, merged)
+      } else if (error) {
+        console.warn('[dashboard] 云端读取失败，已用默认：', error.message)
       }
-      if (!cloud) {
-        if (error) console.warn('[dashboard] 云端读取失败，已用本地兜底：', error.message)
-        return // 云端无数据且本地无 → 维持默认
-      }
-      // 旧设备无戳迁移期：以云端为准收敛一次；但云端默认态且本地有自定义时保留本地
-      if (!cloudTs && !localTs) {
-        if (isDefaultConfig(cloud) && local && !isDefaultConfig(local)) return
-      } else if (cloudTs && localTs && cloudTs <= localTs) {
-        // 云端不比本地新 → 保持本地现状（刷新不闪、不回退、不丢编辑）
-        return
-      }
-      // 采用云端：合并默认尺寸 + 写回本地戳（避免下次刷新又从云端拉，消除"永不保持本地"退化）
-      const merged = { ...cloud, sizes: { ...DEFAULT_SIZES, ...(cloud.sizes ?? {}) } }
-      setConfig(merged)
-      saveToStorage(user.id, merged)
+      finish()
     }
-    load()
+    load().catch(() => finish())
     return () => {
       cancelled = true
     }
@@ -305,7 +331,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [config, persist],
   )
 
-  const value: DashboardContextValue = { config, widgets, actions }
+  const value: DashboardContextValue = { config, widgets, actions, hydrated }
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>
 }
 

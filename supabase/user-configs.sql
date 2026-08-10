@@ -40,11 +40,12 @@ drop policy if exists "user_configs_delete_own" on public.user_configs;
 create policy "user_configs_delete_own" on public.user_configs
   for delete using (auth.uid() = user_id);
 
--- 更新时间自动维护（复用 schema.sql 中的 set_updated_at）
-drop trigger if exists user_configs_set_updated_at on public.user_configs;
-create trigger user_configs_set_updated_at
-  before update on public.user_configs
-  for each row execute function public.set_updated_at();
+-- 注意：此处【不挂】updated_at 自动触发器。
+-- updated_at 由前端 persist 在每次编辑时写入客户端真实编辑时间戳；
+-- 云端仅在 INSERT 时取 DEFAULT now()，UPDATE(upsert) 时保留客户端传入值。
+-- 这样多端才能按"编辑时间"而非"同步时间"判定胜负（与 lww-guard 语义一致）。
+-- 若挂 set_updated_at 触发器，云端会在每次 UPDATE 把时间戳覆写成服务端 now()，
+-- 导致"谁后同步谁赢"而非"谁后编辑谁赢"。
 
 -- 开启 Realtime（让导航 / 主页卡片配置在多 PC 间秒级同步）
 do $$
