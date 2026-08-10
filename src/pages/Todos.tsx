@@ -11,6 +11,8 @@ import {
   IconButton,
 } from '../components/ui'
 import PriorityTag from '../components/PriorityTag'
+import { TagPicker, TagChip } from '../components/TagPicker'
+import { useTags } from '../context/TagsContext'
 import { useTodos } from '../context/TodosContext'
 import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
 import type { Priority, Todo } from '../types'
@@ -18,6 +20,7 @@ import type { Priority, Todo } from '../types'
 type FilterStatus = 'all' | 'active' | 'done'
 type SortKey = 'score' | 'deadline' | 'created'
 type ViewKey = 'list' | 'quadrant'
+const ALL_TAGS = '__ALL_TAGS__'
 
 // ISO（UTC）↔ datetime-local（本地）互转，保证表单显示与存储一致
 function isoToLocalInput(iso?: string | null): string {
@@ -40,6 +43,7 @@ const EMPTY = {
   priority: 'P2' as Priority,
   deadline_at: '',
   note: '',
+  tag_id: null as string | null,
 }
 
 // 四象限视图：P0~P3 直接映射到艾森豪威尔四象限（与需求模块一致）
@@ -93,8 +97,10 @@ function TodoActions({
 
 export default function Todos() {
   const { todos, loading, error, refresh, addTodo, updateTodo, toggleDone, removeTodo } = useTodos()
+  const { categoryByName, valuesByCategoryId } = useTags()
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all')
+  const [filterTag, setFilterTag] = useState<string>(ALL_TAGS)
   const [sortKey, setSortKey] = useState<SortKey>('score')
   const [query, setQuery] = useState('')
   const [view, setView] = useState<ViewKey>('quadrant')
@@ -105,12 +111,16 @@ export default function Todos() {
   const [titleError, setTitleError] = useState('')
   const [toDelete, setToDelete] = useState<Todo | null>(null)
 
+  const tagCat = categoryByName('标签')
+  const tagOptions = tagCat ? valuesByCategoryId(tagCat.id) : []
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     let list = todos.filter((t) => {
       if (filterStatus === 'active' && t.done) return false
       if (filterStatus === 'done' && !t.done) return false
       if (filterPriority !== 'all' && t.priority !== filterPriority) return false
+      if (filterTag !== ALL_TAGS && t.tag_id !== filterTag) return false
       if (q && !t.title.toLowerCase().includes(q)) return false
       return true
     })
@@ -128,7 +138,7 @@ export default function Todos() {
       )
     })
     return list
-  }, [todos, filterStatus, filterPriority, sortKey, query])
+  }, [todos, filterStatus, filterPriority, filterTag, sortKey, query])
 
   // 四象限：按优先级分组（象限内按 Score 降序）
   const byPriority = useMemo(() => {
@@ -160,6 +170,7 @@ export default function Todos() {
       priority: t.priority,
       deadline_at: isoToLocalInput(t.deadline_at),
       note: t.note ?? '',
+      tag_id: t.tag_id ?? null,
     })
     setTitleError('')
     setModalOpen(true)
@@ -180,6 +191,7 @@ export default function Todos() {
       priority: draft.priority,
       deadline_at: localInputToIso(draft.deadline_at),
       note: draft.note || null,
+      tag_id: draft.tag_id,
     }
     if (editing) updateTodo(editing.id, payload)
     else addTodo(payload)
@@ -327,6 +339,19 @@ export default function Todos() {
             <option value="P3">P3</option>
           </Select>
           <Select
+            value={filterTag}
+            onChange={(v) => setFilterTag(v as string)}
+            className="!w-auto min-w-[120px] max-w-[180px] flex-1 basis-[120px] md:flex-none md:basis-auto"
+            aria-label="按标签筛选"
+          >
+            <option value={ALL_TAGS}>全部标签</option>
+            {tagOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.value}
+              </option>
+            ))}
+          </Select>
+          <Select
             value={sortKey}
             onChange={(v) => setSortKey(v as SortKey)}
             className="!w-auto min-w-[130px] max-w-[200px] flex-1 basis-[130px] md:flex-none md:basis-auto"
@@ -413,7 +438,7 @@ export default function Todos() {
                     </div>
                     {/* 标题段：占满剩余宽度，标题与 note 自由换行 */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span
                           className={`break-words text-sm leading-snug ${
                             t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
@@ -432,6 +457,7 @@ export default function Todos() {
                             ↗
                           </a>
                         )}
+                        <TagChip tagId={t.tag_id} />
                       </div>
                       {t.note && (
                         <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">{t.note}</div>
@@ -500,7 +526,7 @@ export default function Todos() {
                             className="h-4 w-4 accent-ink-strong"
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span
                                 className={`break-words text-sm leading-snug ${
                                   t.done ? 'text-ink-mute line-through' : 'text-ink-strong'
@@ -519,6 +545,7 @@ export default function Todos() {
                                   ↗
                                 </a>
                               )}
+                              <TagChip tagId={t.tag_id} />
                             </div>
                             <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">
                               Score {computeScore(t)}
@@ -591,6 +618,9 @@ export default function Todos() {
             />
           </Field>
         </div>
+        <Field label="标签（可选）" hint="单选；点击同一项可取消">
+          <TagPicker value={draft.tag_id} onChange={(v) => setDraft({ ...draft, tag_id: v })} />
+        </Field>
         <Field label="备注（可选）">
           <Textarea
             rows={3}

@@ -114,6 +114,7 @@ export function SprintsProvider({ children }: { children: ReactNode }) {
         end_date: input.end_date || null,
         progress,
         burndown: [Math.max(1, Math.round(progress || 1))],
+        tag_id: input.tag_id || null,
         created_at: now,
         updated_at: now,
       }
@@ -139,6 +140,7 @@ export function SprintsProvider({ children }: { children: ReactNode }) {
         ...(patch.start_date !== undefined ? { start_date: patch.start_date || null } : {}),
         ...(patch.end_date !== undefined ? { end_date: patch.end_date || null } : {}),
         ...(patch.progress != null ? { progress: nextProgress } : {}),
+        ...(patch.tag_id !== undefined ? { tag_id: patch.tag_id || null } : {}),
         updated_at: now,
       }
       await localPut(TABLE, row)

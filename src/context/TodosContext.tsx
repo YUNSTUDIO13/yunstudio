@@ -116,6 +116,7 @@ export function TodosProvider({ children }: { children: ReactNode }) {
         priority: input.priority,
         deadline_at: input.deadline_at || null,
         note: input.note || null,
+        tag_id: input.tag_id || null,
         done: false,
         done_at: null,
         created_at: now,
@@ -140,6 +141,7 @@ export function TodosProvider({ children }: { children: ReactNode }) {
         ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
         ...(patch.deadline_at !== undefined ? { deadline_at: patch.deadline_at || null } : {}),
         ...(patch.note !== undefined ? { note: patch.note || null } : {}),
+        ...(patch.tag_id !== undefined ? { tag_id: patch.tag_id || null } : {}),
         updated_at: now,
       }
       await localPut(TABLE, row)

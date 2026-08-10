@@ -1,4 +1,4 @@
-// 内置模块枚举（预置库）。用户从这 6 个里选，自己不能造新模块。
+// 内置模块枚举（预置库）。用户从这些里选，自己不能造新模块。
 // 后续真接 Supabase 时，每个模块对应一张或多张业务表 + 视图。
 export const BUILTIN_MODULE_IDS = [
   'overview',
@@ -8,6 +8,7 @@ export const BUILTIN_MODULE_IDS = [
   'bugs',
   'news', // 新闻/资讯（Supabase 云端表，支持外部推送）
   'nav-config', // 导航配置本身是个内置模块（角色「配置后台」）
+  'tag-dict', // 字典管理（系统设置下的二级页）
 ] as const
 export type BuiltinModuleId = (typeof BUILTIN_MODULE_IDS)[number]
 
@@ -33,7 +34,7 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
   todos: {
     id: 'todos',
     title: '待办',
-    desc: '待办列表 · Score 排序 · 优先级/截止',
+    desc: '待办列表 · Score 排序 · 优先级/截止/标签',
     route: '/modules/todos',
     defaultEnabled: true,
   },
@@ -70,6 +71,13 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
     title: '新闻',
     desc: '资讯/报表聚合 · 支持外部自动推送',
     route: '/modules/news',
+    defaultEnabled: true,
+  },
+  'tag-dict': {
+    id: 'tag-dict',
+    title: '字典管理',
+    desc: '维护所有受控枚举字段（标签 / 优先级 等）的取值',
+    route: '/modules/tag-dict',
     defaultEnabled: true,
   },
 }

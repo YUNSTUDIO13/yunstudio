@@ -113,6 +113,7 @@ export function BugsProvider({ children }: { children: ReactNode }) {
         status: input.status,
         reporter: input.reporter?.trim() || null,
         source_url: input.source_url || null,
+        tag_id: input.tag_id || null,
         created_at: now,
         updated_at: now,
       }
@@ -136,6 +137,7 @@ export function BugsProvider({ children }: { children: ReactNode }) {
         ...(patch.status !== undefined ? { status: patch.status } : {}),
         ...(patch.reporter !== undefined ? { reporter: patch.reporter?.trim() || null } : {}),
         ...(patch.source_url !== undefined ? { source_url: patch.source_url || null } : {}),
+        ...(patch.tag_id !== undefined ? { tag_id: patch.tag_id || null } : {}),
         updated_at: now,
       }
       await localPut(TABLE, row)

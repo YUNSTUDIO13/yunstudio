@@ -3,9 +3,8 @@ import type { NavConfig } from './nav-types'
 /**
  * 默认 NavConfig（首次打开或点击「重置默认」时使用）
  * 设计原则：
- *  - 6 个一级 Tab（总览/工作/需求/迭代/缺陷/新闻/导航设置）
- *  - 每个一级 Tab 至少一个二级列；二级列 title 为空模块项也允许
- *  - "导航设置"一级 Tab 默认含「导航配置」二级列
+ *  - 6 个一级 Tab（工作 / 总览 / 需求 / 迭代 / 缺陷 / 新闻 / 系统设置）
+ *  - 系统设置下挂「导航配置」+ 「字典管理」两个二级列
  */
 export const DEFAULT_NAV_CONFIG: NavConfig = {
   version: 1,
@@ -67,11 +66,14 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       groups: [{ id: 'g_news_1', title: '资讯', modules: ['news'] }],
     },
     {
-      id: 'p_nav_settings',
-      title: '导航设置',
+      id: 'p_system_settings',
+      title: '系统设置',
       iconKey: 'gear',
       order: 7,
-      groups: [{ id: 'g_set_1', title: '导航配置', modules: ['nav-config'] }],
+      groups: [
+        { id: 'g_sys_1', title: '导航配置', modules: ['nav-config'] },
+        { id: 'g_sys_2', title: '字典管理', modules: ['tag-dict'] },
+      ],
     },
   ],
 }

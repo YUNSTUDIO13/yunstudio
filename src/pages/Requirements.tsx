@@ -13,6 +13,8 @@ import {
 import PriorityTag from '../components/PriorityTag'
 import StatusTag, { type Tone } from '../components/StatusTag'
 import { useRequirements } from '../context/RequirementsContext'
+import { useTags } from '../context/TagsContext'
+import { TagPicker, TagChip } from '../components/TagPicker'
 import { renderIcon } from '../lib/icon-library'
 import type { Priority, ReqStatus, Requirement } from '../types'
 import { C, glass } from '../design/tokens'
@@ -41,7 +43,9 @@ const EMPTY = {
   value_desc: '',
   owner: '',
   source_url: '',
+  tag_id: null as string | null,
 }
+const ALL_TAGS = '__ALL_TAGS__'
 
 // 终态：已上线 / 作废
 const TERMINAL: ReqStatus[] = ['launched', 'void']
@@ -182,6 +186,7 @@ export default function Requirements() {
   const [filterStatus, setFilterStatus] = useState<ReqStatus | 'all'>('all')
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all')
   const [filterArchived, setFilterArchived] = useState<'no' | 'yes'>('no')
+  const [filterTag, setFilterTag] = useState<string>(ALL_TAGS)
   const [keyword, setKeyword] = useState('')
   const [view, setView] = useState<'list' | 'quadrant'>('quadrant')
   const [modalOpen, setModalOpen] = useState(false)
@@ -195,6 +200,10 @@ export default function Requirements() {
   const [overId, setOverId] = useState<string | null>(null)
   const dragAllowed = useRef(false)
 
+  const { categoryByName, valuesByCategoryId } = useTags()
+  const tagCat = categoryByName('标签')
+  const tagOptions = tagCat ? valuesByCategoryId(tagCat.id) : []
+
   const visible = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
     const base = requirements.filter((r) => {
@@ -204,6 +213,7 @@ export default function Requirements() {
       if (filterArchived === 'yes' && !isArchived) return false
       if (filterStatus !== 'all' && r.status !== filterStatus) return false
       if (filterPriority !== 'all' && r.priority !== filterPriority) return false
+      if (filterTag !== ALL_TAGS && r.tag_id !== filterTag) return false
       if (
         kw &&
         !r.title.toLowerCase().includes(kw) &&
@@ -216,7 +226,7 @@ export default function Requirements() {
     if (filterArchived === 'yes')
       base.sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     return base
-  }, [requirements, filterStatus, filterPriority, keyword, filterArchived])
+  }, [requirements, filterStatus, filterPriority, keyword, filterArchived, filterTag])
 
   const openCreate = () => {
     setEditing(null)
@@ -233,6 +243,7 @@ export default function Requirements() {
       value_desc: r.value_desc,
       owner: r.owner ?? '',
       source_url: r.source_url ?? '',
+      tag_id: r.tag_id ?? null,
     })
     setTitleError('')
     setModalOpen(true)
@@ -248,6 +259,7 @@ export default function Requirements() {
       value_desc: draft.value_desc,
       owner: draft.owner || null,
       source_url: draft.source_url || null,
+      tag_id: draft.tag_id,
     }
     if (editing) updateRequirement(editing.id, payload)
     else addRequirement(payload)
@@ -352,8 +364,9 @@ export default function Requirements() {
                 <PriorityTag priority={r.priority} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium leading-snug text-ink-strong break-words">
-                  {r.title}
+                <div className="flex flex-wrap items-center gap-2 text-sm font-medium leading-snug text-ink-strong break-words">
+                  <span>{r.title}</span>
+                  <TagChip tagId={r.tag_id} />
                 </div>
                 <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
                   <div className="break-words">
@@ -408,11 +421,12 @@ export default function Requirements() {
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <StatusTag tone={REQ_STATUS_META[r.status].tone}>
                             {REQ_STATUS_META[r.status].label}
                           </StatusTag>
                           <span className="break-words text-sm font-medium leading-snug text-ink-strong">{r.title}</span>
+                          <TagChip tagId={r.tag_id} />
                         </div>
                         <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
                           <div className="break-words">
@@ -539,6 +553,19 @@ export default function Requirements() {
               </option>
             ))}
           </Select>
+          <Select
+            value={filterTag}
+            onChange={(v) => setFilterTag(v as string)}
+            className="!w-auto min-w-[120px] max-w-[180px] flex-1 basis-[120px] md:flex-none md:basis-auto"
+            aria-label="按标签筛选"
+          >
+            <option value={ALL_TAGS}>全部标签</option>
+            {tagOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.value}
+              </option>
+            ))}
+          </Select>
           <Input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -625,6 +652,9 @@ export default function Requirements() {
             />
           </Field>
         </div>
+        <Field label="标签（可选）" hint="单选；点击同一项可取消">
+          <TagPicker value={draft.tag_id} onChange={(v) => setDraft({ ...draft, tag_id: v })} />
+        </Field>
         <Field label="业务价值说明">
           <Textarea
             rows={3}

@@ -11,6 +11,7 @@ function moduleIcon(m: string): string {
   if (m === 'sprints') return 'clock'
   if (m === 'bugs') return 'bell'
   if (m === 'nav-config') return 'gear'
+  if (m === 'tag-dict') return 'tag'
   return 'gear'
 }
 
@@ -61,6 +62,7 @@ export default function MobileMegaSheet({
                 <div className="flex flex-col">
                   {g.modules.map((m) => {
                     const meta = BUILTIN_MODULES[m]
+                    if (!meta) return null // 防御：跳过已下线/未知模块
                     return (
                       <Link
                         key={m}

@@ -113,6 +113,7 @@ export function RequirementsProvider({ children }: { children: ReactNode }) {
         value_desc: input.value_desc.trim(),
         source_url: input.source_url || null,
         owner: input.owner?.trim() || null,
+        tag_id: input.tag_id || null,
         created_at: now,
         updated_at: now,
       }
@@ -136,6 +137,7 @@ export function RequirementsProvider({ children }: { children: ReactNode }) {
         ...(patch.status !== undefined ? { status: patch.status } : {}),
         ...(patch.source_url !== undefined ? { source_url: patch.source_url || null } : {}),
         ...(patch.owner !== undefined ? { owner: patch.owner?.trim() || null } : {}),
+        ...(patch.tag_id !== undefined ? { tag_id: patch.tag_id || null } : {}),
         updated_at: now,
       }
       await localPut(TABLE, row)

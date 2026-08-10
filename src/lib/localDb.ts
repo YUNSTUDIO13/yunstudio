@@ -3,9 +3,24 @@
 // 联网后由 sync.ts 把本地"发件箱(outbox)"逐条补传到 Supabase。
 // 手机 / PC 共用同一套浏览器代码，一次实现两端生效。
 import Dexie, { type Table } from 'dexie'
-import type { Todo, Requirement, Bug, Sprint, Notification } from '../types'
+import type {
+  Todo,
+  Requirement,
+  Bug,
+  Sprint,
+  Notification,
+  TagCategory,
+  TagValue,
+} from '../types'
 
-export type EntityTable = 'todos' | 'requirements' | 'bugs' | 'sprints' | 'notifications'
+export type EntityTable =
+  | 'todos'
+  | 'requirements'
+  | 'bugs'
+  | 'sprints'
+  | 'notifications'
+  | 'tag_categories'
+  | 'tag_values'
 
 export type SyncOpType = 'insert' | 'update' | 'delete'
 
@@ -26,6 +41,8 @@ interface LocalDB extends Dexie {
   bugs: Table<Bug, string>
   sprints: Table<Sprint, string>
   notifications: Table<Notification, string>
+  tag_categories: Table<TagCategory, string>
+  tag_values: Table<TagValue, string>
   /** 用户已"一键清除"过的通知唯一键（entity_type:entity_id:deadline_at）
    *  用于阻断 60s 兜底扫描把刚清掉的通知又建回来。仅本机语义，不上云。 */
   cleared_notif_keys: Table<{ key: string; cleared_at: string }, string>
@@ -66,6 +83,19 @@ db.version(4).stores({
   outbox: 'id, table, rowId, createdAt',
 })
 
+// v5：新增字典 tag_categories + tag_values；4 业务表加 tag_id 索引便于筛选
+db.version(5).stores({
+  todos: 'id, user_id, updated_at, tag_id',
+  requirements: 'id, user_id, updated_at, tag_id',
+  bugs: 'id, user_id, updated_at, tag_id',
+  sprints: 'id, user_id, updated_at, tag_id',
+  notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
+  tag_categories: 'id, user_id, updated_at, name',
+  tag_values: 'id, category_id, updated_at',
+  cleared_notif_keys: 'key, cleared_at',
+  outbox: 'id, table, rowId, createdAt',
+})
+
 /** 类型化表引用，避免 any 满天飞 */
 function tableRef<T>(table: EntityTable): Table<T> {
   switch (table) {
@@ -79,6 +109,10 @@ function tableRef<T>(table: EntityTable): Table<T> {
       return db.sprints as unknown as Table<T>
     case 'notifications':
       return db.notifications as unknown as Table<T>
+    case 'tag_categories':
+      return db.tag_categories as unknown as Table<T>
+    case 'tag_values':
+      return db.tag_values as unknown as Table<T>
   }
 }
 

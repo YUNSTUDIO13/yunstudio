@@ -13,7 +13,11 @@ import {
 import StatusTag, { type Tone } from '../components/StatusTag'
 import { Burndown } from '../components/Charts'
 import { useSprints } from '../context/SprintsContext'
+import { useTags } from '../context/TagsContext'
+import { TagPicker, TagChip } from '../components/TagPicker'
 import type { Sprint, SprintStatus } from '../types'
+
+const ALL_TAGS = '__ALL_TAGS__'
 
 export const SPRINT_STATUS_META: Record<SprintStatus, { label: string; tone: Tone }> = {
   planning: { label: '规划中', tone: 'violet' },
@@ -34,6 +38,7 @@ const EMPTY = {
   start_date: '',
   end_date: '',
   progress: 0,
+  tag_id: null as string | null,
 }
 
 function fmtDate(s?: string): string {
@@ -108,14 +113,19 @@ function SprintCard({
           <Burndown actual={s.burndown} />
         </div>
       )}
+
+      {/* 标签（最后一个字段「完成进度」之后展示） */}
+      <TagChip tagId={s.tag_id} />
     </Card>
   )
 }
 
 export default function Sprints() {
   const { sprints, loading, error, refresh, addSprint, updateSprint, removeSprint } = useSprints()
+  const { categoryByName, valuesByCategoryId } = useTags()
   const [filterStatus, setFilterStatus] = useState<SprintStatus | 'all'>('all')
   const [filterArchived, setFilterArchived] = useState<'no' | 'yes'>('no')
+  const [filterTag, setFilterTag] = useState<string>(ALL_TAGS)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Sprint | null>(null)
   const [draft, setDraft] = useState(EMPTY)
@@ -129,12 +139,16 @@ export default function Sprints() {
       if (filterArchived === 'no' && isArchived) return false
       if (filterArchived === 'yes' && !isArchived) return false
       if (filterStatus !== 'all' && s.status !== filterStatus) return false
+      if (filterTag !== ALL_TAGS && s.tag_id !== filterTag) return false
       return true
     })
     // 筛选「已归档」时按 updated_at 倒序（最新归档排最前）
     if (filterArchived === 'yes') base.sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     return base
-  }, [sprints, filterStatus, filterArchived])
+  }, [sprints, filterStatus, filterArchived, filterTag])
+
+  const tagCat = categoryByName('标签')
+  const tagOptions = tagCat ? valuesByCategoryId(tagCat.id) : []
 
   const openCreate = () => {
     setEditing(null)
@@ -151,6 +165,7 @@ export default function Sprints() {
       start_date: s.start_date ?? '',
       end_date: s.end_date ?? '',
       progress: s.progress,
+      tag_id: s.tag_id ?? null,
     })
     setNameError('')
     setModalOpen(true)
@@ -166,6 +181,7 @@ export default function Sprints() {
       start_date: draft.start_date,
       end_date: draft.end_date,
       progress: draft.progress,
+      tag_id: draft.tag_id,
     }
     if (editing) updateSprint(editing.id, payload)
     else addSprint(payload)
@@ -271,6 +287,19 @@ export default function Sprints() {
             <option value="no">未归档</option>
             <option value="yes">已归档</option>
           </Select>
+          <Select
+            value={filterTag}
+            onChange={(v) => setFilterTag(v)}
+            className="!w-auto min-w-[120px] max-w-[200px] flex-1 basis-[120px] md:flex-none md:basis-auto"
+            aria-label="按标签筛选"
+          >
+            <option value={ALL_TAGS}>全部标签</option>
+            {tagOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.value}
+              </option>
+            ))}
+          </Select>
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <span className="hidden text-xs text-ink-mute sm:inline">
               共 {visible.length} 个迭代
@@ -363,6 +392,9 @@ export default function Sprints() {
             onChange={(e) => setDraft({ ...draft, progress: Number(e.target.value) })}
             className="w-full accent-accent"
           />
+        </Field>
+        <Field label="标签（可选）">
+          <TagPicker value={draft.tag_id} onChange={(v) => setDraft({ ...draft, tag_id: v })} />
         </Field>
       </Modal>
 

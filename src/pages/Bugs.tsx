@@ -12,8 +12,12 @@ import {
 import PriorityTag from '../components/PriorityTag'
 import StatusTag, { type Tone } from '../components/StatusTag'
 import { useBugs } from '../context/BugsContext'
+import { useTags } from '../context/TagsContext'
+import { TagPicker, TagChip } from '../components/TagPicker'
 import { renderIcon } from '../lib/icon-library'
 import type { Bug, BugSeverity, BugStatus, Priority } from '../types'
+
+const ALL_TAGS = '__ALL_TAGS__'
 
 export const BUG_SEVERITY_META: Record<BugSeverity, { label: string; tone: Tone }> = {
   critical: { label: '致命', tone: 'danger' },
@@ -61,6 +65,7 @@ const EMPTY = {
   status: 'open' as BugStatus,
   reporter: '',
   source_url: '',
+  tag_id: null as string | null,
 }
 
 // ============== 图标 ==============
@@ -164,11 +169,13 @@ function ViewSwitch({
 
 export default function Bugs() {
   const { bugs, loading, error, refresh, addBug, updateBug, removeBug, moveBug } = useBugs()
+  const { categoryByName, valuesByCategoryId } = useTags()
   const [filterSeverity, setFilterSeverity] = useState<BugSeverity | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<BugStatus | 'all'>('all')
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all')
   const [keyword, setKeyword] = useState('')
   const [filterArchived, setFilterArchived] = useState<'no' | 'yes'>('no')
+  const [filterTag, setFilterTag] = useState<string>(ALL_TAGS)
   const [view, setView] = useState<'list' | 'quadrant'>('quadrant')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Bug | null>(null)
@@ -197,12 +204,16 @@ export default function Bugs() {
         !(b.reporter ?? '').toLowerCase().includes(kw)
       )
         return false
+      if (filterTag !== ALL_TAGS && b.tag_id !== filterTag) return false
       return true
     })
     // 筛选「已归档」时按 updated_at 倒序（最新归档排最前）
     if (filterArchived === 'yes') base.sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     return base
-  }, [bugs, filterSeverity, filterStatus, filterPriority, keyword, filterArchived])
+  }, [bugs, filterSeverity, filterStatus, filterPriority, keyword, filterArchived, filterTag])
+
+  const tagCat = categoryByName('标签')
+  const tagOptions = tagCat ? valuesByCategoryId(tagCat.id) : []
 
   const openCreate = () => {
     setEditing(null)
@@ -219,6 +230,7 @@ export default function Bugs() {
       status: b.status,
       reporter: b.reporter ?? '',
       source_url: b.source_url ?? '',
+      tag_id: b.tag_id ?? null,
     })
     setTitleError('')
     setModalOpen(true)
@@ -233,6 +245,7 @@ export default function Bugs() {
       status: draft.status,
       reporter: draft.reporter || null,
       source_url: draft.source_url || null,
+      tag_id: draft.tag_id,
     }
     if (editing) updateBug(editing.id, payload)
     else addBug(payload)
@@ -342,6 +355,9 @@ export default function Bugs() {
                 <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
                   {b.reporter ?? '未指派'}
                 </div>
+                <div className="mt-1">
+                  <TagChip tagId={b.tag_id} />
+                </div>
               </div>
               <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
             </li>
@@ -388,6 +404,9 @@ export default function Bugs() {
                         </div>
                         <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
                           {b.reporter ?? '未指派'}
+                        </div>
+                        <div className="mt-1">
+                          <TagChip tagId={b.tag_id} />
                         </div>
                       </div>
                       <div className="flex items-center justify-end md:justify-end">
@@ -511,6 +530,19 @@ export default function Bugs() {
             <option value="no">未归档</option>
             <option value="yes">已归档</option>
           </Select>
+          <Select
+            value={filterTag}
+            onChange={(v) => setFilterTag(v)}
+            className="!w-auto min-w-[120px] max-w-[200px] flex-1 basis-[120px] md:flex-none md:basis-auto"
+            aria-label="按标签筛选"
+          >
+            <option value={ALL_TAGS}>全部标签</option>
+            {tagOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.value}
+              </option>
+            ))}
+          </Select>
           <Input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -606,6 +638,9 @@ export default function Bugs() {
             />
           </Field>
         </div>
+        <Field label="标签（可选）">
+          <TagPicker value={draft.tag_id} onChange={(v) => setDraft({ ...draft, tag_id: v })} />
+        </Field>
       </Modal>
 
       {/* 删除确认 */}

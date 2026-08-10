@@ -95,6 +95,11 @@ function migrateConfig(cfg: NavConfig): NavConfig {
     if (p.id === 'p_settings') {
       return { ...p, id: 'p_nav_settings', title: p.title === '设置' ? '导航设置' : p.title }
     }
+    // 字典模块上线（2026-08-10）：p_nav_settings → p_system_settings（系统设置）
+    // 旧"导航设置"一级 Tab 自动合并到"系统设置"，避免一个老用户看到两个相似的设置 Tab
+    if (p.id === 'p_nav_settings') {
+      return { ...p, id: 'p_system_settings', title: p.title === '导航设置' ? '系统设置' : p.title }
+    }
     return p
   })
 
@@ -105,6 +110,32 @@ function migrateConfig(cfg: NavConfig): NavConfig {
     if (defaultNews) {
       primaries = [...primaries, { ...defaultNews, order: primaries.length + 1 }]
     }
+  }
+
+  // 字典管理（2026-08-10）：合并升级后若 p_system_settings 缺 nav-config / tag-dict 任一，
+  // 按默认补齐对应二级列（不破坏用户的自定义二级列）。
+  const sysIdx = primaries.findIndex((p) => p.id === 'p_system_settings')
+  if (sysIdx >= 0) {
+    const sysP = primaries[sysIdx]
+    const hasNavCfg = sysP.groups.some((g) => g.modules.includes('nav-config'))
+    const hasTagDict = sysP.groups.some((g) => g.modules.includes('tag-dict'))
+    const defaultSys = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_system_settings')
+    let groups = sysP.groups
+    if (defaultSys) {
+      if (!hasNavCfg) {
+        const navCfgGroup = defaultSys.groups.find((g) => g.modules.includes('nav-config'))
+        if (navCfgGroup) groups = [...groups, { ...navCfgGroup, id: uid('g') }]
+      }
+      if (!hasTagDict) {
+        const tagGroup = defaultSys.groups.find((g) => g.modules.includes('tag-dict'))
+        if (tagGroup) groups = [...groups, { ...tagGroup, id: uid('g') }]
+      }
+    }
+    primaries = [
+      ...primaries.slice(0, sysIdx),
+      { ...sysP, groups },
+      ...primaries.slice(sysIdx + 1),
+    ]
   }
 
   return { ...cfg, primaries }

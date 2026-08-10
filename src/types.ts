@@ -11,6 +11,7 @@ export interface Todo {
   note?: string | null
   done: boolean
   done_at?: string | null
+  tag_id?: string | null // 字典·枚举值 id（来自 tag_values）
   created_at: string
   updated_at: string
 }
@@ -22,6 +23,7 @@ export type TodoInput = {
   priority: Priority
   deadline_at?: string | null
   note?: string | null
+  tag_id?: string | null
 }
 
 // ============================================================
@@ -46,6 +48,7 @@ export interface Requirement {
   value_desc: string // 业务价值说明（DB 端加密，此处仅展示）
   source_url?: string | null // 外部系统链接（仅跳转不对接）
   owner?: string | null // 负责人
+  tag_id?: string | null // 字典·枚举值 id
   created_at: string
   updated_at: string
 }
@@ -57,6 +60,7 @@ export type RequirementInput = {
   value_desc: string
   source_url?: string | null
   owner?: string | null
+  tag_id?: string | null
 }
 
 // ============================================================
@@ -79,6 +83,7 @@ export interface Sprint {
   end_date: string | null // ISO
   progress: number // 完成百分比 0-100
   burndown: number[] // 剩余工作量序列（用于燃尽图）
+  tag_id?: string | null // 字典·枚举值 id
   created_at: string
   updated_at: string
 }
@@ -90,6 +95,7 @@ export type SprintInput = {
   start_date: string
   end_date: string
   progress: number
+  tag_id?: string | null
 }
 
 // ============================================================
@@ -107,6 +113,7 @@ export interface Bug {
   status: BugStatus
   reporter?: string | null // 报告人
   source_url?: string | null // 复现/缺陷单链接
+  tag_id?: string | null // 字典·枚举值 id
   created_at: string
   updated_at: string
 }
@@ -118,6 +125,7 @@ export type BugInput = {
   status: BugStatus
   reporter?: string | null
   source_url?: string | null
+  tag_id?: string | null
 }
 
 // ============================================================
@@ -200,3 +208,27 @@ export interface Notification {
   created_at: string
   updated_at: string
 }
+
+// ============================================================
+// 字典（TagDictionary）
+// 用于支持字段自定义枚举值（如"标签"、"优先级"等所有需要受控枚举的字段）
+// 当前主用：tag_categories.name === "标签"  → 四业务表 todos/requirements/sprints/bugs.tag_id
+// ============================================================
+export interface TagCategory {
+  id: string
+  user_id: string
+  name: string // 字段名，如"标签"
+  created_at: string
+  updated_at: string
+}
+
+export interface TagValue {
+  id: string
+  category_id: string
+  value: string // 枚举值文本
+  created_at: string
+  updated_at: string
+}
+
+export type TagCategoryInput = { name: string }
+export type TagValueInput = { category_id: string; value: string }

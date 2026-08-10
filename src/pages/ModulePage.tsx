@@ -6,6 +6,7 @@ import Sprints from './Sprints'
 import Bugs from './Bugs'
 import News from './News'
 import NavConfig from './NavConfig'
+import TagDict from './TagDict'
 
 /**
  * 统一模块页：根据 /modules/:id 反查并渲染对应内置组件
@@ -29,6 +30,8 @@ export default function ModulePage() {
       return <News />
     case 'nav-config':
       return <NavConfig />
+    case 'tag-dict':
+      return <TagDict />
     default:
       return <Navigate to="/modules/overview" replace />
   }
