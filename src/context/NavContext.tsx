@@ -112,6 +112,15 @@ function migrateConfig(cfg: NavConfig): NavConfig {
     }
   }
 
+  // 应用模块（2026-08-10）：若旧配置缺「应用」一级 Tab，则按默认补齐（不破坏用户已有自定义）
+  const hasApps = primaries.some((p) => p.groups.some((g) => g.modules.includes('apps')))
+  if (!hasApps) {
+    const defaultApps = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_apps')
+    if (defaultApps) {
+      primaries = [...primaries, { ...defaultApps, order: primaries.length + 1 }]
+    }
+  }
+
   // 字典管理（2026-08-10）：合并升级后若 p_system_settings 缺 nav-config / tag-dict 任一，
   // 按默认补齐对应二级列（不破坏用户的自定义二级列）。
   const sysIdx = primaries.findIndex((p) => p.id === 'p_system_settings')

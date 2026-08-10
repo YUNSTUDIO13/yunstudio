@@ -11,6 +11,7 @@ import type {
   Notification,
   TagCategory,
   TagValue,
+  App,
 } from '../types'
 
 export type EntityTable =
@@ -21,6 +22,7 @@ export type EntityTable =
   | 'notifications'
   | 'tag_categories'
   | 'tag_values'
+  | 'apps'
 
 export type SyncOpType = 'insert' | 'update' | 'delete'
 
@@ -46,6 +48,7 @@ interface LocalDB extends Dexie {
   /** 用户已"一键清除"过的通知唯一键（entity_type:entity_id:deadline_at）
    *  用于阻断 60s 兜底扫描把刚清掉的通知又建回来。仅本机语义，不上云。 */
   cleared_notif_keys: Table<{ key: string; cleared_at: string }, string>
+  apps: Table<App, string>
   outbox: Table<OutboxOp, string>
 }
 
@@ -96,6 +99,20 @@ db.version(5).stores({
   outbox: 'id, table, rowId, createdAt',
 })
 
+// v6：新增 apps 表（个人应用导航 / 书签）
+db.version(6).stores({
+  todos: 'id, user_id, updated_at, tag_id',
+  requirements: 'id, user_id, updated_at, tag_id',
+  bugs: 'id, user_id, updated_at, tag_id',
+  sprints: 'id, user_id, updated_at, tag_id',
+  notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
+  tag_categories: 'id, user_id, updated_at, name',
+  tag_values: 'id, category_id, updated_at',
+  apps: 'id, user_id, updated_at',
+  cleared_notif_keys: 'key, cleared_at',
+  outbox: 'id, table, rowId, createdAt',
+})
+
 /** 类型化表引用，避免 any 满天飞 */
 function tableRef<T>(table: EntityTable): Table<T> {
   switch (table) {
@@ -113,6 +130,8 @@ function tableRef<T>(table: EntityTable): Table<T> {
       return db.tag_categories as unknown as Table<T>
     case 'tag_values':
       return db.tag_values as unknown as Table<T>
+    case 'apps':
+      return db.apps as unknown as Table<T>
   }
 }
 
@@ -147,6 +166,7 @@ const TABLES_WITH_USER_ID = new Set<EntityTable>([
   'bugs',
   'tag_categories',
   'notifications',
+  'apps',
 ])
 
 /**

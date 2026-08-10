@@ -9,6 +9,7 @@ export const BUILTIN_MODULE_IDS = [
   'news', // 新闻/资讯（Supabase 云端表，支持外部推送）
   'nav-config', // 导航配置本身是个内置模块（角色「配置后台」）
   'tag-dict', // 字典管理（系统设置下的二级页）
+  'apps', // 应用（个人应用导航 / 书签）
 ] as const
 export type BuiltinModuleId = (typeof BUILTIN_MODULE_IDS)[number]
 
@@ -78,6 +79,13 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
     title: '字典管理',
     desc: '维护所有受控枚举字段（标签 / 优先级 等）的取值',
     route: '/modules/tag-dict',
+    defaultEnabled: true,
+  },
+  'apps': {
+    id: 'apps',
+    title: '应用',
+    desc: '个人应用导航 · 图标跳转 · 新增 / 编辑 / 删除',
+    route: '/modules/apps',
     defaultEnabled: true,
   },
 }

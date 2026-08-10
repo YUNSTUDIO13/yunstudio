@@ -232,3 +232,26 @@ export interface TagValue {
 
 export type TagCategoryInput = { name: string }
 export type TagValueInput = { category_id: string; value: string }
+
+// ============================================================
+// 应用（Apps）—— 个人应用导航 / 书签类
+// 数据列：图标 / 应用名称 / 目标 URL / 功能说明
+// 点击图标直接跳转目标 URL；支持新增 / 编辑 / 删除（云端 Supabase 存储）
+// ============================================================
+export interface App {
+  id: string
+  user_id: string
+  name: string // 应用名称
+  target_url: string // 目标 URL（点击图标跳转）
+  description: string // 功能说明
+  icon_url?: string | null // 抓取到的图标地址（原站 favicon）；空则前端用名称首字兜底
+  created_at: string
+  updated_at: string
+}
+
+export type AppInput = {
+  name: string
+  target_url: string
+  description?: string | null
+  icon_url?: string | null
+}

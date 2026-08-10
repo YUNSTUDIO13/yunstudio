@@ -66,10 +66,17 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       groups: [{ id: 'g_news_1', title: '资讯', modules: ['news'] }],
     },
     {
+      id: 'p_apps',
+      title: '应用',
+      iconKey: 'grid',
+      order: 7,
+      groups: [{ id: 'g_apps_1', title: '全部应用', modules: ['apps'] }],
+    },
+    {
       id: 'p_system_settings',
       title: '系统设置',
       iconKey: 'gear',
-      order: 7,
+      order: 8,
       groups: [
         { id: 'g_sys_1', title: '导航配置', modules: ['nav-config'] },
         { id: 'g_sys_2', title: '字典管理', modules: ['tag-dict'] },
