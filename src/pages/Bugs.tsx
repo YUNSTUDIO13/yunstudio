@@ -31,6 +31,8 @@ export const BUG_STATUS_META: Record<BugStatus, { label: string; tone: Tone }> =
 
 const SEVERITY_ORDER: BugSeverity[] = ['critical', 'major', 'normal', 'minor']
 const STATUS_ORDER: BugStatus[] = ['open', 'in_progress', 'verifying', 'closed']
+// 归档态：已关闭（满足即划入归档板块，主视图不再展示）
+const ARCHIVED: BugStatus[] = ['closed']
 
 const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: 'P0', label: 'P0（最高）' },
@@ -81,6 +83,23 @@ const editIcon = (
 const delIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+  </svg>
+)
+// 归档图标（内联 SVG，与需求/铃铛同风格）
+const archiveIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4 text-ink-soft"
+    aria-hidden
+  >
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+    <path d="M10 12h4" />
   </svg>
 )
 
@@ -181,20 +200,31 @@ export default function Bugs() {
 
   const visible = useMemo(
     () =>
-      bugs.filter((b) => {
-        if (filterSeverity !== 'all' && b.severity !== filterSeverity) return false
-        if (filterStatus !== 'all' && b.status !== filterStatus) return false
-        if (filterPriority !== 'all' && b.priority !== filterPriority) return false
-        const kw = keyword.trim().toLowerCase()
-        if (
-          kw &&
-          !b.title.toLowerCase().includes(kw) &&
-          !(b.reporter ?? '').toLowerCase().includes(kw)
-        )
-          return false
-        return true
-      }),
+      bugs
+        .filter((b) => !ARCHIVED.includes(b.status)) // 归档项仅在归档板块展示
+        .filter((b) => {
+          if (filterSeverity !== 'all' && b.severity !== filterSeverity) return false
+          if (filterStatus !== 'all' && b.status !== filterStatus) return false
+          if (filterPriority !== 'all' && b.priority !== filterPriority) return false
+          const kw = keyword.trim().toLowerCase()
+          if (
+            kw &&
+            !b.title.toLowerCase().includes(kw) &&
+            !(b.reporter ?? '').toLowerCase().includes(kw)
+          )
+            return false
+          return true
+        }),
     [bugs, filterSeverity, filterStatus, filterPriority, keyword],
+  )
+
+  // 归档项：满足归档态，按 updated_at 倒序（最新归档排最前）
+  const archived = useMemo(
+    () =>
+      bugs
+        .filter((b) => ARCHIVED.includes(b.status))
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+    [bugs],
   )
 
   const openCreate = () => {
@@ -246,6 +276,156 @@ export default function Bugs() {
       accent: 'text-success',
     },
   ]
+
+  // ============ 列表 / 四象限渲染（主视图与归档板块共用） ============
+  // draggable 仅主视图列表启用；归档列表不可拖拽重排。
+  const renderBugList = (items: Bug[], draggable: boolean) => (
+    <Card>
+      {items.length === 0 ? (
+        <p className="py-12 text-center text-sm text-ink-mute">没有符合条件的缺陷</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {items.map((b) => (
+            <li
+              key={b.id}
+              draggable={draggable}
+              onDragStart={
+                draggable
+                  ? (e) => {
+                      if (!dragAllowed.current) {
+                        e.preventDefault()
+                        return
+                      }
+                      setDragId(b.id)
+                      e.dataTransfer.effectAllowed = 'move'
+                      try {
+                        e.dataTransfer.setData('text/plain', b.id)
+                      } catch {
+                        /* 忽略 */
+                      }
+                    }
+                  : undefined
+              }
+              onDragEnter={draggable ? () => dragId && setOverId(b.id) : undefined}
+              onDragOver={draggable ? (e) => { if (dragId) e.preventDefault() } : undefined}
+              onDrop={
+                draggable
+                  ? (e) => {
+                      e.preventDefault()
+                      if (dragId && overId && dragId !== overId) moveBug(dragId, overId)
+                      setDragId(null)
+                      setOverId(null)
+                    }
+                  : undefined
+              }
+              onDragEnd={
+                draggable
+                  ? () => {
+                      dragAllowed.current = false
+                      setDragId(null)
+                      setOverId(null)
+                    }
+                  : undefined
+              }
+              className={`group flex flex-col gap-2 px-2 py-3 transition md:flex-row md:items-center md:gap-2 ${
+                draggable && dragId === b.id ? 'opacity-40' : ''
+              } ${
+                draggable && dragId && overId === b.id && dragId !== b.id
+                  ? 'rounded-xl bg-brand-soft ring-1 ring-accent/30'
+                  : ''
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {draggable && (
+                  <button
+                    type="button"
+                    aria-label="拖拽调整顺序"
+                    title="按住拖拽以调整顺序"
+                    onMouseDown={() => {
+                      dragAllowed.current = true
+                    }}
+                    onClick={(e) => e.preventDefault()}
+                    className="hidden shrink-0 cursor-grab text-ink-mute transition hover:text-ink-soft active:cursor-grabbing group-hover:block"
+                  >
+                    {gripIcon}
+                  </button>
+                )}
+                <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
+                  {BUG_SEVERITY_META[b.severity].label}
+                </StatusTag>
+                <StatusTag tone={BUG_STATUS_META[b.status].tone}>
+                  {BUG_STATUS_META[b.status].label}
+                </StatusTag>
+                <PriorityTag priority={b.priority} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium leading-snug text-ink-strong break-words">
+                  {b.title}
+                </div>
+                <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
+                  {b.reporter ?? '未指派'}
+                </div>
+              </div>
+              <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+
+  const renderBugQuadrant = (items: Bug[]) => (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {QUADRANTS.map((q) => {
+        const qitems = items.filter((b) => b.priority === q.priority)
+        return (
+          <Card key={q.priority} className="!p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex h-6 items-center rounded-full px-2 text-xs font-semibold ${q.badge}`}>
+                  {q.priority}
+                </span>
+                <span className="text-sm font-semibold text-ink-strong">{q.title}</span>
+              </div>
+              <span className="text-xs text-ink-mute">{q.axis} · {qitems.length}</span>
+            </div>
+            {qitems.length === 0 ? (
+              <p className="py-10 text-center text-xs text-ink-mute">该象限暂无缺陷</p>
+            ) : (
+              <ul className="space-y-2">
+                {qitems.map((b) => (
+                  <li key={b.id} className="rounded-xl border border-line bg-canvas/40 p-3">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
+                            {BUG_SEVERITY_META[b.severity].label}
+                          </StatusTag>
+                          <StatusTag tone={BUG_STATUS_META[b.status].tone}>
+                            {BUG_STATUS_META[b.status].label}
+                          </StatusTag>
+                          <PriorityTag priority={b.priority} />
+                        </div>
+                        <div className="mt-1.5 text-sm font-medium leading-snug text-ink-strong break-words">
+                          {b.title}
+                        </div>
+                        <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
+                          {b.reporter ?? '未指派'}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end md:justify-end">
+                        <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )
+      })}
+    </div>
+  )
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -356,146 +536,21 @@ export default function Bugs() {
         <div className="mt-1 text-[11px] text-ink-mute sm:hidden">共 {visible.length} 条</div>
       </Card>
 
-      {/* 列表视图 */}
-      {view === 'list' ? (
-        <Card>
-          {visible.length === 0 ? (
-            <p className="py-12 text-center text-sm text-ink-mute">没有符合条件的缺陷</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {visible.map((b) => (
-                <li
-                  key={b.id}
-                  draggable
-                  onDragStart={(e) => {
-                    if (!dragAllowed.current) {
-                      e.preventDefault()
-                      return
-                    }
-                    setDragId(b.id)
-                    e.dataTransfer.effectAllowed = 'move'
-                    try {
-                      e.dataTransfer.setData('text/plain', b.id)
-                    } catch {
-                      /* 忽略 */
-                    }
-                  }}
-                  onDragEnter={() => dragId && setOverId(b.id)}
-                  onDragOver={(e) => {
-                    if (dragId) e.preventDefault()
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    if (dragId && overId && dragId !== overId) moveBug(dragId, overId)
-                    setDragId(null)
-                    setOverId(null)
-                  }}
-                  onDragEnd={() => {
-                    dragAllowed.current = false
-                    setDragId(null)
-                    setOverId(null)
-                  }}
-                  className={`group flex flex-col gap-2 px-2 py-3 transition md:flex-row md:items-center md:gap-2 ${
-                    dragId === b.id ? 'opacity-40' : ''
-                  } ${
-                    dragId && overId === b.id && dragId !== b.id
-                      ? 'rounded-xl bg-brand-soft ring-1 ring-accent/30'
-                      : ''
-                  }`}
-                >
-                  {/* 标签组：移动端独立一行横排，桌面端与标题同行 */}
-                  <div className="flex items-center gap-2">
-                    {/* 左侧拖拽手柄（hover 显示） */}
-                    <button
-                      type="button"
-                      aria-label="拖拽调整顺序"
-                      title="按住拖拽以调整顺序"
-                      onMouseDown={() => {
-                        dragAllowed.current = true
-                      }}
-                      onClick={(e) => e.preventDefault()}
-                      className="hidden shrink-0 cursor-grab text-ink-mute transition hover:text-ink-soft active:cursor-grabbing group-hover:block"
-                    >
-                      {gripIcon}
-                    </button>
-                    <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
-                      {BUG_SEVERITY_META[b.severity].label}
-                    </StatusTag>
-                    <StatusTag tone={BUG_STATUS_META[b.status].tone}>
-                      {BUG_STATUS_META[b.status].label}
-                    </StatusTag>
-                    <PriorityTag priority={b.priority} />
-                  </div>
-                  {/* 标题段：移动端独占满宽；桌面端 flex-1 自适应 */}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium leading-snug text-ink-strong break-words">
-                      {b.title}
-                    </div>
-                    <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
-                      {b.reporter ?? '未指派'}
-                    </div>
-                  </div>
-                  <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {QUADRANTS.map((q) => {
-            const items = visible.filter((b) => b.priority === q.priority)
-            return (
-              <Card key={q.priority} className="!p-4">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex h-6 items-center rounded-full px-2 text-xs font-semibold ${q.badge}`}
-                    >
-                      {q.priority}
-                    </span>
-                    <span className="text-sm font-semibold text-ink-strong">{q.title}</span>
-                  </div>
-                  <span className="text-xs text-ink-mute">
-                    {q.axis} · {items.length}
-                  </span>
-                </div>
-                {items.length === 0 ? (
-                  <p className="py-10 text-center text-xs text-ink-mute">该象限暂无缺陷</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {items.map((b) => (
-                      <li key={b.id} className="rounded-xl border border-line bg-canvas/40 p-3">
-                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <StatusTag tone={BUG_SEVERITY_META[b.severity].tone}>
-                                {BUG_SEVERITY_META[b.severity].label}
-                              </StatusTag>
-                              <StatusTag tone={BUG_STATUS_META[b.status].tone}>
-                                {BUG_STATUS_META[b.status].label}
-                              </StatusTag>
-                              <PriorityTag priority={b.priority} />
-                            </div>
-                            <div className="mt-1.5 text-sm font-medium leading-snug text-ink-strong break-words">
-                              {b.title}
-                            </div>
-                            <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
-                              {b.reporter ?? '未指派'}
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-end md:justify-end">
-                            <BugActions b={b} onEdit={openEdit} onDelete={setToDelete} />
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Card>
-            )
-          })}
-        </div>
+      {/* 主视图：列表 / 四象限（归档项已在 visible 中排除，仅在归档板块展示） */}
+      {view === 'list' ? renderBugList(visible, true) : renderBugQuadrant(visible)}
+
+      {/* 归档板块：随主视图模式（列表 / 四象限）；按 updated_at 倒序，最新归档排最前 */}
+      {archived.length > 0 && (
+        <section className="space-y-3">
+          <header className="flex items-center gap-2 px-1">
+            {archiveIcon}
+            <h2 className="text-base font-semibold text-ink-strong">归档</h2>
+            <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-ink-mute">
+              {archived.length}
+            </span>
+          </header>
+          {view === 'list' ? renderBugList(archived, false) : renderBugQuadrant(archived)}
+        </section>
       )}
 
       {/* 新建/编辑 Modal */}

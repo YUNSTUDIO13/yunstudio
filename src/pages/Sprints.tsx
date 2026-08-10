@@ -24,6 +24,8 @@ export const SPRINT_STATUS_META: Record<SprintStatus, { label: string; tone: Ton
 }
 
 const STATUS_ORDER: SprintStatus[] = ['planning', 'active', 'closing', 'done', 'cancelled']
+// 归档态：已完成 / 已取消（满足即划入归档板块，主网格不再展示）
+const ARCHIVED: SprintStatus[] = ['done', 'cancelled']
 
 const EMPTY = {
   name: '',
@@ -40,6 +42,94 @@ function fmtDate(s?: string): string {
   return `${m}/${d}`
 }
 
+// 归档图标（内联 SVG，与需求/缺陷/铃铛同风格）
+const archiveIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4 text-ink-soft"
+    aria-hidden
+  >
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+    <path d="M10 12h4" />
+  </svg>
+)
+
+// 迭代卡片（主网格与归档网格共用）
+function SprintCard({
+  s,
+  onEdit,
+  onDelete,
+}: {
+  s: Sprint
+  onEdit: (s: Sprint) => void
+  onDelete: (s: Sprint) => void
+}) {
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-base font-semibold text-ink-strong">{s.name}</h3>
+            <StatusTag tone={SPRINT_STATUS_META[s.status].tone}>
+              {SPRINT_STATUS_META[s.status].label}
+            </StatusTag>
+          </div>
+          <p className="mt-1 truncate text-xs text-ink-soft">{s.goal}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <IconButton onClick={() => onEdit(s)} title="编辑" className="!h-8 !w-8">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+          </IconButton>
+          <IconButton
+            onClick={() => onDelete(s)}
+            title="删除"
+            className="!h-8 !w-8 hover:!border-danger/40 hover:!bg-danger/10 hover:!text-danger"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            </svg>
+          </IconButton>
+        </div>
+      </div>
+
+      {/* 日期 + 进度 */}
+      <div className="flex items-center justify-between text-xs text-ink-soft">
+        <span>
+          {fmtDate(s.start_date ?? undefined)} → {fmtDate(s.end_date ?? undefined)}
+        </span>
+        <span className="font-medium text-ink-strong">{s.progress}%</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-line">
+        <div className="h-full rounded-full bg-accent" style={{ width: `${s.progress}%` }} />
+      </div>
+
+      {/* 燃尽图 */}
+      {s.status !== 'cancelled' && (
+        <div>
+          <div className="mb-1 flex items-center gap-3 text-[11px] text-ink-mute">
+            <span className="flex items-center gap-1">
+              <span className="h-0.5 w-4 bg-accent" /> 实际剩余
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-0.5 w-4 border-t border-dashed border-ink-mute" /> 理想剩余
+            </span>
+          </div>
+          <Burndown actual={s.burndown} />
+        </div>
+      )}
+    </Card>
+  )
+}
+
 export default function Sprints() {
   const { sprints, loading, error, refresh, addSprint, updateSprint, removeSprint } = useSprints()
   const [filterStatus, setFilterStatus] = useState<SprintStatus | 'all'>('all')
@@ -51,10 +141,19 @@ export default function Sprints() {
 
   const visible = useMemo(
     () =>
-      filterStatus === 'all'
-        ? sprints
-        : sprints.filter((s) => s.status === filterStatus),
+      sprints
+        .filter((s) => !ARCHIVED.includes(s.status)) // 归档项仅在归档板块展示
+        .filter((s) => (filterStatus === 'all' ? true : s.status === filterStatus)),
     [sprints, filterStatus],
+  )
+
+  // 归档项：满足归档态，按 updated_at 倒序（最新归档排最前）
+  const archived = useMemo(
+    () =>
+      sprints
+        .filter((s) => ARCHIVED.includes(s.status))
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+    [sprints],
   )
 
   const openCreate = () => {
@@ -189,7 +288,7 @@ export default function Sprints() {
         </div>
       </Card>
 
-      {/* 卡片网格 */}
+      {/* 主网格：卡片（归档项已在 visible 中排除，仅在归档板块展示） */}
       {visible.length === 0 ? (
         <Card>
           <p className="py-12 text-center text-sm text-ink-mute">没有符合条件的迭代</p>
@@ -197,69 +296,27 @@ export default function Sprints() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-2">
           {visible.map((s) => (
-            <Card key={s.id} className="space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="truncate text-base font-semibold text-ink-strong">
-                      {s.name}
-                    </h3>
-                    <StatusTag tone={SPRINT_STATUS_META[s.status].tone}>
-                      {SPRINT_STATUS_META[s.status].label}
-                    </StatusTag>
-                  </div>
-                  <p className="mt-1 truncate text-xs text-ink-soft">{s.goal}</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <IconButton onClick={() => openEdit(s)} title="编辑" className="!h-8 !w-8">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                    </svg>
-                  </IconButton>
-                  <IconButton
-                    onClick={() => setToDelete(s)}
-                    title="删除"
-                    className="!h-8 !w-8 hover:!border-danger/40 hover:!bg-danger/10 hover:!text-danger"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    </svg>
-                  </IconButton>
-                </div>
-              </div>
-
-              {/* 日期 + 进度 */}
-              <div className="flex items-center justify-between text-xs text-ink-soft">
-                <span>
-                  {fmtDate(s.start_date ?? undefined)} → {fmtDate(s.end_date ?? undefined)}
-                </span>
-                <span className="font-medium text-ink-strong">{s.progress}%</span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-line">
-                <div
-                  className="h-full rounded-full bg-accent"
-                  style={{ width: `${s.progress}%` }}
-                />
-              </div>
-
-              {/* 燃尽图 */}
-              {s.status !== 'cancelled' && (
-                <div>
-                  <div className="mb-1 flex items-center gap-3 text-[11px] text-ink-mute">
-                    <span className="flex items-center gap-1">
-                      <span className="h-0.5 w-4 bg-accent" /> 实际剩余
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="h-0.5 w-4 border-t border-dashed border-ink-mute" /> 理想剩余
-                    </span>
-                  </div>
-                  <Burndown actual={s.burndown} />
-                </div>
-              )}
-            </Card>
+            <SprintCard key={s.id} s={s} onEdit={openEdit} onDelete={setToDelete} />
           ))}
         </div>
+      )}
+
+      {/* 归档板块：卡片网格；按 updated_at 倒序，最新归档排最前 */}
+      {archived.length > 0 && (
+        <section className="space-y-3">
+          <header className="flex items-center gap-2 px-1">
+            {archiveIcon}
+            <h2 className="text-base font-semibold text-ink-strong">归档</h2>
+            <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-ink-mute">
+              {archived.length}
+            </span>
+          </header>
+          <div className="grid gap-5 lg:grid-cols-2">
+            {archived.map((s) => (
+              <SprintCard key={s.id} s={s} onEdit={openEdit} onDelete={setToDelete} />
+            ))}
+          </div>
+        </section>
       )}
 
       {/* 新建/编辑 Modal */}

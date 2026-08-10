@@ -45,6 +45,8 @@ const EMPTY = {
 
 // 终态：已上线 / 作废
 const TERMINAL: ReqStatus[] = ['launched', 'void']
+// 归档态 = 终态（满足即划入归档板块，主视图不再展示）
+const ARCHIVED: ReqStatus[] = TERMINAL
 
 const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: 'P0', label: 'P0（最高）' },
@@ -86,6 +88,23 @@ const editIcon = (
 const delIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+  </svg>
+)
+// 归档图标（内联 SVG，与铃铛/拖拽图标同风格）
+const archiveIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4 text-ink-soft"
+    aria-hidden
+  >
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+    <path d="M10 12h4" />
   </svg>
 )
 
@@ -194,18 +213,29 @@ export default function Requirements() {
 
   const visible = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
-    return requirements.filter((r) => {
-      if (filterStatus !== 'all' && r.status !== filterStatus) return false
-      if (filterPriority !== 'all' && r.priority !== filterPriority) return false
-      if (
-        kw &&
-        !r.title.toLowerCase().includes(kw) &&
-        !(r.owner ?? '').toLowerCase().includes(kw)
-      )
-        return false
-      return true
-    })
+    return requirements
+      .filter((r) => !ARCHIVED.includes(r.status)) // 归档项仅在归档板块展示
+      .filter((r) => {
+        if (filterStatus !== 'all' && r.status !== filterStatus) return false
+        if (filterPriority !== 'all' && r.priority !== filterPriority) return false
+        if (
+          kw &&
+          !r.title.toLowerCase().includes(kw) &&
+          !(r.owner ?? '').toLowerCase().includes(kw)
+        )
+          return false
+        return true
+      })
   }, [requirements, filterStatus, filterPriority, keyword])
+
+  // 归档项：满足归档态，按 updated_at 倒序（最新归档排最前）
+  const archived = useMemo(
+    () =>
+      requirements
+        .filter((r) => ARCHIVED.includes(r.status))
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+    [requirements],
+  )
 
   const openCreate = () => {
     setEditing(null)
@@ -261,6 +291,172 @@ export default function Requirements() {
       color: C.textGhost,
     },
   ]
+
+  // ============ 列表 / 四象限渲染（主视图与归档板块共用） ============
+  // draggable 仅主视图列表启用；归档列表不可拖拽重排。
+  const renderReqList = (items: Requirement[], draggable: boolean) => (
+    <Card>
+      {items.length === 0 ? (
+        <p className="py-12 text-center text-sm text-ink-mute">没有符合条件的需求</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {items.map((r) => (
+            <li
+              key={r.id}
+              draggable={draggable}
+              onDragStart={
+                draggable
+                  ? (e) => {
+                      if (!dragAllowed.current) {
+                        e.preventDefault()
+                        return
+                      }
+                      setDragId(r.id)
+                      e.dataTransfer.effectAllowed = 'move'
+                      try {
+                        e.dataTransfer.setData('text/plain', r.id)
+                      } catch {
+                        /* 部分浏览器对 setData 有限制，忽略即可 */
+                      }
+                    }
+                  : undefined
+              }
+              onDragEnter={draggable ? () => dragId && setOverId(r.id) : undefined}
+              onDragOver={draggable ? (e) => { if (dragId) e.preventDefault() } : undefined}
+              onDrop={
+                draggable
+                  ? (e) => {
+                      e.preventDefault()
+                      if (dragId && overId && dragId !== overId) moveRequirement(dragId, overId)
+                      setDragId(null)
+                      setOverId(null)
+                    }
+                  : undefined
+              }
+              onDragEnd={
+                draggable
+                  ? () => {
+                      dragAllowed.current = false
+                      setDragId(null)
+                      setOverId(null)
+                    }
+                  : undefined
+              }
+              className={`group flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:gap-2 transition ${
+                draggable && dragId === r.id ? 'opacity-40' : ''
+              } ${
+                draggable && dragId && overId === r.id && dragId !== r.id
+                  ? 'rounded-xl bg-brand-soft ring-1 ring-accent/30'
+                  : ''
+              }`}
+            >
+              {draggable && (
+                <button
+                  type="button"
+                  aria-label="拖拽调整顺序"
+                  title="按住拖拽以调整顺序"
+                  onMouseDown={() => {
+                    dragAllowed.current = true
+                  }}
+                  onClick={(e) => e.preventDefault()}
+                  className="hidden shrink-0 cursor-grab text-ink-mute transition hover:text-ink-soft active:cursor-grabbing group-hover:md:block"
+                >
+                  {gripIcon}
+                </button>
+              )}
+              <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+                <StatusTag tone={REQ_STATUS_META[r.status].tone}>
+                  {REQ_STATUS_META[r.status].label}
+                </StatusTag>
+                <PriorityTag priority={r.priority} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium leading-snug text-ink-strong break-words">
+                  {r.title}
+                </div>
+                <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
+                  <div className="break-words">
+                    <span className="text-ink-mute/80">责任人：</span>
+                    <span className="text-ink-soft">{r.owner ?? '未指派'}</span>
+                  </div>
+                  {r.value_desc && (
+                    <div className="break-words">
+                      <span className="text-ink-mute/80">价值：</span>
+                      <span>{r.value_desc}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-end self-end md:self-auto">
+                <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+
+  const renderReqQuadrant = (items: Requirement[]) => (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {QUADRANTS.map((q) => {
+        const qitems = items.filter((r) => r.priority === q.priority)
+        return (
+          <div
+            key={q.priority}
+            style={{ ...glass.card, borderRadius: 18, padding: '22px 24px', minHeight: 200, position: 'relative', overflow: 'hidden' }}
+          >
+            <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 50%, transparent)' }} />
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex h-6 items-center rounded-full px-2 text-xs font-semibold ${q.badge}`}>
+                  {q.priority}
+                </span>
+                <span className="text-sm font-semibold text-ink-strong">{q.title}</span>
+              </div>
+              <span className="text-xs text-ink-mute">{q.axis} · {qitems.length}</span>
+            </div>
+            {qitems.length === 0 ? (
+              <p className="py-10 text-center text-xs text-ink-mute">该象限暂无需求</p>
+            ) : (
+              <ul className="space-y-2">
+                {qitems.map((r) => (
+                  <li
+                    key={r.id}
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', borderRadius: 12, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}
+                  >
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-2">
+                          <StatusTag tone={REQ_STATUS_META[r.status].tone}>
+                            {REQ_STATUS_META[r.status].label}
+                          </StatusTag>
+                          <span className="break-words text-sm font-medium leading-snug text-ink-strong">{r.title}</span>
+                        </div>
+                        <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
+                          <div className="break-words">
+                            <span className="text-ink-mute/80">责任人：</span>
+                            <span className="text-ink-soft">{r.owner ?? '未指派'}</span>
+                          </div>
+                          {r.value_desc && (
+                            <div className="break-words">
+                              <span className="text-ink-mute/80">价值：</span>
+                              <span>{r.value_desc}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -366,170 +562,21 @@ export default function Requirements() {
         <div className="mt-1 text-[11px] text-ink-mute sm:hidden">共 {visible.length} 条</div>
       </Card>
 
-      {/* 列表视图 */}
-      {view === 'list' ? (
-        <Card>
-          {visible.length === 0 ? (
-            <p className="py-12 text-center text-sm text-ink-mute">没有符合条件的需求</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {visible.map((r) => (
-                <li
-                  key={r.id}
-                  draggable
-                  onDragStart={(e) => {
-                    if (!dragAllowed.current) {
-                      e.preventDefault()
-                      return
-                    }
-                    setDragId(r.id)
-                    e.dataTransfer.effectAllowed = 'move'
-                    try {
-                      e.dataTransfer.setData('text/plain', r.id)
-                    } catch {
-                      /* 部分浏览器对 setData 有限制，忽略即可 */
-                    }
-                  }}
-                  onDragEnter={() => dragId && setOverId(r.id)}
-                  onDragOver={(e) => {
-                    if (dragId) e.preventDefault()
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    if (dragId && overId && dragId !== overId)
-                      moveRequirement(dragId, overId)
-                    setDragId(null)
-                    setOverId(null)
-                  }}
-                  onDragEnd={() => {
-                    dragAllowed.current = false
-                    setDragId(null)
-                    setOverId(null)
-                  }}
-                  className={`group flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:gap-2 transition ${
-                    dragId === r.id ? 'opacity-40' : ''
-                  } ${
-                    dragId && overId === r.id && dragId !== r.id
-                      ? 'rounded-xl bg-brand-soft ring-1 ring-accent/30'
-                      : ''
-                  }`}
-                >
-                  {/* 左侧拖拽手柄（hover 显示） */}
-                  <button
-                    type="button"
-                    aria-label="拖拽调整顺序"
-                    title="按住拖拽以调整顺序"
-                    onMouseDown={() => {
-                      dragAllowed.current = true
-                    }}
-                    onClick={(e) => e.preventDefault()}
-                    className="hidden shrink-0 cursor-grab text-ink-mute transition hover:text-ink-soft active:cursor-grabbing group-hover:md:block"
-                  >
-                    {gripIcon}
-                  </button>
-                  {/* 标签组：移动端独立一行横排；桌面端作 li 横排一栏（与 Bugs 列表项一致） */}
-                  <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-                    <StatusTag tone={REQ_STATUS_META[r.status].tone}>
-                      {REQ_STATUS_META[r.status].label}
-                    </StatusTag>
-                    <PriorityTag priority={r.priority} />
-                  </div>
-                  {/* 标题段：占满剩余宽度，标题与责任人/价值自由换行 */}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium leading-snug text-ink-strong break-words">
-                      {r.title}
-                    </div>
-                    <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
-                      <div className="break-words">
-                        <span className="text-ink-mute/80">责任人：</span>
-                        <span className="text-ink-soft">{r.owner ?? '未指派'}</span>
-                      </div>
-                      {r.value_desc && (
-                        <div className="break-words">
-                          <span className="text-ink-mute/80">价值：</span>
-                          <span>{r.value_desc}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* 末行：链接 + 编辑 + 删除，移动端靠右对齐（与 Bugs 一致） */}
-                  <div className="flex items-center justify-end self-end md:self-auto">
-                    <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {QUADRANTS.map((q) => {
-            const items = visible.filter((r) => r.priority === q.priority)
-            return (
-              <div
-                key={q.priority}
-                style={{ ...glass.card, borderRadius: 18, padding: '22px 24px', minHeight: 200, position: 'relative', overflow: 'hidden' }}
-              >
-                <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 50%, transparent)' }} />
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex h-6 items-center rounded-full px-2 text-xs font-semibold ${q.badge}`}
-                    >
-                      {q.priority}
-                    </span>
-                    <span className="text-sm font-semibold text-ink-strong">
-                      {q.title}
-                    </span>
-                  </div>
-                  <span className="text-xs text-ink-mute">
-                    {q.axis} · {items.length}
-                  </span>
-                </div>
-                {items.length === 0 ? (
-                  <p className="py-10 text-center text-xs text-ink-mute">
-                    该象限暂无需求
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {items.map((r) => (
-                      <li
-                        key={r.id}
-                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', borderRadius: 12, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}
-                      >
-                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-2">
-                              <StatusTag tone={REQ_STATUS_META[r.status].tone}>
-                                {REQ_STATUS_META[r.status].label}
-                              </StatusTag>
-                              <span className="break-words text-sm font-medium leading-snug text-ink-strong">
-                                {r.title}
-                              </span>
-                            </div>
-                            <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
-                              <div className="break-words">
-                                <span className="text-ink-mute/80">责任人：</span>
-                                <span className="text-ink-soft">{r.owner ?? '未指派'}</span>
-                              </div>
-                              {r.value_desc && (
-                                <div className="break-words">
-                                  <span className="text-ink-mute/80">价值：</span>
-                                  <span>{r.value_desc}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <ReqActions r={r} onEdit={openEdit} onDelete={setToDelete} />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )
-          })}
-        </div>
+      {/* 主视图：列表 / 四象限（归档项已在 visible 中排除，仅在归档板块展示） */}
+      {view === 'list' ? renderReqList(visible, true) : renderReqQuadrant(visible)}
+
+      {/* 归档板块：随主视图模式（列表 / 四象限）；按 updated_at 倒序，最新归档排最前 */}
+      {archived.length > 0 && (
+        <section className="space-y-3">
+          <header className="flex items-center gap-2 px-1">
+            {archiveIcon}
+            <h2 className="text-base font-semibold text-ink-strong">归档</h2>
+            <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-ink-mute">
+              {archived.length}
+            </span>
+          </header>
+          {view === 'list' ? renderReqList(archived, false) : renderReqQuadrant(archived)}
+        </section>
       )}
 
       {/* 新建/编辑 Modal */}

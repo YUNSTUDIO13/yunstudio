@@ -49,7 +49,7 @@ function entityLabel(t: Notification['entity_type']): string {
 // 主组件
 // ============================================================
 export default function NotificationBell() {
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
+  const { notifications, unreadCount, markRead, markAllRead, clearAll } = useNotifications()
   const [open, setOpen] = useState(false)
   // 打开面板瞬间即全部已读（用户要求：点了通知按钮就代表看过了）。
   // 但为了让用户仍能一眼分辨"这次新来的是哪几条"，把打开那一刻的未读 id 快照下来，
@@ -295,10 +295,35 @@ export default function NotificationBell() {
 
           {notifications.length > 0 && (
             <div
-              className="px-4 py-2.5 text-center text-[10px]"
-              style={{ borderTop: `1px solid ${C.border}`, color: C.textGhost }}
+              className="flex items-center justify-between gap-2 px-4 py-2.5"
+              style={{ borderTop: `1px solid ${C.border}` }}
             >
-              同一事项的同一截止时间只提醒一次
+              <span className="text-[10px]" style={{ color: C.textGhost }}>
+                同一事项的同一截止时间只提醒一次
+              </span>
+              <button
+                type="button"
+                onClick={() => void clearAll()}
+                title="清空所有通知"
+                className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition hover:bg-danger/10 hover:text-danger"
+                style={{ color: C.textSub }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="13"
+                  height="13"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                </svg>
+                一键清除
+              </button>
             </div>
           )}
         </div>

@@ -33,6 +33,8 @@ interface NotificationsContextValue {
   loading: boolean
   markRead: (id: string) => Promise<void>
   markAllRead: () => Promise<void>
+  /** 清空全部通知（本地删除 + 入队补传云端） */
+  clearAll: () => Promise<void>
   /** 扫描 todos/sprints 中已到期且未完成的实体，建未读通知（去重） */
   scanDueEntities: () => Promise<number>
   refresh: () => Promise<void>
@@ -342,6 +344,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     [notifications],
   )
 
+  /** 一键清空：本地逐条删除并入队补传，内存态同步清空 */
+  const clearAll = useCallback(async () => {
+    if (!user) return
+    const all = await localAll<Notification>(TABLE, user.id)
+    if (!all.length) return
+    for (const n of all) {
+      await localDelete(TABLE, n.id)
+      await enqueueAndMaybeFlush(TABLE, 'delete', n.id)
+    }
+    setNotifications([])
+  }, [user])
+
   return (
     <NotificationsContext.Provider
       value={{
@@ -350,6 +364,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         loading,
         markRead,
         markAllRead,
+        clearAll,
         scanDueEntities,
         refresh: load,
       }}
