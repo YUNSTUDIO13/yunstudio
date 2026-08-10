@@ -123,6 +123,13 @@ function loadAnyStoredConfig(): DashboardConfig | null {
   return null
 }
 
+function isDefaultConfig(c: DashboardConfig): boolean {
+  return (
+    JSON.stringify(c.widgetIds ?? []) === JSON.stringify(DEFAULT_DASHBOARD) &&
+    JSON.stringify(c.sizes ?? {}) === JSON.stringify(DEFAULT_SIZES)
+  )
+}
+
 // ============================================================
 // Provider
 // ============================================================
@@ -145,47 +152,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     if (any) return hydrate(any)
     return { version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } }
   })
-
-  // ----- 加载：首帧已用本地同步渲染（无 FOUC）；挂载后 Always 回云端对齐，多设备收敛 -----
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      if (!user) {
-        setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } })
-        return
-      }
-      writeLastUserId(user.id)
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select('config')
-        .eq('user_id', user.id)
-        .eq('kind', DASHBOARD_KIND)
-        .maybeSingle()
-      if (cancelled) return
-      if (data?.config && isDashboardConfig(data.config)) {
-        const loaded = data.config
-        const merged = { ...loaded, sizes: { ...DEFAULT_SIZES, ...(loaded.sizes ?? {}) } }
-        const localCustom = loadFromStorage(user.id)
-        // 多端 last-write-wins：仅当云端比本地"更新"才覆盖，否则保持本地现状 → 刷新不闪屏
-        // 缺时间戳（旧数据）时以云端为准，触发一次性收敛
-        const localTs = localCustom?.updated_at
-        const cloudTs = merged.updated_at
-        const cloudNewer =
-          !localCustom || (cloudTs && localTs ? cloudTs > localTs : true)
-        if (!cloudNewer) return // 本地已是最新/更新 → 保持本地，不闪
-        setConfig(merged)
-        return
-      }
-      // 云端无数据 / 读取失败：保留首帧已渲染的本地布局（若本地也无则维持默认）
-      if (error) {
-        console.warn('[dashboard] 云端读取失败，已用本地兜底：', error.message)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [user])
 
   // ----- 持久化：云端 upsert + localStorage 双写；每次编辑打 updated_at 时间戳 -----
   const persist = useCallback(
@@ -210,6 +176,53 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     },
     [user, userId],
   )
+
+  // ----- 加载：首帧已用本地同步渲染（无 FOUC）；挂载后回云端，仅云端更新于本地才覆盖 -----
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      if (!user) {
+        setConfig({ version: 1, widgetIds: DEFAULT_DASHBOARD, sizes: { ...DEFAULT_SIZES } })
+        return
+      }
+      writeLastUserId(user.id)
+      const { data, error } = await supabase
+        .from(TABLE)
+        .select('config')
+        .eq('user_id', user.id)
+        .eq('kind', DASHBOARD_KIND)
+        .maybeSingle()
+      if (cancelled) return
+      const local = loadFromStorage(user.id)
+      const cloud = data?.config && isDashboardConfig(data.config) ? data.config : null
+      const localTs = local?.updated_at ?? null
+      const cloudTs = cloud?.updated_at ?? null
+      // 本地有自定义、云端无 → 把本地推上云端，保证跨端可见（首次初始化）
+      if (!cloud && local && isDashboardConfig(local)) {
+        void persist(local)
+        return
+      }
+      if (!cloud) {
+        if (error) console.warn('[dashboard] 云端读取失败，已用本地兜底：', error.message)
+        return // 云端无数据且本地无 → 维持默认
+      }
+      // 旧设备无戳迁移期：以云端为准收敛一次；但云端默认态且本地有自定义时保留本地
+      if (!cloudTs && !localTs) {
+        if (isDefaultConfig(cloud) && local && !isDefaultConfig(local)) return
+      } else if (cloudTs && localTs && cloudTs <= localTs) {
+        // 云端不比本地新 → 保持本地现状（刷新不闪、不回退、不丢编辑）
+        return
+      }
+      // 采用云端：合并默认尺寸 + 写回本地戳（避免下次刷新又从云端拉，消除"永不保持本地"退化）
+      const merged = { ...cloud, sizes: { ...DEFAULT_SIZES, ...(cloud.sizes ?? {}) } }
+      setConfig(merged)
+      saveToStorage(user.id, merged)
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [user, persist])
 
   // ----- Realtime：多 PC 同步 -----
   useEffect(() => {
