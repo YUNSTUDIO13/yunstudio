@@ -15,6 +15,7 @@ import { DEFAULT_NAV_CONFIG } from '../lib/default-nav'
 import type { NavConfig, NavPrimary, SecondaryColumn } from '../lib/nav-types'
 import { uid } from '../lib/nav-types'
 import { useAuth } from './AuthContext'
+import { readLastUserId, writeLastUserId } from './DashboardContext'
 
 // ============================================================
 // 类型
@@ -38,6 +39,9 @@ interface NavActions {
 
 interface NavContextValue {
   config: NavConfig
+  // 是否已加载/确认：本地有数据则首帧同步放行（无默认闪屏）；
+  // 本地无数据（清缓存/首次）则等云端拉到再放行（避免默认态闪现）。用法同 DashboardContext.hydrated。
+  hydrated: boolean
   // 用 moduleId 反查一级 Tab（即 Dock 高亮 / Mega Menu 归属）
   findPrimaryByModule(moduleId: BuiltinModuleId): NavPrimary | null
   findSecondaryByModule(
@@ -178,16 +182,62 @@ function saveToStorage(userId: string, config: NavConfig): void {
 export function NavProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const userId = user?.id ?? 'anonymous'
-  const [config, setConfig] = useState<NavConfig>(DEFAULT_NAV_CONFIG)
 
-  // ----- 加载：云端优先，localStorage 兜底，无则默认 -----
+  // 首帧同步读出上次登录用户的导航配置，避免先渲染默认 Tab 再闪回自定义 Tab（FOUC）。
+  // 与 DashboardContext 同策略：useState 初始化器同步读 localStorage，hadLocal 决定初始 hydrated。
+  const [config, setConfig] = useState<NavConfig>(() => {
+    const last = readLastUserId()
+    if (last) {
+      const local = loadFromStorage(last)
+      if (local) return migrateConfig(local)
+    }
+    return DEFAULT_NAV_CONFIG
+  })
+  const [hydrated, setHydrated] = useState<boolean>(() => {
+    const last = readLastUserId()
+    return !!(last && loadFromStorage(last))
+  })
+
+  // ----- 加载：首帧已用本地同步渲染（无 FOUC）；挂载后回云端校正 -----
+  // hydrated：本地有数据则同步放行（无默认闪屏）；本地无数据（清缓存/首次）则等云端拉到再放行（避免默认态闪现）
   useEffect(() => {
     let cancelled = false
+    let settled = false
+    const finish = () => {
+      if (!cancelled && !settled) {
+        settled = true
+        setHydrated(true)
+      }
+    }
     async function load() {
       if (!user) {
         setConfig(DEFAULT_NAV_CONFIG)
+        finish()
         return
       }
+      writeLastUserId(user.id)
+      const local = loadFromStorage(user.id)
+      if (local) {
+        // 本地已有 → 首帧已渲染本地，无需等云端，立即放行（刷新不闪默认）
+        finish()
+        // 异步校正：拉云端，仅当云端与本地不一致才覆盖（导航改动低频，二者通常一致，避免无意义重渲染）
+        const { data } = await supabase
+          .from(TABLE)
+          .select('config')
+          .eq('user_id', user.id)
+          .eq('kind', NAV_KIND)
+          .maybeSingle()
+        if (cancelled) return
+        const cloud = data?.config ? (data.config as NavConfig) : null
+        if (!cloud) return
+        const merged = migrateConfig(cloud)
+        if (JSON.stringify(merged) !== JSON.stringify(local)) {
+          setConfig(merged)
+          saveToStorage(user.id, merged)
+        }
+        return
+      }
+      // 本地无数据 → 必须等云端返回后再放行（否则先渲染默认再跳联网最新）
       const { data, error } = await supabase
         .from(TABLE)
         .select('config')
@@ -198,15 +248,14 @@ export function NavProvider({ children }: { children: ReactNode }) {
       if (data?.config) {
         setConfig(migrateConfig(data.config as NavConfig))
       } else if (!error) {
-        // 云端无记录 → 试 localStorage
-        const local = loadFromStorage(user.id)
-        setConfig(local ? migrateConfig(local) : DEFAULT_NAV_CONFIG)
+        // 云端无记录 → 维持默认（首次用户默认态即正确，无闪）
+        setConfig(DEFAULT_NAV_CONFIG)
       } else {
-        // 云端异常（多见于表未创建）→ localStorage 兜底
-        const local = loadFromStorage(user.id)
-        setConfig(local ? migrateConfig(local) : DEFAULT_NAV_CONFIG)
-        console.warn('[nav] 云端读取失败，已用本地兜底：', error.message)
+        // 云端异常（多见于表未创建）→ 维持默认，控制台提示
+        setConfig(DEFAULT_NAV_CONFIG)
+        console.warn('[nav] 云端读取失败，已用默认兜底：', error.message)
       }
+      finish()
     }
     load()
     return () => {
@@ -218,7 +267,10 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const persist = useCallback(
     async (next: NavConfig) => {
       setConfig(next)
-      if (user && userId !== 'anonymous') saveToStorage(user.id, next)
+      if (user && userId !== 'anonymous') {
+        saveToStorage(user.id, next)
+        writeLastUserId(user.id)
+      }
       if (user) {
         const { error } = await supabase
           .from(TABLE)
@@ -421,6 +473,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
 
   const value: NavContextValue = {
     config,
+    hydrated,
     findPrimaryByModule,
     findSecondaryByModule,
     actions,

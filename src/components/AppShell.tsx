@@ -102,7 +102,7 @@ function PrimaryDockItem({
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { profile } = useProfile()
-  const { config, findPrimaryByModule } = useNav()
+  const { config, hydrated, findPrimaryByModule } = useNav()
   const location = useLocation()
   const isMobile = useMediaQuery('(max-width: 767px)')
 
@@ -234,18 +234,23 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </Link>
 
         <nav className="flex flex-col items-center gap-2">
-          {sortedPrimaries.map((p) => (
-            <PrimaryDockItem
-              key={p.id}
-              primary={p}
-              isActive={activePrimary?.id === p.id}
-              isOpen={openPrimaryId === p.id}
-              onOpen={() => openMenu(p.id)}
-              onScheduleClose={scheduleClose}
-              isMobile={isMobile}
-              onToggle={() => togglePrimary(p.id)}
-            />
-          ))}
+          {hydrated ? (
+            sortedPrimaries.map((p) => (
+              <PrimaryDockItem
+                key={p.id}
+                primary={p}
+                isActive={activePrimary?.id === p.id}
+                isOpen={openPrimaryId === p.id}
+                onOpen={() => openMenu(p.id)}
+                onScheduleClose={scheduleClose}
+                isMobile={isMobile}
+                onToggle={() => togglePrimary(p.id)}
+              />
+            ))
+          ) : (
+            // 首帧未水合：显示加载占位，避免默认 Tab 闪现（同主页 hydrated 策略）
+            <div className="h-11 w-11 animate-pulse rounded-2xl bg-white/5" />
+          )}
         </nav>
       </aside>
 
@@ -390,28 +395,35 @@ export default function AppShell({ children }: { children: ReactNode }) {
             />
           </Link>
 
-          {sortedPrimaries.map((p) => {
-            const active = activePrimary?.id === p.id || openPrimaryId === p.id
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => togglePrimary(p.id)}
-                title={p.title}
-                aria-label={p.title}
-                aria-expanded={openPrimaryId === p.id}
-                className="flex h-14 flex-1 flex-col items-center justify-center"
-              >
-                <span
-                  className={`grid ${iconSizeCls} place-items-center rounded-2xl transition ${
-                    active ? 'bg-accent/20 text-accent' : 'text-ink-soft'
-                  }`}
+          {hydrated ? (
+            sortedPrimaries.map((p) => {
+              const active = activePrimary?.id === p.id || openPrimaryId === p.id
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => togglePrimary(p.id)}
+                  title={p.title}
+                  aria-label={p.title}
+                  aria-expanded={openPrimaryId === p.id}
+                  className="flex h-14 flex-1 flex-col items-center justify-center"
                 >
-                  {renderIcon(p.iconKey)}
-                </span>
-              </button>
-            )
-          })}
+                  <span
+                    className={`grid ${iconSizeCls} place-items-center rounded-2xl transition ${
+                      active ? 'bg-accent/20 text-accent' : 'text-ink-soft'
+                    }`}
+                  >
+                    {renderIcon(p.iconKey)}
+                  </span>
+                </button>
+              )
+            })
+          ) : (
+            // 首帧未水合：显示加载占位，避免默认 Tab 闪现（同主页 hydrated 策略）
+            <div className="flex h-14 flex-1 items-center justify-center">
+              <div className={`${iconSizeCls} animate-pulse rounded-2xl bg-white/5`} />
+            </div>
+          )}
 
           <div
             className="relative flex h-14 flex-1 flex-col items-center justify-center"

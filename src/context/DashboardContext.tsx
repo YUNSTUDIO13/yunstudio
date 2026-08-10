@@ -59,7 +59,7 @@ function storageKey(userId: string): string {
 // 记录「上次登录的 userId」，用于在首帧同步读出其自定义布局，
 // 消除「默认布局 → 自定义布局」的闪屏（FOUC）。
 const LAST_USER_KEY = 'pw.lastUserId'
-function readLastUserId(): string | null {
+export function readLastUserId(): string | null {
   if (typeof window === 'undefined') return null
   try {
     return window.localStorage.getItem(LAST_USER_KEY)
@@ -67,7 +67,7 @@ function readLastUserId(): string | null {
     return null
   }
 }
-function writeLastUserId(id: string): void {
+export function writeLastUserId(id: string): void {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(LAST_USER_KEY, id)
