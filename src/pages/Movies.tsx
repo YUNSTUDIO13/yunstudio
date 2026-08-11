@@ -1,12 +1,11 @@
 // 观影模块（Movies / 观影志）
 // 布局与功能对齐桌面「工作台前端代码」的观影应用：
-//   顶部工具栏（搜索 / 批量导入 / 新建）+ 精选 Hero + 海报墙 + 点击封面弹开详情
-//   详情弹窗：展示 + 编辑（同新建逻辑）+ 同步数据（第三方）
-//   双评分：个人优先，第三方次之，两者皆有则并排带「我 / 第三方」标识
-//   封面：TMDB 返回公网 URL（自动获取，失败标记手动获取）/ 手动上传走 Supabase Storage
-// UI 风格保持 yunstudio 现有深色玻璃拟态；数据走本地 Dexie 优先 + outbox 补传 Supabase
+//   顶部导航：透明→毛玻璃滚动吸附，仅【搜索 / 批量导入 / 新建】三个入口
+//   Hero：全屏电影封面 + 渐变叠加，随机主推影片左下角展示「标签 / 标题 / 评分 / 年代 / 地区 / 时长 / 简介 / 查看详情」
+//   观影记录：横向滚动海报（160×240 竖版），点击打开详情
+//   详情弹窗：顶部大封面 + 渐变 + 同步/编辑 按钮 + 2×2 键值对信息 + 双评分并排 + 个人短评 + 同步状态
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Modal, Field, Input, Textarea, Button, ConfirmDialog, Card } from '../components/ui'
+import { Modal, Field, Input, Textarea, Button, ConfirmDialog } from '../components/ui'
 import { db } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 import { supabase } from '../lib/supabase'
@@ -14,38 +13,13 @@ import { useAuth } from '../context/AuthContext'
 import { fetchMovieByTitle, syncMovie, uploadMovieCover } from '../lib/tmdb'
 import type { Movie } from '../types'
 
-const SRC_PERSONAL = '我'
 const SRC_THIRD = '第三方'
 
-// ─── 评分徽章：个人优先，双评并排带标识 ─────────────────────────────────────
-function ScoreBadge({ movie }: { movie: Movie }) {
-  const hasP = movie.personal_rating !== null && movie.personal_rating !== undefined
-  const hasT = movie.third_party_rating !== null && movie.third_party_rating !== undefined
-  if (!hasP && !hasT) return null
-  return (
-    <span className="inline-flex items-center gap-2">
-      {hasP && (
-        <span className="text-sm font-semibold text-accent">
-          {movie.personal_rating!.toFixed(1)}
-          <span className="ml-1 text-[10px] font-normal text-ink-mute">{SRC_PERSONAL}</span>
-        </span>
-      )}
-      {hasP && hasT && <span className="text-ink-mute">·</span>}
-      {hasT && (
-        <span className="text-sm font-semibold text-ink-soft">
-          {movie.third_party_rating!.toFixed(1)}
-          <span className="ml-1 text-[10px] font-normal text-ink-mute">{SRC_THIRD}</span>
-        </span>
-      )}
-    </span>
-  )
-}
-
-// ─── 星级（accent 填充） ───────────────────────────────────────────────────
-function Stars({ value, max = 10, size = 12 }: { value: number; max?: number; size?: number }) {
+// ─── 星级（10 分制 → 5 星，半星近似为整星） ─────────────────────────────────
+function Stars({ value, max = 10, size = 14 }: { value: number; max?: number; size?: number }) {
   const filled = Math.round((value / max) * 5)
   return (
-    <span style={{ display: 'inline-flex', gap: 2 }}>
+    <span style={{ display: 'inline-flex', gap: 2, alignItems: 'center' }}>
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
@@ -53,9 +27,9 @@ function Stars({ value, max = 10, size = 12 }: { value: number; max?: number; si
           height={size}
           viewBox="0 0 12 12"
           fill={i < filled ? 'currentColor' : 'none'}
-          stroke={i < filled ? 'currentColor' : '#555'}
+          stroke={i < filled ? 'currentColor' : 'rgba(255,255,255,0.35)'}
           strokeWidth="1.2"
-          className={i < filled ? 'text-accent' : 'text-ink-mute'}
+          className={i < filled ? 'text-yellow-400' : 'text-white/40'}
         >
           <polygon points="6,1 7.5,4.5 11,4.8 8.5,7.2 9.2,11 6,9 2.8,11 3.5,7.2 1,4.8 4.5,4.5" />
         </svg>
@@ -64,13 +38,15 @@ function Stars({ value, max = 10, size = 12 }: { value: number; max?: number; si
   )
 }
 
-// ─── 海报卡（poster） ───────────────────────────────────────────────────────
+// ─── 竖版海报（160×240 严格对齐参考 app） ─────────────────────────────────
 function PosterCard({ movie, onClick }: { movie: Movie; onClick: () => void }) {
   const [err, setErr] = useState(false)
+  const rating = movie.personal_rating ?? movie.third_party_rating
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className="group relative aspect-[2/3] cursor-pointer overflow-hidden rounded-card glass-card transition hover:border-accent/30"
+      className="group relative h-[240px] w-[160px] shrink-0 overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/10 transition hover:ring-accent/40"
     >
       {movie.cover && !err ? (
         <img
@@ -78,116 +54,124 @@ function PosterCard({ movie, onClick }: { movie: Movie; onClick: () => void }) {
           alt={movie.title}
           loading="lazy"
           onError={() => setErr(true)}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
         />
       ) : (
         <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#1a1a2e] to-[#2a2a3e] text-3xl font-semibold text-ink-mute">
           {movie.title.slice(0, 1)}
         </div>
       )}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 p-3">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 px-2.5 py-2 text-left">
         <div className="truncate text-sm font-medium text-white">{movie.title}</div>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="text-[11px] text-ink-mute">{movie.year || '—'}</span>
-          <ScoreBadge movie={movie} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── 封面图（通用，带失败占位） ─────────────────────────────────────────────
-function Cover({
-  src,
-  alt,
-  className,
-  rounded = 'rounded-card',
-}: {
-  src: string
-  alt: string
-  className?: string
-  rounded?: string
-}) {
-  const [err, setErr] = useState(false)
-  if (!src || err) {
-    return (
-      <div
-        className={`grid place-items-center bg-gradient-to-br from-[#1a1a2e] to-[#2a2a3e] text-ink-mute ${rounded} ${className ?? ''}`}
-      >
-        <span className="text-4xl font-semibold opacity-60">{alt.slice(0, 1)}</span>
-      </div>
-    )
-  }
-  return (
-    <img
-      src={src}
-      alt={alt}
-      onError={() => setErr(true)}
-      className={`object-cover ${rounded} ${className ?? ''}`}
-    />
-  )
-}
-
-// ─── 精选 Hero ─────────────────────────────────────────────────────────────
-function Hero({ movie, onClick }: { movie: Movie; onClick: () => void }) {
-  return (
-    <div
-      onClick={onClick}
-      className="group relative h-[300px] cursor-pointer overflow-hidden rounded-card glass-card md:h-[420px]"
-    >
-      <Cover
-        src={movie.cover}
-        alt={movie.title}
-        rounded="rounded-card"
-        className="absolute inset-0 h-full w-full brightness-[0.6] saturate-110 transition group-hover:scale-[1.03]"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 p-6 md:p-10">
-        <div className="flex flex-wrap gap-2">
-          {(movie.genre ?? []).map((g) => (
-            <span
-              key={g}
-              className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] text-white/80"
-            >
-              {g}
-            </span>
-          ))}
-        </div>
-        <h2 className="font-serif text-3xl font-semibold text-white md:text-5xl">{movie.title}</h2>
-        <div className="flex flex-wrap items-center gap-3 text-sm text-white/70">
-          <Stars value={movie.personal_rating ?? movie.third_party_rating ?? 0} size={14} />
-          <ScoreBadge movie={movie} />
-          <span>·</span>
+        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-white/70">
           <span>{movie.year || '—'}</span>
-          {movie.region && (
+          {rating !== null && rating !== undefined && (
             <>
-              <span>·</span>
-              <span>{movie.region}</span>
+              <span className="text-white/30">·</span>
+              <span className="font-semibold text-yellow-400">{rating.toFixed(1)}</span>
             </>
           )}
           {movie.duration > 0 && (
             <>
-              <span>·</span>
+              <span className="text-white/30">·</span>
               <span>{movie.duration}分钟</span>
             </>
           )}
         </div>
-        {movie.review && (
-          <p className="max-w-xl line-clamp-2 text-sm text-white/60">{movie.review}</p>
-        )}
-        <div className="mt-2">
-          <span className="inline-flex rounded-full bg-white/10 px-4 py-1.5 text-xs text-white backdrop-blur transition group-hover:bg-white/20">
-            查看详情
-          </span>
-        </div>
       </div>
-    </div>
+    </button>
   )
 }
 
-// ─── 详情弹窗 ───────────────────────────────────────────────────────────────
+// ─── 全屏 Hero：背景封面 + 渐变 + 左下角信息 ────────────────────────────────
+function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => void }) {
+  const [err, setErr] = useState(false)
+  const rating = movie.personal_rating ?? movie.third_party_rating
+  return (
+    <section
+      className="relative h-[78vh] min-h-[560px] w-full overflow-hidden"
+      key={movie.id /* 切换影片触发淡入动效 */}
+    >
+      <style>{`
+        @keyframes heroFadeIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
+        @keyframes heroInfoIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+      {movie.cover && !err ? (
+        <img
+          src={movie.cover}
+          alt={movie.title}
+          onError={() => setErr(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ animation: 'heroFadeIn 0.8s ease-out' }}
+        />
+      ) : (
+        <div
+          className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#1a1a2e] via-[#0a0a14] to-[#0c0c14]"
+          style={{ animation: 'heroFadeIn 0.8s ease-out' }}
+        >
+          <span className="font-serif text-[12rem] text-white/8">{movie.title.slice(0, 1)}</span>
+        </div>
+      )}
+      {/* 渐变叠加：底部黑色让文字清晰，顶部和右侧轻染 */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/20 to-transparent" />
+
+      {/* 左下角信息 */}
+      <div className="absolute inset-x-0 bottom-0 px-8 pb-16 md:px-16 md:pb-20">
+        <div className="max-w-3xl space-y-3" style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}>
+          {(movie.genre ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-3 text-xs text-white/60">
+              {(movie.genre ?? []).slice(0, 3).map((g, i) => (
+                <span key={g}>
+                  {g}
+                  {i < Math.min(2, movie.genre.length - 1) && <span className="ml-3 text-white/30">·</span>}
+                </span>
+              ))}
+            </div>
+          )}
+          <h1 className="font-serif text-4xl font-semibold text-white md:text-6xl">{movie.title}</h1>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
+            <Stars value={rating ?? 0} size={14} />
+            {movie.personal_rating !== null && movie.personal_rating !== undefined && (
+              <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
+            )}
+            {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
+              <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
+            )}
+            <span className="text-white/30">·</span>
+            <span>{movie.year || '—'}</span>
+            {movie.region && (
+              <>
+                <span className="text-white/30">·</span>
+                <span>{movie.region}</span>
+              </>
+            )}
+            {movie.duration > 0 && (
+              <>
+                <span className="text-white/30">·</span>
+                <span>{movie.duration}分钟</span>
+              </>
+            )}
+          </div>
+          {movie.review && (
+            <p className="max-w-2xl line-clamp-2 text-sm text-white/60">{movie.review}</p>
+          )}
+          <div className="pt-2">
+            <button
+              onClick={onViewDetails}
+              className="rounded-full bg-white/10 px-5 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
+            >
+              查看详情
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ─── 详情弹窗（顶部封面 + 渐变 + 同步/编辑 按钮 + 键值对 + 双评分 + 短评） ───
 function MovieModal({
   movie,
   onClose,
@@ -220,20 +204,21 @@ function MovieModal({
   }
 
   return (
-    <Modal open title={editing ? '编辑观影记录' : movie.title} maxWidth="max-w-3xl" onClose={onClose}>
-      <div className="-m-6">
-        {/* 头部大图 */}
-        <div className="relative h-56 w-full overflow-hidden rounded-t-card bg-black/40 md:h-64">
-          <Cover
-            src={draft.cover}
-            alt={draft.title}
-            rounded="rounded-none"
-            className="h-full w-full"
-          />
+    <Modal open title="" maxWidth="max-w-3xl" onClose={onClose}>
+      <div className="-m-6 overflow-hidden rounded-card">
+        {/* 顶部封面 + 渐变 + 标题 + 按钮 */}
+        <div className="relative h-56 w-full overflow-hidden bg-black/40 md:h-64">
+          {draft.cover ? (
+            <img src={draft.cover} alt={draft.title} className="h-full w-full object-cover" />
+          ) : (
+            <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#1a1a2e] to-[#2a2a3e]">
+              <span className="font-serif text-7xl text-white/15">{draft.title.slice(0, 1)}</span>
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0c0c14] via-[#0c0c14]/30 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5">
             <div>
-              <h2 className="font-serif text-2xl font-semibold text-white">{draft.title}</h2>
+              <h2 className="font-serif text-2xl font-semibold text-white md:text-3xl">{draft.title}</h2>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/70">
                 <span>{draft.year || '—'}</span>
                 {draft.region && (
@@ -271,7 +256,7 @@ function MovieModal({
           </div>
         </div>
 
-        {/* 内容 */}
+        {/* 主体内容 */}
         <div className="space-y-5 p-5">
           {editing && (
             <Field label="封面（自动获取，也可填写 URL 或上传）">
@@ -289,7 +274,8 @@ function MovieModal({
             </Field>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* 2×2 键值对：类型 / 地区 / 年份 / 时长 */}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
             <InfoField
               label="类型"
               value={(draft.genre ?? []).join(' / ')}
@@ -303,7 +289,7 @@ function MovieModal({
               onChange={(v) => setDraft({ ...draft, region: v })}
             />
             <InfoField
-              label="年代"
+              label="年份"
               value={String(draft.year || '')}
               editing={editing}
               onChange={(v) => setDraft({ ...draft, year: parseInt(v, 10) || 0 })}
@@ -316,8 +302,8 @@ function MovieModal({
             />
           </div>
 
-          {/* 评分 */}
-          <div className="flex flex-wrap gap-8">
+          {/* 评分：个人 + 第三方并排 */}
+          <div className="flex flex-wrap gap-10 pt-1">
             <div>
               <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">个人评分</div>
               {editing ? (
@@ -339,8 +325,7 @@ function MovieModal({
               ) : draft.personal_rating !== null && draft.personal_rating !== undefined ? (
                 <div className="flex items-center gap-2">
                   <Stars value={draft.personal_rating} />
-                  <span className="text-xl font-semibold text-accent">{draft.personal_rating.toFixed(1)}</span>
-                  <span className="text-[10px] text-ink-mute">{SRC_PERSONAL}</span>
+                  <span className="text-xl font-semibold text-white">{draft.personal_rating.toFixed(1)}</span>
                 </div>
               ) : (
                 <span className="text-sm text-ink-mute">未评分</span>
@@ -351,8 +336,7 @@ function MovieModal({
                 <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">{SRC_THIRD}评分</div>
                 <div className="flex items-center gap-2">
                   <Stars value={draft.third_party_rating} />
-                  <span className="text-xl font-semibold text-ink-soft">{draft.third_party_rating.toFixed(1)}</span>
-                  <span className="text-[10px] text-ink-mute">{SRC_THIRD}</span>
+                  <span className="text-xl font-semibold text-white/80">{draft.third_party_rating.toFixed(1)}</span>
                 </div>
               </div>
             )}
@@ -409,7 +393,7 @@ function InfoField({
 }) {
   return (
     <div>
-      <div className="mb-1.5 text-[11px] uppercase tracking-wider text-ink-mute">{label}</div>
+      <div className="mb-1 text-[11px] uppercase tracking-wider text-ink-mute">{label}</div>
       {editing ? (
         <Input value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (
@@ -437,7 +421,7 @@ function UploadButton({ userId, onUploaded }: { userId: string; onUploaded: (url
             const url = await uploadMovieCover(file, userId)
             onUploaded(url)
           } catch {
-            /* 静默失败，用户可重试 */
+            /* 静默失败 */
           } finally {
             setBusy(false)
           }
@@ -510,12 +494,8 @@ function NewMovieModal({
       onClose={onClose}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={handleSave} disabled={!draft.title.trim()}>
-            添加记录
-          </Button>
+          <Button variant="ghost" onClick={onClose}>取消</Button>
+          <Button onClick={handleSave} disabled={!draft.title.trim()}>添加记录</Button>
         </>
       }
     >
@@ -564,11 +544,8 @@ function NewMovieModal({
                     try {
                       const url = await uploadMovieCover(file, userId)
                       setDraft({ ...draft, cover: url })
-                    } catch {
-                      /* 静默 */
-                    } finally {
-                      setUploading(false)
-                    }
+                    } catch { /* 静默 */ }
+                    finally { setUploading(false) }
                   }}
                 />
               </label>
@@ -602,10 +579,8 @@ function NewMovieModal({
             </p>
           )}
         </div>
-
-        {/* 封面预览 */}
         <div className="flex flex-col items-center gap-2">
-          <div className="h-[220px] w-[160px] overflow-hidden rounded-card border border-white/8 bg-black/30">
+          <div className="h-[240px] w-[160px] overflow-hidden rounded-xl border border-white/10 bg-black/30">
             {coverUrl ? (
               <img src={coverUrl} alt="封面预览" className="h-full w-full object-cover" />
             ) : fetching ? (
@@ -653,9 +628,7 @@ function BatchImportModal({
       onClose={onClose}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
-            取消
-          </Button>
+          <Button variant="ghost" onClick={onClose}>取消</Button>
           <Button onClick={() => parsed.length && onImport(parsed)} disabled={!parsed.length}>
             导入 {parsed.length ? `${parsed.length} 部` : ''}
           </Button>
@@ -666,10 +639,7 @@ function BatchImportModal({
       <Textarea
         value={text}
         autoFocus
-        onChange={(e) => {
-          setText(e.target.value)
-          parse(e.target.value)
-        }}
+        onChange={(e) => { setText(e.target.value); parse(e.target.value) }}
         placeholder={'奥本海默，2023\n瞬息全宇宙，2022\n坠落的审判，2023'}
         rows={8}
       />
@@ -696,18 +666,58 @@ function BatchImportModal({
   )
 }
 
-// ─── 主页面 ─────────────────────────────────────────────────────────────────
+// ─── 主页面（完全对齐参考 App 布局） ─────────────────────────────────────
 export default function MoviesPage() {
   const { user } = useAuth()
   const userId = user?.id ?? 'anonymous'
   const [movies, setMovies] = useState<Movie[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
   const [selected, setSelected] = useState<Movie | null>(null)
   const [showNew, setShowNew] = useState(false)
   const [showBatch, setShowBatch] = useState(false)
   const [del, setDel] = useState<Movie | null>(null)
-  const [globalError, setGlobalError] = useState<string | null>(null)
+  const [scrolled, setScrolled] = useState(false)
+  const [heroIndex, setHeroIndex] = useState(0)
+
+  // 加载 + Realtime
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      await seedFromServer('movies', userId)
+      if (!cancelled) await reload()
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [userId])
+
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`movies:${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'movies', filter: `user_id=eq.${userId}` },
+        () => {
+          void (async () => {
+            await seedFromServer('movies', userId)
+            await reload()
+          })()
+        },
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user, userId])
+
+  // 滚动监听（导航透明→毛玻璃）
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 30)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const reload = useCallback(async () => {
     if (!user) {
@@ -725,39 +735,6 @@ export default function MoviesPage() {
     setLoading(false)
   }, [user, userId])
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      await seedFromServer('movies', userId)
-      if (!cancelled) await reload()
-    }
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [reload, userId])
-
-  useEffect(() => {
-    if (!user) return
-    const channel = supabase
-      .channel(`movies:${userId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'movies', filter: `user_id=eq.${userId}` },
-        () => {
-          void (async () => {
-            await seedFromServer('movies', userId)
-            await reload()
-          })()
-        },
-      )
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user, userId, reload])
-
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return movies
@@ -768,7 +745,24 @@ export default function MoviesPage() {
     )
   }, [movies, search])
 
-  const hero = visible.length ? visible[0] : null
+  // Hero 轮播：随机选至多 5 部，每 8s 切换
+  const heroCandidates = useMemo(() => {
+    if (visible.length === 0) return []
+    const arr = [...visible]
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr.slice(0, Math.min(5, arr.length))
+  }, [visible])
+
+  useEffect(() => {
+    if (heroCandidates.length <= 1) return
+    const t = setInterval(() => setHeroIndex((i) => (i + 1) % heroCandidates.length), 8000)
+    return () => clearInterval(t)
+  }, [heroCandidates.length])
+
+  const hero = heroCandidates.length ? heroCandidates[heroIndex % heroCandidates.length] : null
 
   const persist = useCallback(
     async (movie: Movie) => {
@@ -776,7 +770,7 @@ export default function MoviesPage() {
       await enqueueAndMaybeFlush('movies', movie.created_at === movie.updated_at ? 'insert' : 'update', movie.id, movie)
       await reload()
     },
-    [reload, userId],
+    [reload],
   )
 
   const handleSaveMovie = (updated: Movie) => {
@@ -834,7 +828,7 @@ export default function MoviesPage() {
       await enqueueAndMaybeFlush('movies', 'insert', m.id, m)
     }
     await reload()
-    // 后台自动同步第三方数据（mock 框架）
+    // 后台自动同步第三方数据
     for (const m of created) {
       void (async () => {
         const updated = await handleSync(m)
@@ -845,15 +839,11 @@ export default function MoviesPage() {
 
   const confirmDelete = async () => {
     if (!del) return
-    try {
-      await db.movies.delete(del.id)
-      await enqueueAndMaybeFlush('movies', 'delete', del.id)
-      await reload()
-      setSelected(null)
-      setDel(null)
-    } catch (e) {
-      setGlobalError(e instanceof Error ? e.message : String(e))
-    }
+    await db.movies.delete(del.id)
+    await enqueueAndMaybeFlush('movies', 'delete', del.id)
+    await reload()
+    setSelected(null)
+    setDel(null)
   }
 
   const openMovie = (m: Movie) => {
@@ -862,74 +852,83 @@ export default function MoviesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      {/* 顶部 */}
-      <header className="flex flex-wrap items-end justify-between gap-3 glass-card p-5">
-        <div>
-          <div className="text-[11px] font-medium uppercase tracking-[0.25em] text-ink-mute">
-            Workspace · 观影
+    <div className="relative w-full">
+      {/* 顶部导航：透明 → 毛玻璃滚动吸附 */}
+      <nav
+        className={`fixed left-0 right-0 top-0 z-30 transition-all duration-300 ${
+          scrolled
+            ? 'bg-black/40 backdrop-blur-xl border-b border-white/10'
+            : 'bg-transparent border-b border-transparent'
+        }`}
+      >
+        <div className="flex items-center justify-between px-6 py-4 md:px-12">
+          <h1 className="text-lg font-semibold text-white tracking-wide">观影志</h1>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setShowSearch((s) => !s)}
+              aria-label="搜索"
+              className="grid h-9 w-9 place-items-center rounded-full bg-white/10 backdrop-blur-md transition hover:bg-white/20"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowBatch(true)}
+              className="rounded-full bg-white/10 px-4 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
+            >
+              批量导入
+            </button>
+            <button
+              onClick={() => setShowNew(true)}
+              className="rounded-full bg-yellow-400 px-4 py-1.5 text-sm font-medium text-black transition hover:bg-yellow-300"
+            >
+              + 新建
+            </button>
           </div>
-          <h1 className="mt-1 text-2xl font-semibold text-ink-strong">观影志</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            记录你看过的电影。支持自动获取封面与第三方评分；点击封面查看详情、编辑或同步数据。
-          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="soft" onClick={() => setShowBatch(true)}>
-            批量导入
-          </Button>
-          <Button onClick={() => setShowNew(true)}>+ 新建</Button>
-        </div>
-      </header>
+        {showSearch && (
+          <div className="border-t border-white/10 px-6 py-3 md:px-12">
+            <Input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索影片名称 / 类型"
+              className="w-full"
+            />
+          </div>
+        )}
+      </nav>
 
-      {globalError ? (
-        <div className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-          {globalError}
-        </div>
-      ) : null}
-
-      {/* 搜索 */}
-      <Card className="!p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索影片名称 / 类型"
-            className="flex-1"
-          />
-          <span className="ml-auto text-xs text-ink-mute">共 {visible.length} 部</span>
-        </div>
-      </Card>
-
-      {loading ? (
-        <Card>
-          <p className="py-12 text-center text-sm text-ink-mute">加载中…</p>
-        </Card>
-      ) : (
-        <>
-          {/* 精选 Hero */}
-          {!search && hero && (
-            <Hero movie={hero} onClick={() => openMovie(hero)} />
-          )}
-
-          {/* 海报墙 */}
-          {visible.length === 0 ? (
-            <Card>
-              <p className="py-12 text-center text-sm text-ink-mute">
-                {movies.length === 0
-                  ? '还没有观影记录。点击右上角「新建」添加，或用「批量导入」一次加入多部。'
-                  : '没有匹配的影片。'}
-              </p>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-              {visible.map((m) => (
-                <PosterCard key={m.id} movie={m} onClick={() => openMovie(m)} />
-              ))}
-            </div>
-          )}
-        </>
+      {/* Hero */}
+      {!loading && hero && (
+        <Hero movie={hero} onViewDetails={() => openMovie(hero)} />
       )}
+
+      {/* 观影记录：横向滚动 */}
+      <section className="px-6 py-10 md:px-12 md:py-14">
+        <h2 className="mb-5 text-base font-semibold text-white/90">
+          观影记录
+          <span className="ml-2 text-sm font-normal text-white/40">{visible.length} 部</span>
+        </h2>
+        {visible.length === 0 ? (
+          <div className="py-16 text-center text-sm text-white/50">
+            {movies.length === 0
+              ? '还没有观影记录。点击右上角「新建」添加，或用「批量导入」一次加入多部。'
+              : '没有匹配的影片。'}
+          </div>
+        ) : (
+          <div
+            className="-mx-6 flex gap-4 overflow-x-auto px-6 pb-4 md:-mx-12 md:px-12"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}
+          >
+            {visible.map((m) => (
+              <PosterCard key={m.id} movie={m} onClick={() => openMovie(m)} />
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* 弹窗 */}
       {selected && (
