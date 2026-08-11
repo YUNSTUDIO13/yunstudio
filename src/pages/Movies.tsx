@@ -5,13 +5,13 @@
 //   观影记录：横向滚动海报（160×240 竖版），点击打开详情
 //   详情弹窗：顶部大封面 + 渐变 + 同步/编辑 按钮 + 2×2 键值对信息 + 双评分并排 + 个人短评 + 同步状态
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ClipboardEvent } from 'react'
 import { Modal, Field, Input, Textarea, Button, ConfirmDialog } from '../components/ui'
 import { db } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage } from '../lib/tmdb'
-import * as XLSX from 'xlsx'
+import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage, type TMDBCandidate } from '../lib/tmdb'
 import type { Movie } from '../types'
 
 const SRC_THIRD = '第三方'
@@ -98,9 +98,10 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
         @keyframes heroFadeIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
         @keyframes heroInfoIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
-      {movie.cover && !err ? (
+      {/* 整张背景：宽幅剧情照 backdrop 优先，海报 cover 兜底（cover/2:3 居中裁剪也能用） */}
+      {(movie.backdrop || movie.cover) && !err ? (
         <img
-          src={movie.cover}
+          src={movie.backdrop || movie.cover}
           alt={movie.title}
           onError={() => setErr(true)}
           className="absolute inset-0 h-full w-full object-cover"
@@ -124,11 +125,11 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
           className="flex max-w-4xl items-start gap-5"
           style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
         >
-          {/* 左侧封面：与「观影记录」海报完全同尺寸 160×240（严格 2:3 竖版），顶部对齐「爱情」标签行 */}
-          {(movie.backdrop || movie.cover) && (
+          {/* 左侧封面：竖版海报（cover）优先，宽幅剧情照（backdrop）兜底；均裁剪为 160×240 */}
+          {(movie.cover || movie.backdrop) && (
             <div className="relative hidden h-[240px] w-[160px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block">
               <img
-                src={movie.backdrop || movie.cover}
+                src={movie.cover || movie.backdrop}
                 alt={movie.title}
                 className="h-full w-full object-cover"
               />
@@ -492,15 +493,22 @@ function NewMovieModal({
   onClose: () => void
   onSave: (m: Movie) => void
 }) {
-  const [draft, setDraft] = useState({ title: '', year: String(new Date().getFullYear()), cover: '', personalRating: '', review: '' })
+  const [draft, setDraft] = useState({ title: '', year: '', cover: '', personalRating: '', review: '' })
   const [preview, setPreview] = useState<Partial<Movie>>({})
   const [fetching, setFetching] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [candidates, setCandidates] = useState<TMDBCandidate[]>([])
+  const [selectedCandidateIdx, setSelectedCandidateIdx] = useState<number | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const triggerFetch = (title: string, year: string) => {
     if (timer.current) clearTimeout(timer.current)
-    if (!title.trim()) return
+    // 必须「名称 + 年代」双字段都非空才触发（同名歧义需要年份辅助 TMDB search 锁定目标）
+    if (!title.trim() || !year.trim()) {
+      setCandidates([])
+      setSelectedCandidateIdx(null)
+      return
+    }
     timer.current = setTimeout(async () => {
       setFetching(true)
       try {
@@ -517,22 +525,51 @@ function NewMovieModal({
           backdrop = b || ''
         }
         setPreview({ ...data, cover, backdrop })
+        setCandidates(data.candidates ?? [])
+        setSelectedCandidateIdx(0)
       } finally {
         setFetching(false)
       }
     }, 800)
   }
 
+  /** 切换候选后，重新压缩上传该候选的封面/剧照，同步年份与评分 */
+  const handleSelectCandidate = async (idx: number) => {
+    const candidate = candidates[idx]
+    if (!candidate) return
+    setSelectedCandidateIdx(idx)
+    setFetching(true)
+    try {
+      const cover = candidate.poster_path
+        ? await uploadTmdbImage(candidate.poster_path, userId).catch(() => '')
+        : ''
+      const backdrop = candidate.backdrop_path
+        ? await uploadTmdbImage(candidate.backdrop_path, userId).catch(() => '')
+        : ''
+      setPreview((prev) => ({
+        ...prev,
+        cover,
+        backdrop,
+        third_party_rating: candidate.vote_average,
+        year: candidate.year,
+        cover_failed: !cover && !prev.cover,
+      }))
+      setDraft((d) => ({ ...d, year: candidate.year ? String(candidate.year) : d.year }))
+    } finally {
+      setFetching(false)
+    }
+  }
+
   const coverUrl = draft.cover || preview.cover || ''
 
   const handleSave = () => {
-    if (!draft.title.trim()) return
+    if (!draft.title.trim() || !draft.year.trim()) return
     const nowIso = new Date().toISOString()
     const movie: Movie = {
       id: crypto.randomUUID(),
       user_id: userId,
       title: draft.title.trim(),
-      year: parseInt(draft.year, 10) || new Date().getFullYear(),
+      year: parseInt(draft.year, 10) || 0,
       cover: draft.cover || preview.cover || '',
       backdrop: preview.backdrop || '',
       personal_rating: draft.personalRating ? parseFloat(draft.personalRating) : null,
@@ -558,7 +595,7 @@ function NewMovieModal({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button onClick={handleSave} disabled={!draft.title.trim()}>添加记录</Button>
+          <Button onClick={handleSave} disabled={!draft.title.trim() || !draft.year.trim()}>添加记录</Button>
         </>
       }
     >
@@ -586,6 +623,36 @@ function NewMovieModal({
               className="w-28"
             />
           </Field>
+          {candidates.length > 0 && (
+            <Field label={`TMDB 候选（${candidates.length} 个）`} hint="点击切换封面 / 年份 / 评分">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {candidates.map((c, idx) => (
+                  <button
+                    key={c.tmdb_id}
+                    type="button"
+                    disabled={fetching}
+                    onClick={() => void handleSelectCandidate(idx)}
+                    className={`relative flex w-[120px] shrink-0 flex-col rounded-lg border p-1.5 text-left transition ${
+                      selectedCandidateIdx === idx ? 'border-accent bg-accent/10' : 'border-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <div className="relative h-[150px] w-full overflow-hidden rounded-md bg-black/40">
+                      {c.poster_path ? (
+                        <img src={c.poster_path} alt={c.title} loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center text-xs text-ink-mute">{c.title.slice(0, 1)}</div>
+                      )}
+                    </div>
+                    <div className="mt-1.5 truncate text-xs text-white">{c.title}</div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-white/60">
+                      <span>{c.year || '—'}</span>
+                      {c.vote_average !== null && <span className="text-yellow-400">★ {c.vote_average.toFixed(1)}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
           <Field label="封面（可手动填写或上传）">
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
@@ -672,29 +739,48 @@ function BatchImportModal({
 }) {
   const [phase, setPhase] = useState<'idle' | 'importing' | 'done'>('idle')
   const [rows, setRows] = useState<{ title: string; year: string }[]>([])
-  const [fileErr, setFileErr] = useState('')
+  const [parseErr, setParseErr] = useState('')
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [results, setResults] = useState<{ title: string; ok: boolean; msg?: string; hasCover?: boolean }[]>([])
-  const [dragging, setDragging] = useState(false)
 
-  const parseFile = async (file: File) => {
-    setFileErr('')
-    try {
-      const buf = await file.arrayBuffer()
-      const wb = XLSX.read(buf, { type: 'array' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][]
-      const parsed = matrix
-        .map((r) => ({ title: String(r[0] ?? '').trim(), year: String(r[1] ?? '').trim() }))
-        .filter((r) => r.title)
-      if (!parsed.length) {
-        setFileErr('未识别到「名称 + 年代」数据，请确认文件前两列分别为 名称、年代')
-        return
-      }
-      setRows(parsed)
-    } catch (e) {
-      setFileErr('解析失败：' + (e instanceof Error ? e.message : String(e)))
+  /**
+   * 粘贴解析：抓取剪贴板的纯文本，按 tab 拆分（Excel 默认复制格式）。
+   * 第一行若包含「名称 / 片名 / 年份」字段识别为表头，自动跳过。
+   */
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = e.clipboardData.getData('text/plain')
+    setParseErr('')
+    if (!text || !text.trim()) return
+    e.preventDefault()
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l)
+    if (!lines.length) {
+      setParseErr('未识别到有效行，请确认复制了名称 + 年代两列')
+      return
     }
+    let startIdx = 0
+    const headerCells = lines[0].split('\t').map((c) => c.trim())
+    const isHeader =
+      /名称|片名|^title$|^name$/i.test(headerCells[0] ?? '') ||
+      /年代|year|年份/i.test(headerCells[1] ?? '')
+    if (isHeader) startIdx = 1
+    const parsed = lines
+      .slice(startIdx)
+      .map((l) => l.split('\t'))
+      .map((cells) => ({
+        title: String(cells[0] ?? '').trim(),
+        year: String(cells[1] ?? '').trim(),
+      }))
+      .filter((r) => r.title)
+    if (!parsed.length) {
+      setParseErr('未识别到「名称 + 年代」数据，请确认前两列为名称、年代')
+      return
+    }
+    setRows(parsed)
+  }
+
+  const handleClear = () => {
+    setRows([])
+    setParseErr('')
   }
 
   const startImport = async () => {
@@ -716,7 +802,7 @@ function BatchImportModal({
           id: crypto.randomUUID(),
           user_id: userId,
           title: r.title,
-          year: data.year || parseInt(r.year, 10) || new Date().getFullYear(),
+          year: data.year || parseInt(r.year, 10) || 0,
           cover,
           backdrop,
           personal_rating: null,
@@ -746,14 +832,14 @@ function BatchImportModal({
   return (
     <Modal
       open
-      title="批量导入（Excel / CSV）"
+      title="粘贴导入·观影记录"
       onClose={onClose}
       footer={
         phase === 'idle' ? (
           <>
             <Button variant="ghost" onClick={onClose}>取消</Button>
             <Button onClick={startImport} disabled={!rows.length}>
-              开始获取并导入 {rows.length ? `${rows.length} 部` : ''}
+              {rows.length ? `确认导入 ${rows.length} 部` : '确认导入'}
             </Button>
           </>
         ) : phase === 'done' ? (
@@ -763,54 +849,67 @@ function BatchImportModal({
         )
       }
     >
-      {phase === 'idle' && (
+      {phase === 'idle' && rows.length === 0 && (
         <>
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDragging(false)
-              const f = e.dataTransfer.files?.[0]
-              if (f) void parseFile(f)
-            }}
-            className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${dragging ? 'border-accent bg-accent/5' : 'border-white/15'}`}
-          >
-            <p className="text-sm text-ink-soft">拖入 Excel / CSV 文件，或</p>
-            <label className="inline-flex cursor-pointer items-center rounded-lg bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/20">
-              选择文件
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) void parseFile(f) }}
-              />
-            </label>
-            <p className="text-xs text-ink-mute">支持 .xlsx / .xls / .csv，前两列分别为「名称、年代」</p>
+          <div className="mb-3 space-y-1 text-xs text-ink-mute">
+            <p>
+              在 Excel 中选中数据区域（含标题行）按 <kbd className="rounded border border-white/15 bg-white/5 px-1 text-[11px] text-ink-soft">Ctrl+C</kbd> 复制，
+              然后点击下方输入框按 <kbd className="rounded border border-white/15 bg-white/5 px-1 text-[11px] text-ink-soft">Ctrl+V</kbd> 粘贴。
+            </p>
+            <p>
+              需包含列：<span className="text-ink-soft">观影名称</span>、<span className="text-ink-soft">年代</span>（年代列可为空，第一行表头自动识别）
+            </p>
           </div>
-          {fileErr && <p className="mt-3 text-xs text-danger">{fileErr}</p>}
-          {rows.length > 0 && (
-            <div className="mt-4">
-              <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">识别到 {rows.length} 部影片</div>
-              <div className="max-h-44 space-y-1 overflow-auto">
+          <textarea
+            onPaste={handlePaste}
+            placeholder="点击此处，按 Ctrl+V 粘贴 Excel 数据…"
+            autoFocus
+            rows={5}
+            className="block w-full resize-none rounded-xl border-2 border-dashed border-accent/40 bg-accent/[0.04] px-4 py-3 text-sm text-ink-soft outline-none transition placeholder:text-ink-mute focus:border-accent focus:bg-accent/[0.08]"
+          />
+          {parseErr && <p className="mt-3 text-xs text-[#f87171]">{parseErr}</p>}
+        </>
+      )}
+      {phase === 'idle' && rows.length > 0 && (
+        <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              已接收 {rows.length} 行数据（不含标题行）· 2 列
+            </span>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-xs text-ink-mute underline-offset-2 transition hover:text-ink-soft hover:underline"
+            >
+              清空重新粘贴
+            </button>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-white/10">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/5 text-left text-[11px] uppercase tracking-wider text-ink-mute">
+                  <th className="w-12 px-3 py-2 text-center">#</th>
+                  <th className="px-3 py-2">观影名称</th>
+                  <th className="w-24 px-3 py-2">年代</th>
+                </tr>
+              </thead>
+              <tbody>
                 {rows.slice(0, 50).map((r, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft"
-                    style={{ background: 'rgba(255,255,255,0.03)' }}
-                  >
-                    <span className="w-5 text-[11px] text-ink-mute">{i + 1}</span>
-                    <span className="flex-1 truncate">{r.title}</span>
-                    <span className="text-ink-mute">{r.year || '—'}</span>
-                    <span className="h-2 w-2 rounded-full bg-[#4ade80]" />
-                  </div>
+                  <tr key={i} className="border-b border-white/5 last:border-b-0 hover:bg-white/[0.03]">
+                    <td className="px-3 py-2 text-center text-[11px] text-ink-mute">{i + 1}</td>
+                    <td className="px-3 py-2 text-ink-soft">{r.title}</td>
+                    <td className="px-3 py-2 text-ink-mute">{r.year || '—'}</td>
+                  </tr>
                 ))}
-                {rows.length > 50 && (
-                  <div className="px-2 py-1 text-[11px] text-ink-mute">…其余 {rows.length - 50} 部省略显示</div>
-                )}
+              </tbody>
+            </table>
+            {rows.length > 50 && (
+              <div className="border-t border-white/10 px-3 py-2 text-center text-[11px] text-ink-mute">
+                … 其余 {rows.length - 50} 行省略显示
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
       {phase !== 'idle' && (

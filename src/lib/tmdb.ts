@@ -26,6 +26,16 @@ const MOCK_BACKDROPS = [
 const MOCK_GENRES = ['剧情', '爱情', '科幻', '犯罪', '喜剧', '悬疑', '动画', '动作']
 const MOCK_REGIONS = ['美国', '英国', '法国', '日本', '韩国', '中国']
 
+export interface TMDBCandidate {
+  tmdb_id: number
+  title: string
+  year: number
+  poster_path: string
+  backdrop_path: string
+  vote_average: number | null
+  origin_country: string
+}
+
 export interface TMDBMovieData {
   cover: string
   backdrop: string // 宽幅背景图（TMDB backdrop_path / 横版剧照）
@@ -35,6 +45,8 @@ export interface TMDBMovieData {
   duration: number
   year: number
   cover_failed: boolean
+  /** TMDB search 返回的全部候选（最多 8 条），供前端在同名歧义时让用户选 */
+  candidates: TMDBCandidate[]
 }
 
 /**
@@ -50,6 +62,17 @@ export async function fetchMovieByTitle(title: string, year: string): Promise<TM
     if (!error && data && data.found) {
       const cover = data.poster_path ? `${TMDB_IMG}/w500${data.poster_path}` : ''
       const backdrop = data.backdrop_path ? `${TMDB_IMG}/w780${data.backdrop_path}` : ''
+      const candidates: TMDBCandidate[] = Array.isArray(data.candidates)
+        ? (data.candidates as TMDBCandidate[]).map((c) => ({
+            tmdb_id: c.tmdb_id,
+            title: c.title ?? '',
+            year: c.year ?? 0,
+            poster_path: c.poster_path ? `${TMDB_IMG}/w500${c.poster_path}` : '',
+            backdrop_path: c.backdrop_path ? `${TMDB_IMG}/w780${c.backdrop_path}` : '',
+            vote_average: c.vote_average ?? null,
+            origin_country: c.origin_country ?? '',
+          }))
+        : []
       return {
         cover,
         backdrop,
@@ -59,6 +82,7 @@ export async function fetchMovieByTitle(title: string, year: string): Promise<TM
         duration: typeof data.runtime === 'number' ? data.runtime : 0,
         year: data.release_date ? Number(String(data.release_date).slice(0, 4)) : Number(year) || 0,
         cover_failed: !cover,
+        candidates,
       }
     }
     if (error) console.warn('[tmdb] invoke error, fallback mock:', error.message)
@@ -81,6 +105,7 @@ export async function fetchMovieByTitle(title: string, year: string): Promise<TM
     duration: 90 + Math.floor(Math.random() * 90),
     year: yr || 2000 + Math.floor(Math.random() * 26),
     cover_failed: !ok,
+    candidates: [],
   }
 }
 
