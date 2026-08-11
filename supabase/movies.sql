@@ -98,3 +98,24 @@ begin
     alter table public.movies add column backdrop text not null default '';
   end if;
 end $$;
+
+-- 简介 + 演员表（新增字段，幂等补列）
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'movies' and column_name = 'overview'
+  ) then
+    alter table public.movies add column overview text not null default '';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'movies' and column_name = 'cast'
+  ) then
+    alter table public.movies add column "cast" text[] not null default '{}';
+  end if;
+end $$;

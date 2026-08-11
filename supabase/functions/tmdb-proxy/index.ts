@@ -48,7 +48,7 @@ serve(async (req: Request) => {
     })
   }
 
-  let body: { title?: string; year?: string | number }
+  let body: { title?: string; year?: string | number; tmdb_id?: number }
   try {
     body = await req.json()
   } catch {
@@ -56,6 +56,57 @@ serve(async (req: Request) => {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+  }
+
+  // v4 Bearer 鉴权（读取访问令牌为长期有效，不自动过期；仅 dashboard 手动 Reset 才失效）
+  const tmdbHeaders: HeadersInit = {
+    accept: 'application/json',
+    Authorization: `Bearer ${TMDB_API_KEY}`,
+  }
+
+  // 统一从 TMDB 详情（含 credits）抽取字段：评分 / 类型 / 中文地区 / 时长 / 简介 / 演员表
+  const buildDetail = (det: any) => {
+    const runtime = det.runtime ?? 0
+    const pc = det.production_countries ?? []
+    const region = (pc[0]?.name as string) || ''
+    const gids = (det.genres ?? []).map((g: { id: number }) => g.id)
+    const genre = gids.map((id: number) => GENRE_MAP[id]).filter(Boolean)
+    const overview = typeof det.overview === 'string' ? det.overview : ''
+    const cast = ((det.credits?.cast ?? []) as { name?: string }[])
+      .slice(0, 12)
+      .map((c) => c.name)
+      .filter((n): n is string => !!n)
+    return {
+      poster_path: det.poster_path ?? '',
+      backdrop_path: det.backdrop_path ?? '',
+      vote_average: typeof det.vote_average === 'number' ? Number(det.vote_average.toFixed(1)) : null,
+      genre,
+      origin_country: region,
+      release_date: det.release_date ?? '',
+      runtime,
+      overview,
+      cast,
+    }
+  }
+
+  // 候选切换：直接按 tmdb_id 拉详情（跳过 search）
+  if (body.tmdb_id) {
+    try {
+      const detRes = await fetch(
+        `${TMDB_BASE}/movie/${Number(body.tmdb_id)}?language=zh-CN&append_to_response=credits`,
+        { headers: tmdbHeaders },
+      )
+      const det = await detRes.json()
+      return new Response(
+        JSON.stringify({ found: true, candidates: [], ...buildDetail(det) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    } catch {
+      return new Response(JSON.stringify({ error: 'detail fetch failed' }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
   }
 
   const title = (body.title ?? '').toString().trim()
@@ -66,12 +117,6 @@ serve(async (req: Request) => {
     })
   }
   const year = body.year ? `&year=${encodeURIComponent(String(body.year))}` : ''
-
-  // v4 Bearer 鉴权（读取访问令牌为长期有效，不自动过期；仅 dashboard 手动 Reset 才失效）
-  const tmdbHeaders: HeadersInit = {
-    accept: 'application/json',
-    Authorization: `Bearer ${TMDB_API_KEY}`,
-  }
 
   // search 加 language=zh-CN 让 TMDB 返回中文地区/标题；取前 8 个候选供前端选择
   const searchRes = await fetch(
@@ -106,35 +151,18 @@ serve(async (req: Request) => {
     })
   }
 
-  // 详情接口补 runtime / 中文地区名 / 完整类型（search 不含这些）
-  let runtime = 0
-  let region = ''
-  let genre: string[] = []
+  // 详情（含 credits）：补 runtime / 中文地区名 / 完整类型 / 简介 / 演员表
+  let det: any = {}
   try {
     const detRes = await fetch(
-      `${TMDB_BASE}/movie/${first.tmdb_id}?language=zh-CN`,
+      `${TMDB_BASE}/movie/${first.tmdb_id}?language=zh-CN&append_to_response=credits`,
       { headers: tmdbHeaders },
     )
-    const det = await detRes.json()
-    runtime = det.runtime ?? 0
-    const pc = det.production_countries ?? []
-    region = (pc[0]?.name as string) || first.origin_country || ''
-    const gids = (det.genres ?? []).map((g: { id: number }) => g.id)
-    genre = gids.map((id: number) => GENRE_MAP[id]).filter(Boolean)
+    det = await detRes.json()
   } catch { /* ignore */ }
 
   return new Response(
-    JSON.stringify({
-      found: true,
-      candidates,
-      poster_path: first.poster_path,
-      backdrop_path: first.backdrop_path,
-      vote_average: first.vote_average,
-      genre,
-      origin_country: region,
-      release_date: first.year ? `${first.year}-01-01` : '',
-      runtime,
-    }),
+    JSON.stringify({ found: true, candidates, ...buildDetail(det) }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   )
 })

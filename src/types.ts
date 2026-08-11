@@ -270,6 +270,8 @@ export interface Movie {
   personal_rating: number | null // 个人评分（0–10）
   third_party_rating: number | null // 第三方评分（TMDB，0–10）
   review: string // 个人短评
+  overview: string // 简介（TMDB overview，zh-CN）
+  cast: string[] // 演员表（TMDB credits.cast 前若干主演）
   genre: string[] // 类型
   region: string // 地区
   duration: number // 时长（分钟）
@@ -288,6 +290,8 @@ export type MovieInput = {
   personal_rating?: number | null
   third_party_rating?: number | null
   review?: string
+  overview?: string
+  cast?: string[]
   genre?: string[]
   region?: string
   duration?: number

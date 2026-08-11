@@ -121,101 +121,219 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
   const rating = movie.personal_rating ?? movie.third_party_rating
   return (
     <section
-      className="relative h-[78vh] min-h-[560px] w-full overflow-hidden md:h-screen md:min-h-0 md:w-screen md:-ml-[120px] md:-mr-6 md:-mt-6"
+      // 桌面：section 全屏高（避开 dock / 留白），内部 60/40 分栏
+      // 移动：section 撑满左右屏宽（破栏 -mx-4 抵消主区 padding），高度自适应
+      className="relative w-full overflow-hidden md:h-screen md:min-h-0 md:w-screen md:-ml-[120px] md:-mr-6 md:-mt-6"
       key={movie.id /* 切换影片触发淡入动效 */}
     >
       <style>{`
         @keyframes heroFadeIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
         @keyframes heroInfoIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
-      {/* 整张背景：宽幅剧情照 backdrop 优先，海报 cover 兜底（cover/2:3 居中裁剪也能用） */}
-      {(movie.backdrop || movie.cover) && !err ? (
-        <img
-          src={movie.backdrop || movie.cover}
-          alt={movie.title}
-          onError={() => setErr(true)}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ animation: 'heroFadeIn 0.8s ease-out' }}
-        />
-      ) : (
-        <div
-          className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#1a1a2e] via-[#0a0a14] to-[#0c0c14]"
-          style={{ animation: 'heroFadeIn 0.8s ease-out' }}
-        >
-          <span className="font-serif text-[12rem] text-white/8">{movie.title.slice(0, 1)}</span>
-        </div>
-      )}
-      {/* 渐变叠加：底部黑色让文字清晰，顶部和右侧轻染 */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/20 to-transparent" />
-
-      {/* 左下角信息块：左封面（backdrop 优先，否则 cover）+ 右文字块 */}
-      <div className="absolute inset-x-0 bottom-0 px-6 pb-12 md:px-0 md:pl-[104px] md:pr-12 md:pb-20">
-        <div
-          className="flex max-w-4xl items-start gap-5"
-          style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
-        >
-          {/* 左侧封面：竖版海报（cover）优先，宽幅剧情照（backdrop）兜底；均裁剪为 160×240 */}
-          {(movie.cover || movie.backdrop) && (
-            <div className="relative hidden h-[240px] w-[160px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block">
-              <img
-                src={movie.cover || movie.backdrop}
-                alt={movie.title}
-                className="h-full w-full object-cover"
-              />
+      {/* ─────────── 桌面布局：左 60% 宽幅背景图 + 右 40% 信息+简介+演员表 ─────────── */}
+      <div className="hidden h-full w-full grid-cols-[60%_40%] md:grid">
+        {/* 左：宽幅剧情照（backdrop）缩小到 60% 宽，整段高度撑满；原模糊区域被裁掉 */}
+        <div className="relative overflow-hidden">
+          {(movie.backdrop || movie.cover) && !err ? (
+            <img
+              src={movie.backdrop || movie.cover}
+              alt={movie.title}
+              onError={() => setErr(true)}
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ animation: 'heroFadeIn 0.8s ease-out' }}
+            />
+          ) : (
+            <div
+              className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#1a1a2e] via-[#0a0a14] to-[#0c0c14]"
+              style={{ animation: 'heroFadeIn 0.8s ease-out' }}
+            >
+              <span className="font-serif text-[12rem] text-white/8">{movie.title.slice(0, 1)}</span>
             </div>
           )}
-          {/* 右侧文字块 */}
-          <div className="flex h-[240px] flex-1 flex-col justify-between">
-            <div className="space-y-3">
-              {(movie.genre ?? []).length > 0 && (
-                <div className="flex flex-wrap gap-3 text-xs text-white/60">
-                  {(movie.genre ?? []).slice(0, 3).map((g, i) => (
-                    <span key={g}>
-                      {g}
-                      {i < Math.min(2, movie.genre.length - 1) && <span className="ml-3 text-white/30">·</span>}
+          {/* 左/底部加深渐变，让右侧信息块不被图片边缘干扰 */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/70" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/80 to-transparent" />
+        </div>
+
+        {/* 右：信息块（保留现有标题/评分/地区/时长/短评/查看详情）+ 新增简介/演员表 */}
+        <div
+          className="relative flex h-full flex-col justify-between gap-6 overflow-y-auto bg-black/55 px-10 py-10 backdrop-blur-sm"
+          style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
+        >
+          {/* 上：标题 + 元信息 + 短评 + 按钮（沿用现有设计，字体不变） */}
+          <div className="space-y-4">
+            {(movie.genre ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-3 text-xs text-white/60">
+                {(movie.genre ?? []).slice(0, 3).map((g, i) => (
+                  <span key={g}>
+                    {g}
+                    {i < Math.min(2, movie.genre.length - 1) && <span className="ml-3 text-white/30">·</span>}
+                  </span>
+                ))}
+              </div>
+            )}
+            <h1 className="font-serif text-4xl font-semibold text-white md:text-5xl">{movie.title}</h1>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
+              <Stars value={rating ?? 0} size={14} />
+              {movie.personal_rating !== null && movie.personal_rating !== undefined && (
+                <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
+              )}
+              {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
+                <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
+              )}
+              <span className="text-white/30">·</span>
+              <span>{movie.year || '—'}</span>
+              {movie.region && (
+                <>
+                  <span className="text-white/30">·</span>
+                  <span>{movie.region}</span>
+                </>
+              )}
+              {movie.duration > 0 && (
+                <>
+                  <span className="text-white/30">·</span>
+                  <span>{movie.duration}分钟</span>
+                </>
+              )}
+            </div>
+            {movie.review && (
+              <p className="line-clamp-2 max-w-xl text-sm text-white/60">{movie.review}</p>
+            )}
+            <button
+              onClick={onViewDetails}
+              className="rounded-full bg-white/10 px-5 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
+            >
+              查看详情
+            </button>
+          </div>
+
+          {/* 下：简介 + 演员表（仅在有数据时展示；设计风格与短评一致） */}
+          {(movie.overview || (movie.cast ?? []).length > 0) && (
+            <div className="space-y-5 border-t border-white/10 pt-5">
+              {movie.overview && (
+                <div>
+                  <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">简介</div>
+                  <p className="line-clamp-5 text-sm leading-relaxed text-ink-soft">{movie.overview}</p>
+                </div>
+              )}
+              {(movie.cast ?? []).length > 0 && (
+                <div>
+                  <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">演员表</div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-sm text-ink-soft">
+                    {(movie.cast ?? []).slice(0, 8).map((c, i) => (
+                      <span key={`${c}-${i}`}>
+                        {c}
+                        {i < Math.min(7, movie.cast.length - 1) && <span className="ml-3 text-white/25">·</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─────────── 移动布局：cover（竖版海报）撑满 + 紧凑信息块 + 下方简介演员表 ─────────── */}
+      <div
+        className="relative -mx-4 md:hidden"
+        style={{ animation: 'heroFadeIn 0.8s ease-out' }}
+      >
+        {/* 封面：竖版海报 cover（移动不展示宽幅剧情照，因竖屏展示易模糊） */}
+        {(movie.cover || movie.backdrop) && !err ? (
+          <img
+            src={movie.cover || movie.backdrop}
+            alt={movie.title}
+            onError={() => setErr(true)}
+            className="h-[68vh] min-h-[480px] w-full object-cover"
+          />
+        ) : (
+          <div className="grid h-[68vh] min-h-[480px] w-full place-items-center bg-gradient-to-br from-[#1a1a2e] via-[#0a0a14] to-[#0c0c14]">
+            <span className="font-serif text-[10rem] text-white/8">{movie.title.slice(0, 1)}</span>
+          </div>
+        )}
+        {/* 渐变叠加：底部黑色让文字清晰 */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+
+        {/* 信息块：紧凑（短评→按钮间距从默认 mt-auto 缩为 mt-2） */}
+        <div
+          className="absolute inset-x-0 bottom-0 flex flex-col gap-2 px-4 pb-6"
+          style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
+        >
+          {(movie.genre ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-2 text-[11px] text-white/60">
+              {(movie.genre ?? []).slice(0, 3).map((g, i) => (
+                <span key={g}>
+                  {g}
+                  {i < Math.min(2, movie.genre.length - 1) && <span className="ml-2 text-white/30">·</span>}
+                </span>
+              ))}
+            </div>
+          )}
+          <h1 className="font-serif text-3xl font-semibold text-white">{movie.title}</h1>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-white/80">
+            <Stars value={rating ?? 0} size={12} />
+            {movie.personal_rating !== null && movie.personal_rating !== undefined && (
+              <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
+            )}
+            {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
+              <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
+            )}
+            <span className="text-white/30">·</span>
+            <span>{movie.year || '—'}</span>
+            {movie.region && (
+              <>
+                <span className="text-white/30">·</span>
+                <span>{movie.region}</span>
+              </>
+            )}
+            {movie.duration > 0 && (
+              <>
+                <span className="text-white/30">·</span>
+                <span>{movie.duration}分钟</span>
+              </>
+            )}
+          </div>
+          {/* 短评 + 查看详情 紧凑（间距 mt-2，远小于桌面 mt-auto） */}
+          {movie.review && (
+            <p className="line-clamp-2 text-xs text-white/60">{movie.review}</p>
+          )}
+          <div className="mt-2">
+            <button
+              onClick={onViewDetails}
+              className="rounded-full bg-white/10 px-4 py-1 text-xs text-white backdrop-blur-md transition hover:bg-white/20"
+            >
+              查看详情
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 移动端：section 下方追加简介+演员表（在主区 px-4 留白内） */}
+      <div className="space-y-5 px-4 pb-6 pt-4 md:hidden">
+        {(movie.overview || (movie.cast ?? []).length > 0) && (
+          <>
+            {movie.overview && (
+              <div>
+                <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">简介</div>
+                <p className="text-sm leading-relaxed text-ink-soft">{movie.overview}</p>
+              </div>
+            )}
+            {(movie.cast ?? []).length > 0 && (
+              <div>
+                <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">演员表</div>
+                <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-ink-soft">
+                  {(movie.cast ?? []).slice(0, 8).map((c, i) => (
+                    <span key={`m-${c}-${i}`}>
+                      {c}
+                      {i < Math.min(7, movie.cast.length - 1) && <span className="ml-2 text-white/25">·</span>}
                     </span>
                   ))}
                 </div>
-              )}
-              <h1 className="font-serif text-4xl font-semibold text-white md:text-6xl">{movie.title}</h1>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
-                <Stars value={rating ?? 0} size={14} />
-                {movie.personal_rating !== null && movie.personal_rating !== undefined && (
-                  <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
-                )}
-                {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
-                  <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
-                )}
-                <span className="text-white/30">·</span>
-                <span>{movie.year || '—'}</span>
-                {movie.region && (
-                  <>
-                    <span className="text-white/30">·</span>
-                    <span>{movie.region}</span>
-                  </>
-                )}
-                {movie.duration > 0 && (
-                  <>
-                    <span className="text-white/30">·</span>
-                    <span>{movie.duration}分钟</span>
-                  </>
-                )}
               </div>
-              {movie.review && (
-                <p className="max-w-2xl line-clamp-2 text-sm text-white/60">{movie.review}</p>
-              )}
-            </div>
-            <div>
-              <button
-                onClick={onViewDetails}
-                className="rounded-full bg-white/10 px-5 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
-              >
-                查看详情
-              </button>
-            </div>
-          </div>
-        </div>
+            )}
+          </>
+        )}
       </div>
     </section>
   )
@@ -451,6 +569,52 @@ function MovieModal({
               </div>
             </div>
           )}
+        </div>
+
+        {/* 简介 + 演员表（个人短评上方） */}
+        <div className="mt-12 space-y-6 px-6 md:px-10">
+          <div>
+            <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">简介</div>
+            {editing ? (
+              <Textarea
+                value={draft.overview}
+                onChange={(e) => setDraft({ ...draft, overview: e.target.value })}
+                placeholder="可手动补充简介…"
+                rows={3}
+              />
+            ) : (
+              <p className="text-sm leading-relaxed text-ink-soft">{draft.overview || '暂无简介'}</p>
+            )}
+          </div>
+          <div>
+            <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">演员表</div>
+            {editing ? (
+              <Input
+                value={(draft.cast ?? []).join(' / ')}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    cast: e.target.value
+                      .split('/')
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  })
+                }
+                placeholder="多个演员用「/」分隔，如：基努·里维斯 / 凯瑞-安·莫斯"
+              />
+            ) : (draft.cast ?? []).length > 0 ? (
+              <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-sm text-ink-soft">
+                {(draft.cast ?? []).map((c, i) => (
+                  <span key={`${c}-${i}`}>
+                    {c}
+                    {i < draft.cast.length - 1 && <span className="ml-3 text-white/25">·</span>}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-mute">暂无演员表</p>
+            )}
+          </div>
         </div>
 
         {/* 个人短评 */}
@@ -713,6 +877,8 @@ function NewMovieModal({
       personal_rating: draft.personalRating ? parseFloat(draft.personalRating) : null,
       third_party_rating: preview.third_party_rating ?? null,
       review: draft.review.trim(),
+      overview: preview.overview ?? '',
+      cast: preview.cast ?? [],
       genre: preview.genre ?? [],
       region: preview.region ?? '',
       duration: preview.duration ?? 0,
@@ -946,6 +1112,8 @@ function BatchImportModal({
           personal_rating: null,
           third_party_rating: data.third_party_rating ?? null,
           review: '',
+          overview: data.overview ?? '',
+          cast: data.cast ?? [],
           genre: data.genre ?? [],
           region: data.region ?? '',
           duration: data.duration ?? 0,

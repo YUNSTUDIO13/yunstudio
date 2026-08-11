@@ -45,6 +45,10 @@ export interface TMDBMovieData {
   duration: number
   year: number
   cover_failed: boolean
+  /** 简介（TMDB overview，zh-CN） */
+  overview: string
+  /** 演员表（TMDB credits.cast 前若干主演） */
+  cast: string[]
   /** TMDB search 返回的全部候选（最多 8 条），供前端在同名歧义时让用户选 */
   candidates: TMDBCandidate[]
 }
@@ -82,6 +86,8 @@ export async function fetchMovieByTitle(title: string, year: string): Promise<TM
         duration: typeof data.runtime === 'number' ? data.runtime : 0,
         year: data.release_date ? Number(String(data.release_date).slice(0, 4)) : Number(year) || 0,
         cover_failed: !cover,
+        overview: typeof data.overview === 'string' ? data.overview : '',
+        cast: Array.isArray(data.cast) ? (data.cast as string[]) : [],
         candidates,
       }
     }
@@ -105,6 +111,8 @@ export async function fetchMovieByTitle(title: string, year: string): Promise<TM
     duration: 90 + Math.floor(Math.random() * 90),
     year: yr || 2000 + Math.floor(Math.random() * 26),
     cover_failed: !ok,
+    overview: '',
+    cast: [],
     candidates: [],
   }
 }
