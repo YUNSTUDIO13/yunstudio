@@ -2,7 +2,7 @@
 // 功能：
 //  1. 数据列：图标 / 应用名称 / 目标 URL / 功能说明（网格卡片）
 //  2. 搜索：按名称 / URL / 功能说明模糊过滤
-//  3. 新增：弹窗，字段同数据列；图标优先取目标网站 favicon，加载失败回退首字
+//  3. 新增：弹窗，字段同数据列；图标 PWA 感知解析（manifest > favicon > 首字），加载失败回退首字
 //  4. 管理态：开启后每张卡片显示编辑 / 删除；编辑复用新增逻辑；删除走确认弹窗
 //  5. 点击图标直接跳转目标 URL（管理态下不跳转，避免误触）
 // 数据：本地 Dexie 优先 + outbox 补传 Supabase（与其他模块一致的本地优先架构）
@@ -29,25 +29,91 @@ interface Draft {
   description: string
 }
 
-/** 由目标 URL 推导原站 favicon 地址 */
-function faviconFor(url: string): string {
+// 模块级本地图标缓存：key(appId 或 url) -> 解析出的图标地址 | null(回退首字)
+// 刷新即清空 → 重新按目标 URL 解析；符合「图标不落库、本地缓存、清空则重新获取」
+const iconCache = new Map<string, string | null>()
+
+/** 从 manifest 的 icons 数组里挑最合适的图标（prefer purpose=any，尺寸尽量大） */
+function pickManifestIcon(icons: { src: string; sizes?: string; purpose?: string }[]): string | null {
+  if (!Array.isArray(icons) || icons.length === 0) return null
+  const parsed = icons.map((i) => {
+    const any = (i.purpose || 'any').split(' ').includes('any')
+    const sizeNum = (i.sizes || '')
+      .split(' ')
+      .map((s) => parseInt(s, 10))
+      .filter((n) => !Number.isNaN(n))
+    return { src: i.src, any, size: sizeNum.length ? Math.max(...sizeNum) : 0 }
+  })
+  const pool = parsed.filter((p) => p.any).length ? parsed.filter((p) => p.any) : parsed
+  pool.sort((a, b) => b.size - a.size)
+  return pool[0]?.src ?? null
+}
+
+/**
+ * PWA 感知的图标解析：
+ *  1) 抓取目标页 HTML（同域可成功，跨域受 CORS 限制会失败），解析
+ *     <link rel="manifest"> → 清单里的 icons（真实 PWA 品牌图标）
+ *     再退 <link rel="icon"> / <link rel="apple-touch-icon">
+ *  2) 跨域拿不到 HTML 时，回退猜测 ${origin}/favicon.ico
+ *  3) 任何失败最终返回 null → 调用方回退名称首字
+ */
+async function resolveAppIcon(url: string): Promise<string | null> {
   try {
     const u = new URL(url)
+    const page = `${u.origin}${u.pathname}`
+    try {
+      const res = await fetch(page, { mode: 'cors' })
+      if (res.ok) {
+        const html = await res.text()
+        const manifestHref =
+          /<link[^>]+rel=["'][^"']*\bmanifest\b[^"']*["'][^>]*href=["']([^"']+)["']/i.exec(html)?.[1] ??
+          /<link[^>]+href=["']([^"']+)["'][^>]*rel=["'][^"']*\bmanifest\b[^"']*["']/i.exec(html)?.[1]
+        if (manifestHref) {
+          const manifestUrl = new URL(manifestHref, page).href
+          try {
+            const m = await (await fetch(manifestUrl, { mode: 'cors' })).json()
+            if (m?.icons?.length) {
+              const src = pickManifestIcon(m.icons)
+              if (src) return new URL(src, manifestUrl).href
+            }
+          } catch {
+            /* 清单解析失败，继续回退 */
+          }
+        }
+        const iconHref =
+          /<link[^>]+rel=["'][^"']*\bicon\b[^"']*["'][^>]*href=["']([^"']+)["']/i.exec(html)?.[1] ??
+          /<link[^>]+href=["']([^"']+)["'][^>]*rel=["'][^"']*\bicon\b[^"']*["']/i.exec(html)?.[1]
+        if (iconHref) return new URL(iconHref, page).href
+        const appleHref = /<link[^>]+rel=["']apple-touch-icon["'][^>]*href=["']([^"']+)["']/i.exec(html)?.[1]
+        if (appleHref) return new URL(appleHref, page).href
+      }
+    } catch {
+      /* CORS / 网络失败 → 回退猜测 favicon.ico */
+    }
     return `${u.origin}/favicon.ico`
   } catch {
-    return ''
+    return null
   }
 }
 
-// 模块级本地图标缓存：appId -> true(已成功) / false(失败回退首字)
-// 刷新即清空 → 重新按目标 URL 抓取 favicon；符合「图标不落库、本地缓存、清空则重新获取」
-const iconCache = new Map<string, boolean>()
-
-/** 图标：运行时按 target_url 取原站 favicon；成功存本地缓存，失败回退名称首字 */
+/** 图标：运行时 PWA 感知解析；解析结果存本地缓存，失败（含 404）回退名称首字 */
 function AppIcon({ app, size = 'h-12 w-12' }: { app: App; size?: string }) {
-  const faviconUrl = useMemo(() => faviconFor(app.target_url), [app.target_url])
-  const [failed, setFailed] = useState(() => iconCache.get(app.id) === false)
-  if (!faviconUrl || failed) {
+  const [iconUrl, setIconUrl] = useState<string | null>(() => iconCache.get(app.id) ?? null)
+  useEffect(() => {
+    let cancelled = false
+    if (!iconCache.has(app.id)) {
+      void resolveAppIcon(app.target_url).then((r) => {
+        if (cancelled) return
+        iconCache.set(app.id, r)
+        setIconUrl(r)
+      })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [app.id, app.target_url])
+
+  if (!iconUrl) {
     return (
       <div
         className={`${size} grid shrink-0 place-items-center rounded-xl bg-accent/15 text-lg font-semibold text-accent`}
@@ -58,30 +124,37 @@ function AppIcon({ app, size = 'h-12 w-12' }: { app: App; size?: string }) {
   }
   return (
     <img
-      src={faviconUrl}
+      src={iconUrl}
       alt={app.name}
       className={`${size} shrink-0 rounded-xl object-cover`}
       onError={() => {
-        iconCache.set(app.id, false)
-        setFailed(true)
-      }}
-      onLoad={() => {
-        iconCache.set(app.id, true)
+        iconCache.set(app.id, null)
+        setIconUrl(null)
       }}
     />
   )
 }
 
-/** 预览图标（编辑弹窗内，按目标 URL 实时取 favicon） */
+/** 预览图标（编辑弹窗内，按目标 URL 实时 PWA 感知解析） */
 function PreviewIcon({ url, name, size = 'h-16 w-16' }: { url: string; name: string; size?: string }) {
-  const [err, setErr] = useState(false)
-  useEffect(() => setErr(false), [url])
-  if (url && !err) {
+  const [iconUrl, setIconUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    setIconUrl(null)
+    if (!url) return
+    void resolveAppIcon(url).then((r) => {
+      if (!cancelled) setIconUrl(r)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [url])
+  if (iconUrl) {
     return (
       <img
-        src={url}
+        src={iconUrl}
         alt={name}
-        onError={() => setErr(true)}
+        onError={() => setIconUrl(null)}
         className={`${size} shrink-0 rounded-2xl object-cover`}
       />
     )
@@ -179,7 +252,7 @@ export default function AppsPage() {
     })
   }
 
-  const previewIcon = edit ? faviconFor(edit.targetUrl) : ''
+  const previewIcon = edit?.targetUrl ?? ''
 
   async function submit() {
     if (!edit || !user) return
@@ -367,7 +440,7 @@ export default function AppsPage() {
               <PreviewIcon url={previewIcon} name={edit.name || '应用'} />
               <div className="min-w-0 text-xs text-ink-mute">
                 <div className="font-medium text-ink-soft">图标预览</div>
-                自动取目标网站 favicon；加载失败自动显示「{edit.name.slice(0, 1).toUpperCase() || '首字'}」兜底。图标不落库，仅本地缓存。
+                优先取目标站 PWA 清单(manifest)里的真实图标，其次 favicon / apple-touch-icon；加载失败自动显示「{edit.name.slice(0, 1).toUpperCase() || '首字'}」兜底。图标不落库，仅本地缓存。
               </div>
             </div>
 
