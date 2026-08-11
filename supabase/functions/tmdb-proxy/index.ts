@@ -1,10 +1,11 @@
 // TMDB 代理（Supabase Edge Function）
-// 关键：TMDB_API_KEY 仅存于 Supabase 服务端密钥，前端经本函数取元数据，绝不直接暴露 key。
+// 关键：TMDB_API_KEY 仅存于 Supabase 服务端密钥（v4 Bearer Token / JWT），
+//       前端经本函数取元数据，绝不直接暴露 key。
 // 图片本身走 image.tmdb.org 公开 CDN（无需 key），由前端直拉后压缩上传 Storage。
 //
-// 部署（密钥由皇上在本地终端输入，不经 AI、不进 git）：
+// 部署（v4 临牌由皇上在本地终端输入，不经 AI、不进 git）：
 //   supabase functions deploy tmdb-proxy
-//   supabase secrets set TMDB_API_KEY=你的临牌
+//   supabase secrets set TMDB_API_KEY=eyJh...  ← v4 Bearer Token（JWT，eyJh... 开头）
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -66,8 +67,15 @@ serve(async (req: Request) => {
   }
   const year = body.year ? `&year=${encodeURIComponent(String(body.year))}` : ''
 
+  // v4 Bearer 鉴权（读取访问令牌为长期有效，不自动过期；仅 dashboard 手动 Reset 才失效）
+  const tmdbHeaders: HeadersInit = {
+    accept: 'application/json',
+    Authorization: `Bearer ${TMDB_API_KEY}`,
+  }
+
   const searchRes = await fetch(
-    `${TMDB_BASE}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}${year}`,
+    `${TMDB_BASE}/search/movie?query=${encodeURIComponent(title)}${year}`,
+    { headers: tmdbHeaders },
   )
   const searchJson = await searchRes.json()
   const m = searchJson.results?.[0]
@@ -80,7 +88,7 @@ serve(async (req: Request) => {
   // 详情接口补 runtime（search 不含）
   let runtime = 0
   try {
-    const detRes = await fetch(`${TMDB_BASE}/movie/${m.id}?api_key=${TMDB_API_KEY}`)
+    const detRes = await fetch(`${TMDB_BASE}/movie/${m.id}`, { headers: tmdbHeaders })
     const det = await detRes.json()
     runtime = det.runtime ?? 0
   } catch { /* ignore */ }
