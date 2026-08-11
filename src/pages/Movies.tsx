@@ -16,6 +16,34 @@ import type { Movie } from '../types'
 
 const SRC_THIRD = '第三方'
 
+// ─── 评分档位（筛选用，多选） ─────────────────────────────────
+const RATING_TIERS = [
+  { key: '9+', label: '9 分以上', test: (r: number) => r >= 9 },
+  { key: '8-9', label: '8–9 分', test: (r: number) => r >= 8 && r < 9 },
+  { key: '7-8', label: '7–8 分', test: (r: number) => r >= 7 && r < 8 },
+  { key: '6-7', label: '6–7 分', test: (r: number) => r >= 6 && r < 7 },
+  { key: '<6', label: '6 分以下', test: (r: number) => r < 6 },
+]
+
+// ─── 跨域图片下载（fetch→blob→a.download；失败退回新标签） ─────────
+async function downloadImage(url: string, filename: string) {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('fetch failed')
+    const blob = await res.blob()
+    const objUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(objUrl)
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
 // ─── 星级（10 分制 → 5 星，半星近似为整星） ─────────────────────────────────
 function Stars({ value, max = 10, size = 14 }: { value: number; max?: number; size?: number }) {
   const filled = Math.round((value / max) * 5)
@@ -39,15 +67,17 @@ function Stars({ value, max = 10, size = 14 }: { value: number; max?: number; si
   )
 }
 
-// ─── 竖版海报（160×240 严格对齐参考 app） ─────────────────────────────────
-function PosterCard({ movie, onClick }: { movie: Movie; onClick: () => void }) {
+// ─── 竖版海报（160×240 严格对齐参考 app；fluid=手机 2 列网格自适应） ─────────
+function PosterCard({ movie, onClick, fluid }: { movie: Movie; onClick: () => void; fluid?: boolean }) {
   const [err, setErr] = useState(false)
   const rating = movie.personal_rating ?? movie.third_party_rating
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative h-[240px] w-[160px] shrink-0 overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/10 transition hover:ring-accent/40"
+      className={`group relative shrink-0 overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/10 transition hover:ring-accent/40 ${
+        fluid ? 'w-full aspect-[2/3]' : 'h-[240px] w-[160px]'
+      }`}
     >
       {movie.cover && !err ? (
         <img
@@ -191,6 +221,53 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
   )
 }
 
+// ─── 剧照缩略图（封面/剧情照，点击放大，提供下载） ────────────────────────
+function StillThumb({
+  url,
+  label,
+  onOpen,
+  onDownload,
+}: {
+  url: string
+  label: string
+  onOpen: () => void
+  onDownload: () => void
+}) {
+  const [err, setErr] = useState(false)
+  return (
+    <div className="group relative w-[150px] shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+      <button type="button" onClick={onOpen} className="block w-full">
+        {!err ? (
+          <img
+            src={url}
+            alt={label}
+            loading="lazy"
+            onError={() => setErr(true)}
+            className="h-[100px] w-full object-cover transition duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="grid h-[100px] w-full place-items-center bg-black/30 text-xs text-ink-mute">{label}</div>
+        )}
+      </button>
+      <span className="absolute left-1.5 top-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/85">
+        {label}
+      </span>
+      <button
+        type="button"
+        onClick={onDownload}
+        aria-label="下载保存"
+        className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white/85 opacity-0 transition hover:bg-black/75 group-hover:opacity-100"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
 // ─── 详情弹窗（顶部封面 + 渐变 + 同步/编辑 按钮 + 键值对 + 双评分 + 短评） ───
 function MovieModal({
   movie,
@@ -208,6 +285,7 @@ function MovieModal({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Movie>(movie)
   const [syncing, setSyncing] = useState(false)
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
   // 自实现全屏弹窗：锁滚动 + ESC 关闭（替代原 <Modal>）
   useEffect(() => {
@@ -389,6 +467,66 @@ function MovieModal({
             <p className="text-base leading-relaxed text-ink-soft">{draft.review || '暂无短评'}</p>
           )}
         </div>
+
+        {/* 剧照：主封面 + 剧情照（点击放大查看 / 下载保存） */}
+        <div className="mt-12 px-6 md:px-10">
+          <div className="mb-3 text-[11px] uppercase tracking-wider text-ink-mute">剧照</div>
+          {(draft.cover || draft.backdrop) ? (
+            <div className="flex flex-wrap gap-3">
+              {draft.cover && (
+                <StillThumb
+                  url={draft.cover}
+                  label="主封面"
+                  onOpen={() => setLightbox(draft.cover)}
+                  onDownload={() => void downloadImage(draft.cover, `${draft.title || 'movie'}-封面.jpg`)}
+                />
+              )}
+              {draft.backdrop && (
+                <StillThumb
+                  url={draft.backdrop}
+                  label="剧情照"
+                  onOpen={() => setLightbox(draft.backdrop)}
+                  onDownload={() => void downloadImage(draft.backdrop, `${draft.title || 'movie'}-剧情照.jpg`)}
+                />
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-ink-mute">暂无剧照</p>
+          )}
+        </div>
+
+        {/* 灯箱：放大查看 + 下载保存 */}
+        {lightbox && (
+          <div
+            className="fixed inset-0 z-[60] grid place-items-center bg-black/95 p-4"
+            onClick={() => setLightbox(null)}
+          >
+            <button
+              onClick={() => setLightbox(null)}
+              aria-label="关闭"
+              className="fixed right-6 top-6 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
+            >
+              ✕
+            </button>
+            <img
+              src={lightbox}
+              alt="剧照大图"
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[82vh] max-w-full rounded-lg object-contain"
+            />
+            <button
+              onClick={() => void downloadImage(lightbox, `${draft.title || 'movie'}-剧照.jpg`)}
+              className="fixed bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/15 px-5 py-2.5 text-sm text-white backdrop-blur-md transition hover:bg-white/25"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              下载保存
+            </button>
+          </div>
+        )}
 
         {/* 底部：同步状态 + 操作按钮（同步 / 编辑 / 取消 / 删除 全部并排） */}
         <div className="mt-16 flex flex-col gap-4 border-t border-white/10 px-6 pt-6 md:px-10">
@@ -947,6 +1085,132 @@ function BatchImportModal({
   )
 }
 
+// ─── 筛选弹窗（类型 / 地区 / 年份 / 评分，每维度多选） ─────────────────────
+interface FilterState {
+  genres: string[]
+  regions: string[]
+  years: string[]
+  ratings: string[]
+}
+
+const EMPTY_FILTER: FilterState = { genres: [], regions: [], years: [], ratings: [] }
+
+function FilterChips({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: { value: string; label: string }[]
+  selected: string[]
+  onToggle: (v: string) => void
+}) {
+  if (!options.length) {
+    return <p className="text-xs text-ink-mute">暂无可选值（当前库无此类数据）</p>
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => {
+        const active = selected.includes(o.value)
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onToggle(o.value)}
+            className={`rounded-full border px-3 py-1.5 text-sm transition ${
+              active
+                ? 'border-accent bg-accent/15 text-white'
+                : 'border-white/10 bg-white/5 text-ink-soft hover:border-white/30'
+            }`}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function FilterModal({
+  open,
+  init,
+  genres,
+  regions,
+  years,
+  onApply,
+  onClear,
+  onClose,
+}: {
+  open: boolean
+  init: FilterState
+  genres: string[]
+  regions: string[]
+  years: string[]
+  onApply: (f: FilterState) => void
+  onClear: () => void
+  onClose: () => void
+}) {
+  const [sel, setSel] = useState<FilterState>(init)
+  useEffect(() => { if (open) setSel(init) }, [open, init])
+
+  const toggle = (dim: keyof FilterState, v: string) =>
+    setSel((s) => ({
+      ...s,
+      [dim]: s[dim].includes(v) ? s[dim].filter((x) => x !== v) : [...s[dim], v],
+    }))
+
+  const activeCount = sel.genres.length + sel.regions.length + sel.years.length + sel.ratings.length
+
+  return (
+    <Modal
+      open={open}
+      title="筛选观影记录"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClear}>清空</Button>
+          <Button variant="ghost" onClick={onClose}>取消</Button>
+          <Button variant="primary" onClick={() => onApply(sel)}>应用{activeCount ? `（${activeCount}）` : ''}</Button>
+        </>
+      }
+    >
+      <div className="space-y-6">
+        <div>
+          <div className="mb-2.5 text-[11px] uppercase tracking-wider text-ink-mute">类型</div>
+          <FilterChips
+            options={genres.map((g) => ({ value: g, label: g }))}
+            selected={sel.genres}
+            onToggle={(v) => toggle('genres', v)}
+          />
+        </div>
+        <div>
+          <div className="mb-2.5 text-[11px] uppercase tracking-wider text-ink-mute">地区</div>
+          <FilterChips
+            options={regions.map((r) => ({ value: r, label: r }))}
+            selected={sel.regions}
+            onToggle={(v) => toggle('regions', v)}
+          />
+        </div>
+        <div>
+          <div className="mb-2.5 text-[11px] uppercase tracking-wider text-ink-mute">年份</div>
+          <FilterChips
+            options={years.map((y) => ({ value: y, label: y }))}
+            selected={sel.years}
+            onToggle={(v) => toggle('years', v)}
+          />
+        </div>
+        <div>
+          <div className="mb-2.5 text-[11px] uppercase tracking-wider text-ink-mute">评分</div>
+          <FilterChips
+            options={RATING_TIERS.map((t) => ({ value: t.key, label: t.label }))}
+            selected={sel.ratings}
+            onToggle={(v) => toggle('ratings', v)}
+          />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── 主页面（完全对齐参考 App 布局） ─────────────────────────────────────
 export default function MoviesPage() {
   const { user } = useAuth()
@@ -958,6 +1222,8 @@ export default function MoviesPage() {
   const [selected, setSelected] = useState<Movie | null>(null)
   const [showNew, setShowNew] = useState(false)
   const [showBatch, setShowBatch] = useState(false)
+  const [showFilter, setShowFilter] = useState(false)
+  const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER)
   const [del, setDel] = useState<Movie | null>(null)
   const [scrolled, setScrolled] = useState(false)
   const [heroIndex, setHeroIndex] = useState(0)
@@ -1018,13 +1284,40 @@ export default function MoviesPage() {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return movies
-    return movies.filter(
-      (m) =>
-        m.title.toLowerCase().includes(q) ||
-        (m.genre ?? []).some((g) => g.toLowerCase().includes(q)),
+    return movies.filter((m) => {
+      // 搜索（名称 + 类型）
+      if (q && !(m.title.toLowerCase().includes(q) || (m.genre ?? []).some((g) => g.toLowerCase().includes(q)))) {
+        return false
+      }
+      // 类型（OR 维度内，AND 跨维度）
+      if (filter.genres.length && !(m.genre ?? []).some((g) => filter.genres.includes(g))) return false
+      // 地区
+      if (filter.regions.length && !filter.regions.includes(m.region)) return false
+      // 年份
+      if (filter.years.length && !filter.years.includes(String(m.year || ''))) return false
+      // 评分档位
+      if (filter.ratings.length) {
+        const r = m.personal_rating ?? m.third_party_rating
+        if (r == null) return false
+        const ok = RATING_TIERS.some((t) => filter.ratings.includes(t.key) && t.test(r))
+        if (!ok) return false
+      }
+      return true
+    })
+  }, [movies, search, filter])
+
+  // 筛选可选值（从当前库派生）
+  const filterOptions = useMemo(() => {
+    const genres = Array.from(new Set(movies.flatMap((m) => m.genre ?? []))).sort()
+    const regions = Array.from(new Set(movies.map((m) => m.region).filter(Boolean))).sort()
+    const years = Array.from(new Set(movies.map((m) => String(m.year || '')).filter(Boolean))).sort(
+      (a, b) => Number(b) - Number(a),
     )
-  }, [movies, search])
+    return { genres, regions, years }
+  }, [movies])
+
+  const activeFilterCount =
+    filter.genres.length + filter.regions.length + filter.years.length + filter.ratings.length
 
   // Hero 轮播：随机选至多 5 部，每 8s 切换
   const heroCandidates = useMemo(() => {
@@ -1116,6 +1409,22 @@ export default function MoviesPage() {
       >
         <div className="flex items-center justify-end gap-2.5 px-6 py-4 md:px-12">
             <button
+              onClick={() => setShowFilter(true)}
+              aria-label="筛选"
+              className={`relative grid h-9 w-9 place-items-center rounded-full backdrop-blur-md transition ${
+                activeFilterCount ? 'bg-accent/20 text-accent' : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              {activeFilterCount > 0 && (
+                <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-black">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setShowSearch((s) => !s)}
               aria-label="搜索"
               className="grid h-9 w-9 place-items-center rounded-full bg-white/10 backdrop-blur-md transition hover:bg-white/20"
@@ -1169,14 +1478,23 @@ export default function MoviesPage() {
               : '没有匹配的影片。'}
           </div>
         ) : (
-          <div
-            className="-mx-6 flex gap-4 overflow-x-auto px-6 pb-4 md:-mx-12 md:px-12"
-            style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}
-          >
-            {visible.map((m) => (
-              <PosterCard key={m.id} movie={m} onClick={() => openMovie(m)} />
-            ))}
-          </div>
+          <>
+            {/* 桌面：横向滚动轮播 */}
+            <div
+              className="hidden gap-4 overflow-x-auto pb-4 md:-mx-12 md:flex md:px-12"
+              style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}
+            >
+              {visible.map((m) => (
+                <PosterCard key={m.id} movie={m} onClick={() => openMovie(m)} />
+              ))}
+            </div>
+            {/* 手机：2 列网格，上下滚动 */}
+            <div className="grid grid-cols-2 gap-4 md:hidden">
+              {visible.map((m) => (
+                <PosterCard key={m.id} movie={m} fluid onClick={() => openMovie(m)} />
+              ))}
+            </div>
+          </>
         )}
       </section>
 
@@ -1195,6 +1513,18 @@ export default function MoviesPage() {
       )}
       {showBatch && (
         <BatchImportModal userId={userId} onClose={() => setShowBatch(false)} onDone={() => { void reload() }} />
+      )}
+      {showFilter && (
+        <FilterModal
+          open={showFilter}
+          init={filter}
+          genres={filterOptions.genres}
+          regions={filterOptions.regions}
+          years={filterOptions.years}
+          onApply={(f) => { setFilter(f); setShowFilter(false) }}
+          onClear={() => { setFilter(EMPTY_FILTER); setShowFilter(false) }}
+          onClose={() => setShowFilter(false)}
+        />
       )}
 
       <ConfirmDialog
