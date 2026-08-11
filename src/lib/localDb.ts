@@ -204,6 +204,9 @@ export async function mergeServerIntoLocal(
   skipIds: Set<string>,
   userId: string,
 ): Promise<void> {
+  // 云端无数据（表空或查询未返回任何行）：不合并、不回收，避免误删本地全部。
+  // 否则在「本地有数据、云端表刚建还是空」时，会把所有本地行当孤儿删光（表现为刷新丢失）。
+  if (!serverRows.length) return
   const toPut = serverRows.filter((r) => !skipIds.has(String(r.id)))
   if (toPut.length) await tableRef(table).bulkPut(toPut as never)
 
