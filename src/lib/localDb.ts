@@ -185,35 +185,19 @@ export async function localDelete(table: EntityTable, id: string): Promise<void>
  * 本函数【绝不删除】任何本地行。任何删除都必须由显式操作触发——
  *   ① 用户主动删除（confirmDelete → db.xxx.delete + outbox delete）；
  *   ② Realtime 的 DELETE 事件（订阅回调里按 payload.old.id 精确删除）。
- * 早期版本在此做「孤儿回收」（云端没有就删本地），看似能同步其它端的删除，
- * 但在本地优先架构下极其危险：刷新时 seedFromServer 拉云端，若刚加的电影因 outbox 补传时序 /
- * RLS 暂未进云端，或云端查询瞬间未返回该行，本地副本就被当孤儿删光——表现为「刷新必丢失」。
- * 跨端删除一致性改由 ② 显式 Realtime DELETE 兜底，不再用「猜孤儿」的方式。
+ * 绝不在此做「孤儿回收」（云端没有就删本地）：在本地优先架构下极危险——
+ * 刷新时 seedFromServer 拉云端，若刚加的电影因 outbox 补传时序 / RLS 暂未进云端，
+ * 或云端查询瞬间未返回该行，本地副本就被当孤儿删光——表现为「刷新必丢失」。
+ * 跨端删除一致性由 ② 显式 Realtime DELETE 兜底（各模块订阅均已实现），不靠「猜孤儿」。
  */
 export async function mergeServerIntoLocal(
   table: EntityTable,
   serverRows: Record<string, unknown>[],
   skipIds: Set<string>,
-  userId: string,
 ): Promise<void> {
-  const serverIds = new Set(serverRows.map((r) => String(r.id)))
-  // outbox 中尚待上传的行（本地新建/编辑/删除）一律不碰，避免「刷新丢失新建」回归
-  const pending = await pendingRowIds(table)
-
-  // 1) 云端有 → upsert 进本地（skipIds 里的本地编辑不覆盖）
+  // 云端有 → upsert 进本地（skipIds 里的本地编辑不覆盖）；绝不碰本地独有/未同步行
   const toPut = serverRows.filter((r) => !skipIds.has(String(r.id)))
   if (toPut.length) await tableRef(table).bulkPut(toPut as never)
-
-  // 2) 跨端删除一致性：本地有、云端没有、且不在 outbox（非本地未同步新建）→ 清理本地。
-  //    修复「手机删了、PC 刷新后还在」：无痕模式正常正是因为本地无数据、直接 seed 云端（已删除）。
-  //    PC 端老本地残留靠此步在 seed 时回收；同时保留 Realtime DELETE 实时路径做即时清理。
-  const localRows = await tableRef(table).where('user_id').equals(userId).toArray()
-  const toDelete = localRows
-    .map((r) => String((r as { id: string }).id))
-    .filter((id) => !serverIds.has(id))
-    .filter((id) => !skipIds.has(id))
-    .filter((id) => !pending.has(id))
-  if (toDelete.length) await tableRef(table).bulkDelete(toDelete as never)
 }
 
 /** 入队一条待同步操作 */

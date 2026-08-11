@@ -114,7 +114,7 @@ export async function seedFromServer(table: EntityTable, userId: string): Promis
     .eq('user_id', userId)
   if (error || !data) return
   const skip = await pendingRowIds(table)
-  await mergeServerIntoLocal(table, data as Record<string, unknown>[], skip, userId)
+  await mergeServerIntoLocal(table, data as Record<string, unknown>[], skip)
 }
 
 /** 全局挂载：监听 online 事件补传；并定时兜底重试（防在线事件未触发） */
