@@ -114,23 +114,9 @@ function migrateConfig(cfg: NavConfig): NavConfig {
     return p
   })
 
-  // M2.10：若旧配置缺「新闻」一级 Tab，则按默认补齐（不破坏用户已有自定义）
-  const hasNews = primaries.some((p) => p.groups.some((g) => g.modules.includes('news')))
-  if (!hasNews) {
-    const defaultNews = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_news')
-    if (defaultNews) {
-      primaries = [...primaries, { ...defaultNews, order: primaries.length + 1 }]
-    }
-  }
-
-  // 应用模块（2026-08-10）：若旧配置缺「应用」一级 Tab，则按默认补齐（不破坏用户已有自定义）
-  const hasApps = primaries.some((p) => p.groups.some((g) => g.modules.includes('apps')))
-  if (!hasApps) {
-    const defaultApps = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_apps')
-    if (defaultApps) {
-      primaries = [...primaries, { ...defaultApps, order: primaries.length + 1 }]
-    }
-  }
+  // 注：早期「新闻 / 应用」一级 Tab 的前向补齐逻辑已移除——新用户由 DEFAULT_NAV_CONFIG 自带这两个
+  // Tab，老用户若曾缺失也早已补齐过；此处不再按「是否含模块」反复补齐，以尊重用户在导航设置中的
+  // 主动删除（否则每次加载 migrateConfig 都会把用户删掉的 Tab 重新加回来，出现「删了又自动新增」）。
 
   // 系统设置（2026-08-11）：老账户 config 可能整体缺失 p_system_settings（早期版本未自动种入）。
   // 仅在「完全缺失」时一次性种入默认 primary（含 nav-config / tag-dict 两条默认二级列），
