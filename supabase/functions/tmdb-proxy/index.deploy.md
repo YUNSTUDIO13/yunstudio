@@ -46,15 +46,21 @@ const COUNTRY_EN: Record<string, string> = {
   'Iraq': '伊拉克', 'Saudi Arabia': '沙特阿拉伯', 'United Arab Emirates': '阿联酋',
   'Ukraine': '乌克兰', 'Romania': '罗马尼亚', 'Bulgaria': '保加利亚',
 }
-// 任意外文地区字符串 → 中文（先查 EN 长名 → ISO 码 → 模糊）
+// 任意外文地区字符串 → 中文（精确 → 大小写不敏感 → ISO 码 → 直通）
 const toCNRegion = (raw: string): string => {
   if (!raw) return ''
-  const en = COUNTRY_EN[raw]
-  if (en) return en
-  const iso = COUNTRY_CN[raw]
+  const r = raw.trim()
+  // 1) 精确匹配（首字母大写，如 "China" / "United States of America"）
+  if (COUNTRY_EN[r]) return COUNTRY_EN[r]
+  // 2) 大小写不敏感匹配（TMDB 偶发全小写，如 "china"）
+  const rLow = r.toLowerCase()
+  const enHit = (Object.keys(COUNTRY_EN) as string[]).find((k) => k.toLowerCase() === rLow)
+  if (enHit) return COUNTRY_EN[enHit]
+  // 3) ISO 码匹配（兼容小写 "us"）
+  const iso = COUNTRY_CN[r.toUpperCase()]
   if (iso) return iso
   // 已是中文则直通
-  return raw
+  return r
 }
 // 同时支持两种来源：①detail.production_countries[].name（英文长名）②search.origin_country[0]（ISO 码）
 const pickRegion = (det: any): string => {
