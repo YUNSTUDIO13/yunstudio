@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ClipboardEvent } from 'react'
 import { Modal, Field, Input, Textarea, Button, ConfirmDialog } from '../components/ui'
 import { db } from '../lib/localDb'
-import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
+import { seedFromServer, enqueueAndMaybeFlush, setSyncStatusHandler } from '../lib/sync'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage, normalizeRegion, type TMDBCandidate } from '../lib/tmdb'
@@ -1227,6 +1227,7 @@ export default function MoviesPage() {
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER)
   const [del, setDel] = useState<Movie | null>(null)
   const [scrolled, setScrolled] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const isMobile = useMediaQuery('(max-width: 767px)')
   const [showFunc, setShowFunc] = useState(false)
   const funcRef = useRef<HTMLDivElement>(null)
@@ -1240,6 +1241,15 @@ export default function MoviesPage() {
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
   }, [showFunc])
+
+  // 注册同步状态回调：上传失败显式报错横幅，成功则清除
+  useEffect(() => {
+    setSyncStatusHandler((s) => {
+      if (s.ok) setSyncError(null)
+      else setSyncError(s.msg ?? '同步到云端失败')
+    })
+    return () => setSyncStatusHandler(null)
+  }, [])
 
   // 加载 + Realtime
   useEffect(() => {
@@ -1495,6 +1505,14 @@ export default function MoviesPage() {
           </div>
         )}
       </nav>
+
+      {syncError && (
+        <div className="px-6 pt-24 md:px-12 md:pt-28">
+          <div className="mb-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+            {syncError}
+          </div>
+        </div>
+      )}
 
       {/* 观影记录：PC 分栏（左列表压缩 · 右详情 7:3） / 移动端全屏弹窗 */}
       {selected && !isMobile ? (

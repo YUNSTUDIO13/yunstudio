@@ -20,6 +20,14 @@ import {
 
 let flushing = false
 
+// 同步状态回调：UI 注册后，上传失败/成功时收到通知（用于显式报错，避免静默失败）
+type SyncStatus = { ok: boolean; msg?: string }
+let syncStatusHandler: ((s: SyncStatus) => void) | null = null
+const notifiedOps = new Set<string>() // 已提示过的 rowId，避免重复弹错误
+export function setSyncStatusHandler(fn: ((s: SyncStatus) => void) | null): void {
+  syncStatusHandler = fn
+}
+
 /** 入队一条操作，并在在线时立刻尝试补传 */
 export async function enqueueAndMaybeFlush(
   table: EntityTable,
@@ -33,44 +41,65 @@ export async function enqueueAndMaybeFlush(
   }
 }
 
-/** 把单条操作应用到 Supabase */
-async function applyOp(op: {
-  table: EntityTable
-  op: SyncOpType
-  rowId: string
-  payload?: unknown
-}): Promise<void> {
+/**
+ * 把单条操作应用到 Supabase。
+ * uid 为实时登录用户（flush 时取，避免创建瞬间 user 未解出导致的 'anonymous' 中毒）。
+ * insert/update 统一 upsert（onConflict: id）→ 幂等、最后写入胜。
+ */
+async function applyOp(
+  op: { table: EntityTable; op: SyncOpType; rowId: string; payload?: unknown },
+  uid: string | null,
+): Promise<void> {
+  if (!uid) throw new Error('未登录，无法同步到云端（登录后自动重试）')
   const table = supabase.from(op.table)
   if (op.op === 'delete') {
     await table.delete().eq('id', op.rowId)
   } else {
-    // insert 与 update 统一用 upsert（onConflict: id）→ 幂等、最后写入胜
-    await table.upsert(op.payload as Record<string, unknown>, { onConflict: 'id' })
+    const payload = { ...(op.payload as Record<string, unknown>) }
+    // 关键修正：用实时会话 uid 覆盖 payload 里的 user_id，
+    // 即便创建时 userId 为 'anonymous'，也能在 flush 时纠正为真实 uid 使 RLS 通过。
+    payload.user_id = uid
+    await table.upsert(payload, { onConflict: 'id' })
   }
 }
 
-/** 把本地发件箱逐条补传到云端；失败保留待下次重试 */
+/** 把本地发件箱逐条补传到云端；失败保留待下次重试，并向 UI 显式报错（不再静默吞掉） */
 export async function flushOutbox(): Promise<void> {
   if (flushing) return
   if (typeof navigator !== 'undefined' && !navigator.onLine) return
   flushing = true
+  let processed = 0
+  let errored = false
   try {
+    // 取一次实时登录态（flush 时 user 必然已解出），用于 RLS 的 user_id 修正
+    const { data: authData, error: authErr } = await supabase.auth.getUser()
+    const uid = authErr ? null : authData.user?.id ?? null
     const ops = await pendingOps()
     for (const op of ops) {
       try {
-        await applyOp(op)
+        await applyOp(op, uid)
         await clearOp(op.id)
-      } catch {
-        // 网络/服务端异常：记录重试次数并保留，下一次 online 或定时再试
+        notifiedOps.delete(op.rowId) // 成功则允许后续失败再提示
+        processed++
+      } catch (e) {
+        errored = true
+        const msg = e instanceof Error ? e.message : String(e)
+        // 不再静默吞掉：打印到控制台 + 首次失败显式提示 UI
+        console.error('[sync] 上传云端失败:', op.table, op.rowId, msg)
         await bumpAttempts(op.id)
+        if (!notifiedOps.has(op.rowId)) {
+          notifiedOps.add(op.rowId)
+          syncStatusHandler?.({ ok: false, msg: `同步到云端失败：${msg}` })
+        }
+        // 离线则停止后续；其余（如权限/列缺失）继续处理其余 op，等下次重试
         if (typeof navigator !== 'undefined' && !navigator.onLine) break
-        // 连续多条失败（如鉴权失效）时不再无意义重试，等 online 事件触发
-        break
       }
     }
   } finally {
     flushing = false
   }
+  // 本轮有成功处理且无错误 → 清掉错误横幅（说明已追上云端）
+  if (processed > 0 && !errored) syncStatusHandler?.({ ok: true })
 }
 
 /**
