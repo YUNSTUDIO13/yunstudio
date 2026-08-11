@@ -51,7 +51,7 @@ export interface UISettingsConfig {
 }
 
 const DEFAULT_THEME_COLOR: Record<ThemeId, string> = {
-  particles: '#a78bfa', // 靛紫
+  particles: '#002FA7', // 克莱因蓝 International Klein Blue
   comet: '#c084fc',     // 紫
 }
 

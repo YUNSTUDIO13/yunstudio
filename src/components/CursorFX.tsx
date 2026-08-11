@@ -142,7 +142,7 @@ function CursorCanvas({ settingsRef }: { settingsRef: ReturnType<typeof useSetti
             vy: Math.sin(angle) * speed + 0.1, // 略向下沉
             life: PARTICLE_BASE_LIFE * (0.7 + Math.random() * 0.6),
             maxLife: PARTICLE_BASE_LIFE,
-            r: 1 + Math.random() * 1.6,
+            r: 0.6 + Math.random() * 1.0,
           })
         }
       }
@@ -236,7 +236,7 @@ function CursorCanvas({ settingsRef }: { settingsRef: ReturnType<typeof useSetti
           // 外圈辉光
           ctx!.fillStyle = rgbaStr(color, alpha * 0.18)
           ctx!.beginPath()
-          ctx!.arc(p.x, p.y, r * 3, 0, Math.PI * 2)
+          ctx!.arc(p.x, p.y, r * 2, 0, Math.PI * 2)
           ctx!.fill()
           // 内核
           ctx!.fillStyle = rgbaStr(color, alpha)
