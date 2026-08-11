@@ -117,53 +117,73 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/20 to-transparent" />
 
-      {/* 左下角信息（桌面端 padding-left 让位给 dock 72px + 30px 间距 = 102px；为更好视觉效果取 104px） */}
+      {/* 左下角信息块：左封面（backdrop 优先，否则 cover）+ 右文字块 */}
       <div className="absolute inset-x-0 bottom-0 px-6 pb-12 md:px-0 md:pl-[104px] md:pr-12 md:pb-20">
-        <div className="max-w-3xl space-y-3" style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}>
-          {(movie.genre ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-3 text-xs text-white/60">
-              {(movie.genre ?? []).slice(0, 3).map((g, i) => (
-                <span key={g}>
-                  {g}
-                  {i < Math.min(2, movie.genre.length - 1) && <span className="ml-3 text-white/30">·</span>}
-                </span>
-              ))}
+        <div
+          className="flex max-w-4xl items-end gap-5"
+          style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
+        >
+          {/* 左侧封面：高度 = 信息块整体高度；宽幅图（backdrop）展示横版，竖版（cover）自动按比例显示 */}
+          {(movie.backdrop || movie.cover) && (
+            <div className="relative hidden h-[200px] w-[300px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10 md:block">
+              <img
+                src={movie.backdrop || movie.cover}
+                alt={movie.title}
+                className="h-full w-full object-cover"
+              />
+              {/* 标识：横版=剧照/背景图，竖版=海报 */}
+              <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/80 backdrop-blur-md">
+                {movie.backdrop ? '剧照' : '海报'}
+              </span>
             </div>
           )}
-          <h1 className="font-serif text-4xl font-semibold text-white md:text-6xl">{movie.title}</h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
-            <Stars value={rating ?? 0} size={14} />
-            {movie.personal_rating !== null && movie.personal_rating !== undefined && (
-              <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
+          {/* 右侧文字块 */}
+          <div className="flex-1 space-y-3 pb-1">
+            {(movie.genre ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-3 text-xs text-white/60">
+                {(movie.genre ?? []).slice(0, 3).map((g, i) => (
+                  <span key={g}>
+                    {g}
+                    {i < Math.min(2, movie.genre.length - 1) && <span className="ml-3 text-white/30">·</span>}
+                  </span>
+                ))}
+              </div>
             )}
-            {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
-              <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
+            <h1 className="font-serif text-4xl font-semibold text-white md:text-6xl">{movie.title}</h1>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
+              <Stars value={rating ?? 0} size={14} />
+              {movie.personal_rating !== null && movie.personal_rating !== undefined && (
+                <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
+              )}
+              {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
+                <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
+              )}
+              <span className="text-white/30">·</span>
+              <span>{movie.year || '—'}</span>
+              {movie.region && (
+                <>
+                  <span className="text-white/30">·</span>
+                  <span>{movie.region}</span>
+                </>
+              )}
+              {movie.duration > 0 && (
+                <>
+                  <span className="text-white/30">·</span>
+                  <span>{movie.duration}分钟</span>
+                </>
+              )}
+            </div>
+            {movie.review && (
+              <p className="max-w-2xl line-clamp-2 text-sm text-white/60">{movie.review}</p>
             )}
-            <span className="text-white/30">·</span>
-            <span>{movie.year || '—'}</span>
-            {movie.region && (
-              <>
-                <span className="text-white/30">·</span>
-                <span>{movie.region}</span>
-              </>
-            )}
-            {movie.duration > 0 && (
-              <>
-                <span className="text-white/30">·</span>
-                <span>{movie.duration}分钟</span>
-              </>
-            )}
-          </div>
-          {movie.review && (
-            <p className="max-w-2xl line-clamp-2 text-sm text-white/60">{movie.review}</p>
-          )}
-          <div className="pt-2">
-            <button
-              onClick={onViewDetails}
-              className="rounded-full bg-white/10 px-5 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
-            >
-              查看详情
-            </button>
+            <div className="pt-2">
+              <button
+                onClick={onViewDetails}
+                className="rounded-full bg-white/10 px-5 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
+              >
+                查看详情
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -504,6 +524,7 @@ function NewMovieModal({
       title: draft.title.trim(),
       year: parseInt(draft.year, 10) || new Date().getFullYear(),
       cover: draft.cover || preview.cover || '',
+      backdrop: preview.backdrop || '',
       personal_rating: draft.personalRating ? parseFloat(draft.personalRating) : null,
       third_party_rating: preview.third_party_rating ?? null,
       review: draft.review.trim(),
@@ -820,6 +841,7 @@ export default function MoviesPage() {
     const updated: Movie = {
       ...m,
       cover: m.cover || data.cover || '',
+      backdrop: m.backdrop || data.backdrop || '',
       third_party_rating: data.third_party_rating ?? m.third_party_rating,
       genre: m.genre.length ? m.genre : data.genre ?? [],
       region: m.region || data.region || '',
@@ -843,6 +865,7 @@ export default function MoviesPage() {
       title: r.title,
       year: parseInt(r.year, 10) || new Date().getFullYear(),
       cover: '',
+      backdrop: '',
       personal_rating: null,
       third_party_rating: null,
       review: '',

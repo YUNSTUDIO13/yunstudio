@@ -28,11 +28,20 @@ const MOCK_COVERS = [
   'https://images.unsplash.com/photo-1512070679279-8988d32161be?w=600&h=900&fit=crop&auto=format',
   'https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=600&h=900&fit=crop&auto=format',
 ]
+// 宽幅背景图（16:9 横版），用于 Hero 信息块左侧封面
+const MOCK_BACKDROPS = [
+  'https://images.unsplash.com/photo-1489599735734-79b4625b3676?w=1200&h=675&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=1200&h=675&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=1200&h=675&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1200&h=675&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=1200&h=675&fit=crop&auto=format',
+]
 const MOCK_GENRES = ['剧情', '爱情', '科幻', '犯罪', '喜剧', '悬疑', '动画', '动作']
 const MOCK_REGIONS = ['美国', '英国', '法国', '日本', '韩国', '中国']
 
 export interface TMDBMovieData {
   cover: string
+  backdrop: string // 宽幅背景图（TMDB backdrop_path / 抽样的横版剧照）
   third_party_rating: number | null
   genre: string[]
   region: string
@@ -53,11 +62,17 @@ export async function fetchMovieByTitle(title: string, year: string): Promise<TM
     const json = await res.json()
     const m = json.results?.[0]
     if (!m) {
-      return { cover: '', third_party_rating: null, genre: [], region: '', duration: 0, year: Number(year) || 0, cover_failed: true }
+      return {
+        cover: '', backdrop: '', third_party_rating: null, genre: [], region: '', duration: 0,
+        year: Number(year) || 0, cover_failed: true,
+      }
     }
     const cover = m.poster_path ? `${TMDB_IMG}${m.poster_path}` : ''
+    // 宽幅背景图：TMDB 的 backdrop_path 是 16:9 横版（如 /abc.jpg），前端可拼 `https://image.tmdb.org/t/p/w780{backdrop_path}`
+    const backdrop = m.backdrop_path ? `https://image.tmdb.org/t/p/w780${m.backdrop_path}` : ''
     return {
       cover,
+      backdrop,
       third_party_rating: typeof m.vote_average === 'number' ? Number(m.vote_average.toFixed(1)) : null,
       genre: ((m.genre_ids ?? []) as number[]).map((id) => GENRE_MAP[id]).filter((g): g is string => Boolean(g)),
       region: (m.origin_country ?? [])[0] ?? '',
@@ -71,8 +86,11 @@ export async function fetchMovieByTitle(title: string, year: string): Promise<TM
   await new Promise((r) => setTimeout(r, 600 + Math.random() * 500))
   const ok = Math.random() > 0.12 // ~12% 概率封面获取失败，用于演示「手动获取」
   const yr = parseInt(year, 10) || 0
+  const cover = ok ? MOCK_COVERS[Math.floor(Math.random() * MOCK_COVERS.length)] : ''
+  const backdrop = ok ? MOCK_BACKDROPS[Math.floor(Math.random() * MOCK_BACKDROPS.length)] : ''
   return {
-    cover: ok ? MOCK_COVERS[Math.floor(Math.random() * MOCK_COVERS.length)] : '',
+    cover,
+    backdrop,
     third_party_rating: Number((6 + Math.random() * 3).toFixed(1)),
     genre: [MOCK_GENRES[Math.floor(Math.random() * MOCK_GENRES.length)]],
     region: MOCK_REGIONS[Math.floor(Math.random() * MOCK_REGIONS.length)],

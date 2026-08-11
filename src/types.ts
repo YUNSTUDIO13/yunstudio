@@ -266,6 +266,7 @@ export interface Movie {
   title: string
   year: number
   cover: string // 封面图 URL（TMDB 公网 / Storage 公链）；为空时显示占位
+  backdrop: string // 宽幅背景图 URL（TMDB backdrop_path）；Hero 优先用此图，竖版则用 cover
   personal_rating: number | null // 个人评分（0–10）
   third_party_rating: number | null // 第三方评分（TMDB，0–10）
   review: string // 个人短评
@@ -283,6 +284,7 @@ export type MovieInput = {
   title: string
   year: number
   cover?: string
+  backdrop?: string
   personal_rating?: number | null
   third_party_rating?: number | null
   review?: string
