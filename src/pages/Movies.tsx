@@ -1702,6 +1702,7 @@ export default function MoviesPage() {
   const [syncError, setSyncError] = useState<string | null>(null)
   const isMobile = useMediaQuery('(max-width: 767px)')
   const [showFunc, setShowFunc] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const funcRef = useRef<HTMLDivElement>(null)
 
   // 功能弹窗：点击外部关闭
@@ -1723,35 +1724,54 @@ export default function MoviesPage() {
     return () => setSyncStatusHandler(null)
   }, [])
 
+  const reload = useCallback(async () => {
+    if (!user) {
+      setMovies([])
+      setLoading(false)
+      return
+    }
+    const rows = await db.movies.where('user_id').equals(userId).toArray()
+    // 兼容历史数据：地区字段可能在旧版函数时期存成了英文，统一中文化（已是中文则直通）
+    const norm = rows.map((m) => ({ ...m, region: normalizeRegion(m.region ?? '') }))
+    norm.sort(
+      (a, b) =>
+        String(b.watched_at ?? '').localeCompare(String(a.watched_at ?? '')) ||
+        b.created_at.localeCompare(a.created_at),
+    )
+    setMovies(norm)
+    setLoading(false)
+  }, [user, userId])
+
+  // 本地 vs 云端孤儿对账：清理「云端已删除、且本地无挂起 upsert」的残留记录。
+  // 跨端删除一致性兜底——PC 错过 Realtime DELETE 时本地残留永不清（无痕模式因全新 IndexedDB 才正常）。
+  // 同时供「手动刷新」复用。
+  const reconcileOrphans = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return
+    try {
+      const { data, error } = await supabase
+        .from('movies')
+        .select('id')
+        .eq('user_id', userId)
+      if (error || !data) return
+      const cloudIds = new Set((data as { id: string }[]).map((r) => r.id))
+      const locals = await db.movies.where('user_id').equals(userId).toArray()
+      const pending = await pendingRowIds('movies')
+      const orphanIds = locals
+        .map((m) => m.id)
+        .filter((id) => !cloudIds.has(id) && !pending.has(id))
+      if (orphanIds.length) {
+        await db.movies.bulkDelete(orphanIds)
+        const del = new Set(orphanIds)
+        setMovies((prev) => prev.filter((m) => !del.has(m.id)))
+      }
+    } catch {
+      // 对账失败静默处理，绝不阻塞主流程
+    }
+  }, [userId])
+
   // 加载 + Realtime
   useEffect(() => {
     let cancelled = false
-    // 本地 vs 云端孤儿对账：清理「云端已删除、且本地无挂起 upsert」的残留记录。
-    // 这是跨端删除一致性的兜底——PC 若错过 Realtime DELETE 事件（页面未开/被浏览器挂起/SW 重连丢事件），
-    // 仅靠「本地有数据就信任本地」会导致残留永远不清（刷新也没用，无痕模式因全新 IndexedDB 才正常）。
-    async function reconcileOrphans() {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) return
-      try {
-        const { data, error } = await supabase
-          .from('movies')
-          .select('id')
-          .eq('user_id', userId)
-        if (error || !data) return
-        const cloudIds = new Set((data as { id: string }[]).map((r) => r.id))
-        const locals = await db.movies.where('user_id').equals(userId).toArray()
-        const pending = await pendingRowIds('movies')
-        const orphanIds = locals
-          .map((m) => m.id)
-          .filter((id) => !cloudIds.has(id) && !pending.has(id))
-        if (orphanIds.length) {
-          await db.movies.bulkDelete(orphanIds)
-          const del = new Set(orphanIds)
-          setMovies((prev) => prev.filter((m) => !del.has(m.id)))
-        }
-      } catch {
-        // 对账失败静默处理，绝不阻塞主流程
-      }
-    }
     async function load() {
       setLoading(true)
       // 本地优先：先立即从 IndexedDB 秒出数据（首屏不卡）
@@ -1774,7 +1794,27 @@ export default function MoviesPage() {
       if (!cancelled) void reconcileOrphans()
     }, 30000)
     return () => { cancelled = true; window.clearInterval(timer) }
-  }, [userId])
+  }, [userId, reload, reconcileOrphans])
+
+  // 手动刷新：主动从云端全量拉取并本地对账（补手机端新建、PC 未收到 Realtime UPSERT 的新增；清云端已删孤儿）。
+  // 不锁滚动、按钮转圈，失败给错误提示但不阻塞。
+  const refreshFromCloud = useCallback(async () => {
+    if (!user || refreshing) return
+    setRefreshing(true)
+    try {
+      // 云端全量拉取并 bulkPut 到本地（含 PC 端缺失的新增记录）
+      await seedFromServer('movies', userId)
+      // 清理云端已删的本地孤儿
+      await reconcileOrphans()
+      // 刷新列表 state
+      await reload()
+      setSyncError(null)
+    } catch {
+      setSyncError('从云端刷新失败，请检查网络后重试')
+    } finally {
+      setRefreshing(false)
+    }
+  }, [user, userId, refreshing, reload, reconcileOrphans])
 
   // 安全网：本页卸载（切换模块）时强制释放任何残留的滚动锁，避免跨路由后全站仍被锁死。
   useEffect(() => () => { forceUnlockBodyScroll() }, [])
@@ -1813,24 +1853,6 @@ export default function MoviesPage() {
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [user, userId])
-
-  const reload = useCallback(async () => {
-    if (!user) {
-      setMovies([])
-      setLoading(false)
-      return
-    }
-    const rows = await db.movies.where('user_id').equals(userId).toArray()
-    // 兼容历史数据：地区字段可能在旧版函数时期存成了英文，统一中文化（已是中文则直通）
-    const norm = rows.map((m) => ({ ...m, region: normalizeRegion(m.region ?? '') }))
-    norm.sort(
-      (a, b) =>
-        String(b.watched_at ?? '').localeCompare(String(a.watched_at ?? '')) ||
-        b.created_at.localeCompare(a.created_at),
-    )
-    setMovies(norm)
-    setLoading(false)
   }, [user, userId])
 
   const visible = useMemo(() => {
@@ -1991,6 +2013,20 @@ export default function MoviesPage() {
                 {activeFilterCount}
               </span>
             )}
+          </button>
+          {/* 刷新（主动从云端拉取并本地对账：补手机端新建、PC 未收到 Realtime 时手动补） */}
+          <button
+            onClick={refreshFromCloud}
+            disabled={refreshing}
+            aria-label="从云端刷新"
+            className={`grid h-9 w-9 place-items-center rounded-full backdrop-blur-md transition ${
+              refreshing ? 'bg-white/20 text-accent' : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={refreshing ? 'animate-spin' : ''}>
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <polyline points="21 3 21 9 15 9" />
+            </svg>
           </button>
           {/* 功能（圆形按钮，点击展开批量导入 / 新建） */}
           <div className="relative" ref={funcRef}>
