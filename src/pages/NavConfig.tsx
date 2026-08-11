@@ -74,7 +74,49 @@ export default function NavConfigPage() {
         </Button>
       </header>
 
-      {/* 一级 Tab 列表 */}
+      {/* 顶部独立卡片：系统设置（固定 dock 齿轮浮层的内容，可在此自定义） */}
+      {(() => {
+        const sys = sortedPrimaries.find((p) => p.id === 'p_system_settings')
+        if (!sys) return null
+        return (
+          <section className="glass-card p-5 ring-1 ring-accent/30">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-surface text-accent">
+                  {renderIcon(sys.iconKey)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-semibold text-ink-strong">{sys.title}</h2>
+                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">
+                      齿轮浮层
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-ink-soft">
+                    管理 dock 左下角齿轮弹出的二级功能模块。此模块固定存在于齿轮，不会显示在下方一级 Tab 中。
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="soft"
+                className="px-3 py-1.5 text-xs"
+                onClick={() => setEditingPrimary({ id: 'p_system_settings' })}
+              >
+                ✎ 编辑名称/图标
+              </Button>
+            </div>
+
+            <SecondaryList
+              primaryId="p_system_settings"
+              groups={sys.groups}
+              onEditGroup={(groupId) => setEditingGroup({ primaryId: 'p_system_settings', groupId })}
+              onAddGroup={() => setEditingGroup({ primaryId: 'p_system_settings' })}
+            />
+          </section>
+        )
+      })()}
+
+      {/* 一级 Tab 列表（不含 p_system_settings，它独立于顶部「系统设置」卡片） */}
       <section className="glass-card p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink-strong">一级 Tab</h2>
@@ -87,7 +129,9 @@ export default function NavConfigPage() {
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {sortedPrimaries.map((p, idx) => (
+          {sortedPrimaries
+            .filter((p) => p.id !== 'p_system_settings')
+            .map((p, idx) => (
             <div
               key={p.id}
               className="glass-card p-4"
@@ -128,64 +172,13 @@ export default function NavConfigPage() {
                 </div>
               </div>
 
-              {/* 二级列子列表 */}
-              <div className="mt-3 space-y-1.5 border-t border-line pt-3">
-                {p.groups.map((g, gIdx) => (
-                  <div
-                    key={g.id}
-                    className="flex items-center gap-2 rounded-lg bg-surface/70 px-2 py-1.5"
-                  >
-                    <span className="grid h-5 w-5 place-items-center rounded-md bg-brand-soft text-xs text-ink-strong">
-                      {gIdx + 1}
-                    </span>
-                    <span className="flex-1 truncate text-sm text-ink-strong">
-                      {g.title || '未命名'}
-                    </span>
-                    <span className="text-xs text-ink-mute">{g.modules.length} 模块</span>
-                    <button
-                      type="button"
-                      title="上移"
-                      disabled={gIdx === 0}
-                      onClick={() => actions.moveSecondary(p.id, g.id, 'up')}
-                      className="rounded-md px-1 text-ink-soft transition hover:bg-brand-soft disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      title="下移"
-                      disabled={gIdx === p.groups.length - 1}
-                      onClick={() => actions.moveSecondary(p.id, g.id, 'down')}
-                      className="rounded-md px-1 text-ink-soft transition hover:bg-brand-soft disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      title="编辑"
-                      onClick={() => setEditingGroup({ primaryId: p.id, groupId: g.id })}
-                      className="rounded-md px-1 text-ink-soft transition hover:bg-brand-soft"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      title="删除"
-                      onClick={() => actions.removeSecondary(p.id, g.id)}
-                      className="rounded-md px-1 text-ink-soft transition hover:bg-danger/10 hover:text-danger"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setEditingGroup({ primaryId: p.id })}
-                  className="w-full rounded-lg border border-dashed border-line bg-transparent py-1.5 text-xs text-ink-soft transition hover:border-ink-strong hover:text-ink-strong"
-                >
-                  + 新增二级列
-                </button>
-              </div>
+              {/* 二级列子列表（复用 SecondaryList） */}
+              <SecondaryList
+                primaryId={p.id}
+                groups={p.groups}
+                onEditGroup={(groupId) => setEditingGroup({ primaryId: p.id, groupId })}
+                onAddGroup={() => setEditingGroup({ primaryId: p.id })}
+              />
             </div>
           ))}
         </div>
@@ -316,6 +309,84 @@ export default function NavConfigPage() {
         }}
         onClose={() => setDelPrimary(null)}
       />
+    </div>
+  )
+}
+
+// ============================================================
+// 子组件：二级列列表（网格卡片与系统设置卡片共用，避免冗余）
+//  - 移动/删除直接走 NavContext actions
+//  - 编辑/新增通过回调打开对应 Modal
+// ============================================================
+function SecondaryList({
+  primaryId,
+  groups,
+  onEditGroup,
+  onAddGroup,
+}: {
+  primaryId: string
+  groups: { id: string; title: string; modules: string[] }[]
+  onEditGroup: (groupId: string) => void
+  onAddGroup: () => void
+}) {
+  const { actions } = useNav()
+  return (
+    <div className="mt-3 space-y-1.5 border-t border-line pt-3">
+      {groups.map((g, gIdx) => (
+        <div
+          key={g.id}
+          className="flex items-center gap-2 rounded-lg bg-surface/70 px-2 py-1.5"
+        >
+          <span className="grid h-5 w-5 place-items-center rounded-md bg-brand-soft text-xs text-ink-strong">
+            {gIdx + 1}
+          </span>
+          <span className="flex-1 truncate text-sm text-ink-strong">
+            {g.title || '未命名'}
+          </span>
+          <span className="text-xs text-ink-mute">{g.modules.length} 模块</span>
+          <button
+            type="button"
+            title="上移"
+            disabled={gIdx === 0}
+            onClick={() => actions.moveSecondary(primaryId, g.id, 'up')}
+            className="rounded-md px-1 text-ink-soft transition hover:bg-brand-soft disabled:opacity-30"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            title="下移"
+            disabled={gIdx === groups.length - 1}
+            onClick={() => actions.moveSecondary(primaryId, g.id, 'down')}
+            className="rounded-md px-1 text-ink-soft transition hover:bg-brand-soft disabled:opacity-30"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            title="编辑"
+            onClick={() => onEditGroup(g.id)}
+            className="rounded-md px-1 text-ink-soft transition hover:bg-brand-soft"
+          >
+            ✎
+          </button>
+          <button
+            type="button"
+            title="删除"
+            onClick={() => actions.removeSecondary(primaryId, g.id)}
+            className="rounded-md px-1 text-ink-soft transition hover:bg-danger/10 hover:text-danger"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={onAddGroup}
+        className="w-full rounded-lg border border-dashed border-line bg-transparent py-1.5 text-xs text-ink-soft transition hover:border-ink-strong hover:text-ink-strong"
+      >
+        + 新增二级列
+      </button>
     </div>
   )
 }

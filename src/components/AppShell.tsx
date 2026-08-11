@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../context/ProfileContext'
@@ -10,6 +10,7 @@ import MegaMenu from './MegaMenu'
 import MobileMegaSheet from './MobileMegaSheet'
 import Avatar from './Avatar'
 import type { BuiltinModuleId } from '../lib/builtin-modules'
+import type { NavPrimary } from '../lib/nav-types'
 import AuroraBackground from '../design/AuroraBackground'
 
 // ============================================================
@@ -185,17 +186,29 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const sortedPrimaries = [...config.primaries].sort((a, b) => a.order - b.order)
   const openPrimary = sortedPrimaries.find((p) => p.id === openPrimaryId) ?? null
 
-  // 「系统设置」伪 primary：复用 MegaMenu / MobileMegaSheet 渲染其下的字典管理、导航配置
-  const settingsPrimary: import('../lib/nav-types').NavPrimary = {
-    id: 'p_settings_dock',
-    title: '系统设置',
-    iconKey: 'gear',
-    order: 9999,
-    groups: [
-      { id: 'g_settings_tag', title: '字典管理', modules: ['tag-dict'] },
-      { id: 'g_settings_nav', title: '导航配置', modules: ['nav-config'] },
-    ],
-  }
+  // dock 一级 Tab 列表：排除「系统设置」（它固定在 gear 齿轮浮层，不占一级 Tab 格，避免与齿轮重复）
+  const dockPrimaries = useMemo(
+    () => sortedPrimaries.filter((p) => p.id !== 'p_system_settings'),
+    [sortedPrimaries],
+  )
+
+  // 「系统设置」浮层内容：直接读配置里的真源 p_system_settings（可经「导航配置」页自定义），
+  // 仅当配置缺失（极旧账户）时回落到写死兜底。
+  const settingsPrimary: NavPrimary = useMemo(() => {
+    const sys = sortedPrimaries.find((p) => p.id === 'p_system_settings')
+    return (
+      sys ?? {
+        id: 'p_system_settings',
+        title: '系统设置',
+        iconKey: 'gear',
+        order: 9999,
+        groups: [
+          { id: 'g_sys_1', title: '导航配置', modules: ['nav-config'] },
+          { id: 'g_sys_2', title: '字典管理', modules: ['tag-dict'] },
+        ],
+      }
+    )
+  }, [sortedPrimaries])
 
   function toggleSettings() {
     setSettingsOpen((cur) => {
@@ -207,7 +220,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   // 手机 dock 图标自适应档位：总元素数（含 Logo/齿轮/头像）越多 → 图标越小
   // 一级模块少时撑大避免「图标分开太多」；多时收紧避免拥挤；PC 不变（hidden md:flex）
-  const mobileTotalSlots = sortedPrimaries.length + 3 // Logo + primaries + gear + avatar
+  const mobileTotalSlots = dockPrimaries.length + 3 // Logo + primaries(不含系统设置) + gear + avatar
   const iconSizeCls =
     mobileTotalSlots <= 3 ? 'h-12 w-12'
     : mobileTotalSlots <= 5 ? 'h-10 w-10'
@@ -235,7 +248,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
         <nav className="flex flex-col items-center gap-2">
           {hydrated ? (
-            sortedPrimaries.map((p) => (
+            dockPrimaries.map((p) => (
               <PrimaryDockItem
                 key={p.id}
                 primary={p}
@@ -396,7 +409,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           {hydrated ? (
-            sortedPrimaries.map((p) => {
+            dockPrimaries.map((p) => {
               const active = activePrimary?.id === p.id || openPrimaryId === p.id
               return (
                 <button
