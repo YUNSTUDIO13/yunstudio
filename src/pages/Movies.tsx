@@ -1725,8 +1725,13 @@ export default function MoviesPage() {
     let cancelled = false
     async function load() {
       setLoading(true)
+      // 本地优先：先立即从 IndexedDB 秒出数据（首屏不卡），再后台静默与云端对齐
+      await reload()
+      if (cancelled) return
       await seedFromServer('movies', userId)
-      if (!cancelled) await reload()
+      if (cancelled) return
+      // 云端对齐完成后再刷一次（反映跨端更新 / 跨端删除回收）
+      await reload()
     }
     void load()
     return () => { cancelled = true }
