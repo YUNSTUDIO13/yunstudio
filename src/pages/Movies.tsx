@@ -130,7 +130,7 @@ function StillThumb({
 }) {
   const [err, setErr] = useState(false)
   return (
-    <div className="group relative w-[150px] shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+    <div className="group relative w-full overflow-hidden rounded-lg ring-1 ring-white/10">
       <button type="button" onClick={onOpen} className="block w-full">
         {!err ? (
           <img
@@ -384,7 +384,7 @@ function MovieDetailPanel({
         <div className="mt-12 px-6 md:px-10">
           <div className="mb-3 text-[11px] uppercase tracking-wider text-ink-mute">剧照</div>
           {(draft.cover || draft.backdrop) ? (
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {draft.cover && (
                 <StillThumb
                   url={draft.cover}
