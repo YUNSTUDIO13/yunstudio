@@ -1723,6 +1723,32 @@ export default function MoviesPage() {
   // 加载 + Realtime
   useEffect(() => {
     let cancelled = false
+    // 本地 vs 云端孤儿对账：清理「云端已删除、且本地无挂起 upsert」的残留记录。
+    // 这是跨端删除一致性的兜底——PC 若错过 Realtime DELETE 事件（页面未开/被浏览器挂起/SW 重连丢事件），
+    // 仅靠「本地有数据就信任本地」会导致残留永远不清（刷新也没用，无痕模式因全新 IndexedDB 才正常）。
+    async function reconcileOrphans() {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return
+      try {
+        const { data, error } = await supabase
+          .from('movies')
+          .select('id')
+          .eq('user_id', userId)
+        if (error || !data) return
+        const cloudIds = new Set((data as { id: string }[]).map((r) => r.id))
+        const locals = await db.movies.where('user_id').equals(userId).toArray()
+        const pending = await pendingRowIds('movies')
+        const orphanIds = locals
+          .map((m) => m.id)
+          .filter((id) => !cloudIds.has(id) && !pending.has(id))
+        if (orphanIds.length) {
+          await db.movies.bulkDelete(orphanIds)
+          const del = new Set(orphanIds)
+          setMovies((prev) => prev.filter((m) => !del.has(m.id)))
+        }
+      } catch {
+        // 对账失败静默处理，绝不阻塞主流程
+      }
+    }
     async function load() {
       setLoading(true)
       // 本地优先：先立即从 IndexedDB 秒出数据（首屏不卡）
@@ -1736,9 +1762,15 @@ export default function MoviesPage() {
         if (cancelled) return
         await reload()
       }
+      // 增量对账：无论本地是否有数据，都清理云端已删的本地孤儿（跨端删除一致性兜底）
+      if (!cancelled) await reconcileOrphans()
     }
     void load()
-    return () => { cancelled = true }
+    // 兜底：页面长时间打开错过 Realtime 时，每 30s 静默对账一次自动自愈
+    const timer = window.setInterval(() => {
+      if (!cancelled) void reconcileOrphans()
+    }, 30000)
+    return () => { cancelled = true; window.clearInterval(timer) }
   }, [userId])
 
   useEffect(() => {
