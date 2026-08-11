@@ -2,7 +2,7 @@
 // 布局与功能对齐桌面「工作台前端代码」的观影应用：
 //   顶部导航：透明→毛玻璃滚动吸附，仅【搜索 / 批量导入 / 新建】三个入口
 //   （2026-08-11 已移除顶部 Hero 推荐模块；观影记录整体上移，顶部留白避开 fixed 导航）
-//   观影记录：横向滚动海报（160×240 竖版），点击打开详情
+//   观影记录：竖版海报网格（PC 自适应换行 auto-fill/最小 160px，手机 2 列），点击打开详情
 //   详情弹窗：顶部大封面 + 渐变 + 同步/编辑 按钮 + 2×2 键值对信息 + 双评分并排 + 个人短评 + 同步状态
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ClipboardEvent } from 'react'
@@ -43,6 +43,65 @@ async function downloadImage(url: string, filename: string) {
   } catch {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
+}
+
+// ─── 去重键 / 解析辅助（新建 · 批量导入 · 批量更新 三处共用） ────────────────
+/**
+ * 影片唯一键 = 名称（去首尾空格 + 转小写）+ 年代。
+ * 大小写与首尾空格不敏感，避免「奥本海默 」与「奥本海默」被当成两部。
+ */
+function movieKey(title: string, year: number | string): string {
+  return `${String(title ?? '').trim().toLowerCase()}__${String(year ?? '').trim()}`
+}
+
+/**
+ * 日期归一为 YYYY-MM-DD。支持 2024-3-5 / 2024/3/5 / 2024.3.5 / 2024年3月5日 /
+ * 仅年月（补 01 日）/ 仅年份（补 01-01）/ Excel 日期序列号。无法识别返回空串。
+ */
+function normalizeDate(raw: string): string {
+  const s = String(raw ?? '').trim()
+  if (!s) return ''
+  // Excel 日期序列号（5 位数字，1900 起算）
+  if (/^\d{5}$/.test(s)) {
+    const d = new Date((Number(s) - 25569) * 86400000)
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+  }
+  // 年月日
+  const ymd = s.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/)
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`
+  // 仅年月
+  const ym = s.match(/^(\d{4})[-/.年](\d{1,2})月?$/)
+  if (ym) return `${ym[1]}-${ym[2].padStart(2, '0')}-01`
+  // 仅年份
+  if (/^\d{4}$/.test(s)) return `${s}-01-01`
+  const d = new Date(s)
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+  return ''
+}
+
+/** 评分解析：非数字返回 null，超范围钳到 0–10 */
+function parseRating(raw: string): number | null {
+  const s = String(raw ?? '').trim()
+  if (!s) return null
+  const n = parseFloat(s)
+  if (isNaN(n)) return null
+  return Math.min(10, Math.max(0, n))
+}
+
+/**
+ * 剪贴板文本 → 行数组（tab 分隔，Excel 默认复制格式）。
+ * 首行若命中「名称/片名/年代/评分/观影时间」等表头词则自动跳过。
+ */
+function parseClipboardRows(text: string): string[][] {
+  const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  if (!lines.length) return []
+  const head = lines[0].split('\t').map((c) => c.trim())
+  const isHeader =
+    /名称|片名|^title$|^name$/i.test(head[0] ?? '') ||
+    /年代|年份|year/i.test(head[1] ?? '') ||
+    /评分|rating|score/i.test(head[2] ?? '') ||
+    /观影时间|观影日期|日期|date/i.test(head[3] ?? '')
+  return lines.slice(isHeader ? 1 : 0).map((l) => l.split('\t').map((c) => c.trim()))
 }
 
 // ─── 星级（10 分制 → 5 星，半星近似为整星） ─────────────────────────────────
@@ -251,7 +310,7 @@ function MovieDetailPanel({
           </div>
         )}
 
-        {/* 2×2 键值对 */}
+        {/* 键值对（类型/地区/年份/时长/观影时间） */}
         <div className="mt-12 grid grid-cols-2 gap-x-8 gap-y-6 px-6 md:px-10">
           <InfoField
             label="类型"
@@ -276,6 +335,13 @@ function MovieDetailPanel({
             value={String(draft.duration || '')}
             editing={editing}
             onChange={(v) => setDraft({ ...draft, duration: parseInt(v, 10) || 0 })}
+          />
+          <InfoField
+            label="观影时间"
+            type="date"
+            value={draft.watched_at ?? ''}
+            editing={editing}
+            onChange={(v) => setDraft({ ...draft, watched_at: normalizeDate(v) })}
           />
         </div>
 
@@ -548,13 +614,10 @@ function MovieList({
   }
   return (
     <>
-      {/* 桌面：横向滚动轮播 */}
-      <div
-        className="hidden gap-4 overflow-x-auto pb-4 md:-mx-12 md:flex md:px-12"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}
-      >
+      {/* 桌面：自适应换行网格（列数随容器宽度自动增减，单列最小 160px） */}
+      <div className="hidden gap-4 md:grid md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
         {visible.map((m) => (
-          <PosterCard key={m.id} movie={m} onClick={() => onOpen(m)} />
+          <PosterCard key={m.id} movie={m} fluid onClick={() => onOpen(m)} />
         ))}
       </div>
       {/* 手机：2 列网格，上下滚动 */}
@@ -572,17 +635,20 @@ function InfoField({
   value,
   editing,
   onChange,
+  type,
 }: {
   label: string
   value: string
   editing: boolean
   onChange: (v: string) => void
+  /** 编辑态 input 类型，如 'date'（默认 text） */
+  type?: string
 }) {
   return (
     <div>
       <div className="mb-1 text-[11px] uppercase tracking-wider text-ink-mute">{label}</div>
       {editing ? (
-        <Input value={value} onChange={(e) => onChange(e.target.value)} />
+        <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (
         <div className="text-sm text-ink-strong">{value || '—'}</div>
       )}
@@ -621,14 +687,17 @@ function UploadButton({ userId, onUploaded }: { userId: string; onUploaded: (url
 // ─── 新建弹窗 ───────────────────────────────────────────────────────────────
 function NewMovieModal({
   userId,
+  existingKeys,
   onClose,
   onSave,
 }: {
   userId: string
+  /** 已有影片的去重键集合（名称+年代），命中则拒绝重复创建 */
+  existingKeys: Set<string>
   onClose: () => void
   onSave: (m: Movie) => void
 }) {
-  const [draft, setDraft] = useState({ title: '', year: '', cover: '', personalRating: '', review: '' })
+  const [draft, setDraft] = useState({ title: '', year: '', cover: '', personalRating: '', review: '', watchedAt: '' })
   const [preview, setPreview] = useState<Partial<Movie>>({})
   const [fetching, setFetching] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -697,8 +766,13 @@ function NewMovieModal({
 
   const coverUrl = draft.cover || preview.cover || ''
 
+  // 去重校验：名称 + 年代 都填了才判定（年代空时无法唯一定位，不拦）
+  const isDuplicate =
+    !!draft.title.trim() && !!draft.year.trim() && existingKeys.has(movieKey(draft.title, draft.year))
+
   const handleSave = () => {
     if (!draft.title.trim() || !draft.year.trim()) return
+    if (isDuplicate) return // 已存在同名同年影片，直接跳过不新建
     const nowIso = new Date().toISOString()
     const movie: Movie = {
       id: crypto.randomUUID(),
@@ -715,7 +789,7 @@ function NewMovieModal({
       genre: preview.genre ?? [],
       region: preview.region ?? '',
       duration: preview.duration ?? 0,
-      watched_at: nowIso.slice(0, 10),
+      watched_at: normalizeDate(draft.watchedAt) || nowIso.slice(0, 10),
       synced: !!preview.cover,
       cover_failed: !preview.cover && !draft.cover,
       created_at: nowIso,
@@ -732,7 +806,9 @@ function NewMovieModal({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button onClick={handleSave} disabled={!draft.title.trim() || !draft.year.trim()}>添加记录</Button>
+          <Button onClick={handleSave} disabled={!draft.title.trim() || !draft.year.trim() || isDuplicate}>
+            {isDuplicate ? '已存在，无需添加' : '添加记录'}
+          </Button>
         </>
       }
     >
@@ -760,6 +836,11 @@ function NewMovieModal({
               className="w-28"
             />
           </Field>
+          {isDuplicate && (
+            <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+              库中已存在「{draft.title.trim()}（{draft.year.trim()}）」，已阻止重复创建。如需修改请到列表中打开该影片编辑。
+            </p>
+          )}
           {candidates.length > 0 && (
             <Field label={`TMDB 候选（${candidates.length} 个）`} hint="点击切换封面 / 年份 / 评分">
               <div className="flex gap-2 overflow-x-auto pb-1">
@@ -830,6 +911,13 @@ function NewMovieModal({
               className="w-32"
             />
           </Field>
+          <Field label="观影时间" hint="留空则默认记为今天">
+            <Input
+              type="date"
+              value={draft.watchedAt}
+              onChange={(e) => setDraft({ ...draft, watchedAt: e.target.value })}
+            />
+          </Field>
           <Field label="个人评价">
             <Textarea
               value={draft.review}
@@ -864,48 +952,47 @@ function NewMovieModal({
   )
 }
 
-// ─── 批量导入弹窗（Excel/CSV + 逐行富化 + 压缩上传 + 进度 + 容错）─────────────
+// ─── 批量导入弹窗（粘贴 4 列 + 去重跳过 + 逐行富化 + 压缩上传 + 进度 + 容错）───
 function BatchImportModal({
   userId,
+  existingKeys,
   onClose,
   onDone,
 }: {
   userId: string
+  /** 已有影片的去重键集合（名称+年代），命中则整行跳过（不请求 TMDB、不新建） */
+  existingKeys: Set<string>
   onClose: () => void
   onDone: () => void
 }) {
   const [phase, setPhase] = useState<'idle' | 'importing' | 'done'>('idle')
-  const [rows, setRows] = useState<{ title: string; year: string }[]>([])
+  const [rows, setRows] = useState<{ title: string; year: string; rating: string; watchedAt: string }[]>([])
   const [parseErr, setParseErr] = useState('')
   const [progress, setProgress] = useState({ done: 0, total: 0 })
-  const [results, setResults] = useState<{ title: string; ok: boolean; msg?: string; hasCover?: boolean }[]>([])
+  const [results, setResults] = useState<
+    { title: string; ok: boolean; skipped?: boolean; msg?: string; hasCover?: boolean }[]
+  >([])
 
   /**
-   * 粘贴解析：抓取剪贴板的纯文本，按 tab 拆分（Excel 默认复制格式）。
-   * 第一行若包含「名称 / 片名 / 年份」字段识别为表头，自动跳过。
+   * 粘贴解析：抓取剪贴板纯文本，按 tab 拆分（Excel 默认复制格式）。
+   * 列序：观影名称 / 年代 / 个人评分（可选）/ 观影时间（可选）。表头自动识别跳过。
    */
   const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const text = e.clipboardData.getData('text/plain')
     setParseErr('')
     if (!text || !text.trim()) return
     e.preventDefault()
-    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l)
-    if (!lines.length) {
-      setParseErr('未识别到有效行，请确认复制了名称 + 年代两列')
+    const cells = parseClipboardRows(text)
+    if (!cells.length) {
+      setParseErr('未识别到有效行，请确认复制了「名称 + 年代」列')
       return
     }
-    let startIdx = 0
-    const headerCells = lines[0].split('\t').map((c) => c.trim())
-    const isHeader =
-      /名称|片名|^title$|^name$/i.test(headerCells[0] ?? '') ||
-      /年代|year|年份/i.test(headerCells[1] ?? '')
-    if (isHeader) startIdx = 1
-    const parsed = lines
-      .slice(startIdx)
-      .map((l) => l.split('\t'))
-      .map((cells) => ({
-        title: String(cells[0] ?? '').trim(),
-        year: String(cells[1] ?? '').trim(),
+    const parsed = cells
+      .map((c) => ({
+        title: String(c[0] ?? '').trim(),
+        year: String(c[1] ?? '').trim(),
+        rating: String(c[2] ?? '').trim(),
+        watchedAt: String(c[3] ?? '').trim(),
       }))
       .filter((r) => r.title)
     if (!parsed.length) {
@@ -914,6 +1001,12 @@ function BatchImportModal({
     }
     setRows(parsed)
   }
+
+  // 预判：本批中有多少行是库里已存在的（会被跳过）
+  const dupCount = useMemo(
+    () => rows.filter((r) => existingKeys.has(movieKey(r.title, r.year))).length,
+    [rows, existingKeys],
+  )
 
   const handleClear = () => {
     setRows([])
@@ -925,8 +1018,18 @@ function BatchImportModal({
     setPhase('importing')
     setProgress({ done: 0, total: rows.length })
     setResults([])
+    // 本批内也去重（同一份表格里出现两次同名同年，只建一次）
+    const seen = new Set(existingKeys)
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i]
+      const key = movieKey(r.title, r.year)
+      // 去重校验：库中或本批已有 → 直接跳过，不请求 TMDB、不新建
+      if (seen.has(key)) {
+        setResults((p) => [...p, { title: r.title, ok: true, skipped: true }])
+        setProgress({ done: i + 1, total: rows.length })
+        continue
+      }
+      seen.add(key)
       try {
         const data = await fetchMovieByTitle(r.title, r.year)
         let cover = ''
@@ -942,7 +1045,7 @@ function BatchImportModal({
           year: data.year || parseInt(r.year, 10) || 0,
           cover,
           backdrop,
-          personal_rating: null,
+          personal_rating: parseRating(r.rating),
           third_party_rating: data.third_party_rating ?? null,
           review: '',
           overview: data.overview ?? '',
@@ -950,7 +1053,7 @@ function BatchImportModal({
           genre: data.genre ?? [],
           region: data.region ?? '',
           duration: data.duration ?? 0,
-          watched_at: nowIso.slice(0, 10),
+          watched_at: normalizeDate(r.watchedAt) || nowIso.slice(0, 10),
           synced: !!(cover || backdrop),
           cover_failed: !cover,
           created_at: nowIso,
@@ -977,8 +1080,12 @@ function BatchImportModal({
         phase === 'idle' ? (
           <>
             <Button variant="ghost" onClick={onClose}>取消</Button>
-            <Button onClick={startImport} disabled={!rows.length}>
-              {rows.length ? `确认导入 ${rows.length} 部` : '确认导入'}
+            <Button onClick={startImport} disabled={!rows.length || rows.length === dupCount}>
+              {rows.length
+                ? rows.length === dupCount
+                  ? '全部已存在'
+                  : `确认导入 ${rows.length - dupCount} 部`
+                : '确认导入'}
             </Button>
           </>
         ) : phase === 'done' ? (
@@ -996,7 +1103,12 @@ function BatchImportModal({
               然后点击下方输入框按 <kbd className="rounded border border-white/15 bg-white/5 px-1 text-[11px] text-ink-soft">Ctrl+V</kbd> 粘贴。
             </p>
             <p>
-              需包含列：<span className="text-ink-soft">观影名称</span>、<span className="text-ink-soft">年代</span>（年代列可为空，第一行表头自动识别）
+              列序：<span className="text-ink-soft">观影名称</span>、<span className="text-ink-soft">年代</span>、
+              <span className="text-ink-soft">个人评分</span>（可选）、<span className="text-ink-soft">观影时间</span>（可选）·
+              第一行表头自动识别
+            </p>
+            <p className="text-amber-300/80">
+              已有影片（同名 + 同年代）会自动跳过，不会重复创建。若只想更新已有影片的评分 / 观影时间，请用「批量更新」。
             </p>
           </div>
           <textarea
@@ -1012,10 +1124,17 @@ function BatchImportModal({
       {phase === 'idle' && rows.length > 0 && (
         <>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              已接收 {rows.length} 行数据（不含标题行）· 2 列
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                已接收 {rows.length} 行 · 待新建 {rows.length - dupCount} 部
+              </span>
+              {dupCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-xs text-amber-300">
+                  已存在 {dupCount} 部，将跳过
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={handleClear}
@@ -1030,17 +1149,28 @@ function BatchImportModal({
                 <tr className="border-b border-white/10 bg-white/5 text-left text-[11px] uppercase tracking-wider text-ink-mute">
                   <th className="w-12 px-3 py-2 text-center">#</th>
                   <th className="px-3 py-2">观影名称</th>
-                  <th className="w-24 px-3 py-2">年代</th>
+                  <th className="w-20 px-3 py-2">年代</th>
+                  <th className="w-16 px-3 py-2">评分</th>
+                  <th className="w-28 px-3 py-2">观影时间</th>
+                  <th className="w-20 px-3 py-2">处理</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.slice(0, 50).map((r, i) => (
-                  <tr key={i} className="border-b border-white/5 last:border-b-0 hover:bg-white/[0.03]">
-                    <td className="px-3 py-2 text-center text-[11px] text-ink-mute">{i + 1}</td>
-                    <td className="px-3 py-2 text-ink-soft">{r.title}</td>
-                    <td className="px-3 py-2 text-ink-mute">{r.year || '—'}</td>
-                  </tr>
-                ))}
+                {rows.slice(0, 50).map((r, i) => {
+                  const dup = existingKeys.has(movieKey(r.title, r.year))
+                  return (
+                    <tr key={i} className="border-b border-white/5 last:border-b-0 hover:bg-white/[0.03]">
+                      <td className="px-3 py-2 text-center text-[11px] text-ink-mute">{i + 1}</td>
+                      <td className="px-3 py-2 text-ink-soft">{r.title}</td>
+                      <td className="px-3 py-2 text-ink-mute">{r.year || '—'}</td>
+                      <td className="px-3 py-2 text-ink-mute">{parseRating(r.rating) ?? '—'}</td>
+                      <td className="px-3 py-2 text-ink-mute">{normalizeDate(r.watchedAt) || '—'}</td>
+                      <td className={`px-3 py-2 text-[11px] ${dup ? 'text-amber-300' : 'text-emerald-300'}`}>
+                        {dup ? '跳过' : '新建'}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
             {rows.length > 50 && (
@@ -1063,6 +1193,13 @@ function BatchImportModal({
               style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
             />
           </div>
+          {phase === 'done' && (
+            <p className="text-xs text-ink-mute">
+              新增 <span className="text-emerald-300">{results.filter((r) => r.ok && !r.skipped).length}</span> 部 ·
+              跳过（已存在）<span className="text-amber-300">{results.filter((r) => r.skipped).length}</span> 部 ·
+              失败 <span className="text-[#f87171]">{results.filter((r) => !r.ok).length}</span> 部
+            </p>
+          )}
           <div className="max-h-52 space-y-1 overflow-auto">
             {results.map((r, i) => (
               <div
@@ -1070,15 +1207,279 @@ function BatchImportModal({
                 className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
                 style={{ background: 'rgba(255,255,255,0.03)' }}
               >
-                <span className={`h-2 w-2 shrink-0 rounded-full ${r.ok ? 'bg-[#4ade80]' : 'bg-[#f87171]'}`} />
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${
+                    r.skipped ? 'bg-[#fbbf24]' : r.ok ? 'bg-[#4ade80]' : 'bg-[#f87171]'
+                  }`}
+                />
                 <span className="flex-1 truncate text-ink-soft">{r.title}</span>
-                {r.ok ? (
+                {r.skipped ? (
+                  <span className="text-[11px] text-amber-300">已存在·跳过</span>
+                ) : r.ok ? (
                   r.hasCover ? <span className="text-[11px] text-ink-mute">封面✓</span> : <span className="text-[11px] text-[#f87171]">无封面</span>
                 ) : (
                   <span className="text-[11px] text-[#f87171]">{(r.msg ?? '').slice(0, 20)}</span>
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+// ─── 批量更新弹窗（4 列：名称/年代/个人评分/观影时间 → 仅更新已有影片的 2 个字段）──
+function BatchUpdateModal({
+  movies,
+  onClose,
+  onDone,
+}: {
+  movies: Movie[]
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [phase, setPhase] = useState<'idle' | 'running' | 'done'>('idle')
+  const [rows, setRows] = useState<{ title: string; year: string; rating: string; watchedAt: string }[]>([])
+  const [parseErr, setParseErr] = useState('')
+  const [progress, setProgress] = useState({ done: 0, total: 0 })
+  const [results, setResults] = useState<
+    { title: string; status: 'updated' | 'nochange' | 'missing' | 'error'; msg?: string }[]
+  >([])
+
+  /** 现有影片索引：去重键 → Movie */
+  const index = useMemo(() => {
+    const m = new Map<string, Movie>()
+    for (const mv of movies) m.set(movieKey(mv.title, mv.year), mv)
+    return m
+  }, [movies])
+
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = e.clipboardData.getData('text/plain')
+    setParseErr('')
+    if (!text || !text.trim()) return
+    e.preventDefault()
+    const cells = parseClipboardRows(text)
+    if (!cells.length) {
+      setParseErr('未识别到有效行，请确认复制了 4 列数据')
+      return
+    }
+    const parsed = cells
+      .map((c) => ({
+        title: String(c[0] ?? '').trim(),
+        year: String(c[1] ?? '').trim(),
+        rating: String(c[2] ?? '').trim(),
+        watchedAt: String(c[3] ?? '').trim(),
+      }))
+      .filter((r) => r.title)
+    if (!parsed.length) {
+      setParseErr('未识别到「名称 + 年代」数据，请确认列序为 名称 / 年代 / 个人评分 / 观影时间')
+      return
+    }
+    setRows(parsed)
+  }
+
+  // 预判：能匹配到现有影片的行数
+  const matchCount = useMemo(
+    () => rows.filter((r) => index.has(movieKey(r.title, r.year))).length,
+    [rows, index],
+  )
+
+  const startUpdate = async () => {
+    if (!rows.length) return
+    setPhase('running')
+    setProgress({ done: 0, total: rows.length })
+    setResults([])
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]
+      const target = index.get(movieKey(r.title, r.year))
+      // 匹配不到 → 跳过，绝不新建（皇上明确要求）
+      if (!target) {
+        setResults((p) => [...p, { title: `${r.title}（${r.year || '—'}）`, status: 'missing' }])
+        setProgress({ done: i + 1, total: rows.length })
+        continue
+      }
+      const rating = parseRating(r.rating)
+      const watched = normalizeDate(r.watchedAt)
+      // 两列都为空 → 无可更新内容，保留原值
+      if (rating === null && !watched) {
+        setResults((p) => [...p, { title: target.title, status: 'nochange' }])
+        setProgress({ done: i + 1, total: rows.length })
+        continue
+      }
+      try {
+        const updated: Movie = {
+          ...target,
+          // 列为空则保留原值，不覆盖成 null / 空串
+          personal_rating: rating ?? target.personal_rating,
+          watched_at: watched || target.watched_at,
+          updated_at: new Date().toISOString(),
+        }
+        await db.movies.put(updated)
+        await enqueueAndMaybeFlush('movies', 'update', updated.id, updated)
+        setResults((p) => [...p, { title: target.title, status: 'updated' }])
+      } catch (e) {
+        setResults((p) => [
+          ...p,
+          { title: target.title, status: 'error', msg: e instanceof Error ? e.message : String(e) },
+        ])
+      }
+      setProgress({ done: i + 1, total: rows.length })
+      // 每 20 条让出一次主线程，避免大批量写入卡 UI
+      if (i % 20 === 19) await new Promise((res) => setTimeout(res, 60))
+    }
+    setPhase('done')
+  }
+
+  const STATUS_META = {
+    updated: { dot: 'bg-[#4ade80]', text: 'text-emerald-300', label: '已更新' },
+    nochange: { dot: 'bg-white/30', text: 'text-ink-mute', label: '无变更' },
+    missing: { dot: 'bg-[#fbbf24]', text: 'text-amber-300', label: '库中无·跳过' },
+    error: { dot: 'bg-[#f87171]', text: 'text-[#f87171]', label: '失败' },
+  } as const
+
+  return (
+    <Modal
+      open
+      title="批量更新·评分与观影时间"
+      onClose={onClose}
+      footer={
+        phase === 'idle' ? (
+          <>
+            <Button variant="ghost" onClick={onClose}>取消</Button>
+            <Button onClick={startUpdate} disabled={!rows.length || matchCount === 0}>
+              {rows.length ? (matchCount ? `确认更新 ${matchCount} 部` : '无匹配影片') : '确认更新'}
+            </Button>
+          </>
+        ) : phase === 'done' ? (
+          <Button onClick={() => { onDone(); onClose() }}>完成</Button>
+        ) : (
+          <Button disabled>更新中…</Button>
+        )
+      }
+    >
+      {phase === 'idle' && rows.length === 0 && (
+        <>
+          <div className="mb-3 space-y-1 text-xs text-ink-mute">
+            <p>
+              在 Excel 中选中数据区域（含标题行）按 <kbd className="rounded border border-white/15 bg-white/5 px-1 text-[11px] text-ink-soft">Ctrl+C</kbd> 复制，
+              然后点击下方输入框按 <kbd className="rounded border border-white/15 bg-white/5 px-1 text-[11px] text-ink-soft">Ctrl+V</kbd> 粘贴。
+            </p>
+            <p>
+              列序：<span className="text-ink-soft">观影名称</span>、<span className="text-ink-soft">年代</span>、
+              <span className="text-ink-soft">个人评分</span>、<span className="text-ink-soft">观影时间</span>
+            </p>
+            <p className="text-accent/80">
+              仅按「名称 + 年代」匹配库中已有影片，更新 <span className="text-ink-soft">个人评分</span> 与{' '}
+              <span className="text-ink-soft">观影时间</span> 两个字段；匹配不到的行直接跳过，
+              <span className="text-ink-soft">不会新建任何影片</span>。某列留空则保留该影片原值。
+            </p>
+          </div>
+          <textarea
+            onPaste={handlePaste}
+            placeholder="点击此处，按 Ctrl+V 粘贴 Excel 数据…"
+            autoFocus
+            rows={5}
+            className="block w-full resize-none rounded-xl border-2 border-dashed border-accent/40 bg-accent/[0.04] px-4 py-3 text-sm text-ink-soft outline-none transition placeholder:text-ink-mute focus:border-accent focus:bg-accent/[0.08]"
+          />
+          {parseErr && <p className="mt-3 text-xs text-[#f87171]">{parseErr}</p>}
+        </>
+      )}
+      {phase === 'idle' && rows.length > 0 && (
+        <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                已接收 {rows.length} 行 · 匹配 {matchCount} 部
+              </span>
+              {rows.length - matchCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-xs text-amber-300">
+                  库中无 {rows.length - matchCount} 部，将跳过
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setRows([]); setParseErr('') }}
+              className="text-xs text-ink-mute underline-offset-2 transition hover:text-ink-soft hover:underline"
+            >
+              清空重新粘贴
+            </button>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-white/10">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/5 text-left text-[11px] uppercase tracking-wider text-ink-mute">
+                  <th className="w-12 px-3 py-2 text-center">#</th>
+                  <th className="px-3 py-2">观影名称</th>
+                  <th className="w-20 px-3 py-2">年代</th>
+                  <th className="w-16 px-3 py-2">评分</th>
+                  <th className="w-28 px-3 py-2">观影时间</th>
+                  <th className="w-24 px-3 py-2">处理</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 50).map((r, i) => {
+                  const hit = index.has(movieKey(r.title, r.year))
+                  return (
+                    <tr key={i} className="border-b border-white/5 last:border-b-0 hover:bg-white/[0.03]">
+                      <td className="px-3 py-2 text-center text-[11px] text-ink-mute">{i + 1}</td>
+                      <td className="px-3 py-2 text-ink-soft">{r.title}</td>
+                      <td className="px-3 py-2 text-ink-mute">{r.year || '—'}</td>
+                      <td className="px-3 py-2 text-ink-mute">{parseRating(r.rating) ?? '—'}</td>
+                      <td className="px-3 py-2 text-ink-mute">{normalizeDate(r.watchedAt) || '—'}</td>
+                      <td className={`px-3 py-2 text-[11px] ${hit ? 'text-emerald-300' : 'text-amber-300'}`}>
+                        {hit ? '更新' : '库中无·跳过'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {rows.length > 50 && (
+              <div className="border-t border-white/10 px-3 py-2 text-center text-[11px] text-ink-mute">
+                … 其余 {rows.length - 50} 行省略显示
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      {phase !== 'idle' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-ink-soft">更新进度</span>
+            <span className="text-ink-mute">{progress.done} / {progress.total}</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full bg-accent transition-all"
+              style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
+            />
+          </div>
+          {phase === 'done' && (
+            <p className="text-xs text-ink-mute">
+              已更新 <span className="text-emerald-300">{results.filter((r) => r.status === 'updated').length}</span> 部 ·
+              无变更 {results.filter((r) => r.status === 'nochange').length} 部 ·
+              库中无 <span className="text-amber-300">{results.filter((r) => r.status === 'missing').length}</span> 部 ·
+              失败 <span className="text-[#f87171]">{results.filter((r) => r.status === 'error').length}</span> 部
+            </p>
+          )}
+          <div className="max-h-52 space-y-1 overflow-auto">
+            {results.map((r, i) => {
+              const meta = STATUS_META[r.status]
+              return (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
+                  style={{ background: 'rgba(255,255,255,0.03)' }}
+                >
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
+                  <span className="flex-1 truncate text-ink-soft">{r.title}</span>
+                  <span className={`text-[11px] ${meta.text}`}>{r.msg ? r.msg.slice(0, 20) : meta.label}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -1223,6 +1624,7 @@ export default function MoviesPage() {
   const [selected, setSelected] = useState<Movie | null>(null)
   const [showNew, setShowNew] = useState(false)
   const [showBatch, setShowBatch] = useState(false)
+  const [showBatchUpdate, setShowBatchUpdate] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER)
   const [del, setDel] = useState<Movie | null>(null)
@@ -1329,6 +1731,12 @@ export default function MoviesPage() {
       return true
     })
   }, [movies, search, filter])
+
+  // 去重键集合（名称 + 年代）：新建 / 批量导入 共用，命中则跳过不重复创建
+  const existingKeys = useMemo(
+    () => new Set(movies.map((m) => movieKey(m.title, m.year))),
+    [movies],
+  )
 
   // 筛选可选值（从当前库派生）
   const filterOptions = useMemo(() => {
@@ -1472,6 +1880,18 @@ export default function MoviesPage() {
                   批量导入
                 </button>
                 <button
+                  onClick={() => { setShowFunc(false); setShowBatchUpdate(true) }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/85 transition hover:bg-white/10"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                    <path d="M3 22v-6h6" />
+                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                  </svg>
+                  批量更新
+                </button>
+                <button
                   onClick={() => { setShowFunc(false); setShowNew(true) }}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/85 transition hover:bg-white/10"
                 >
@@ -1548,10 +1968,27 @@ export default function MoviesPage() {
         </>
       )}
       {showNew && (
-        <NewMovieModal userId={userId} onClose={() => setShowNew(false)} onSave={handleNewMovie} />
+        <NewMovieModal
+          userId={userId}
+          existingKeys={existingKeys}
+          onClose={() => setShowNew(false)}
+          onSave={handleNewMovie}
+        />
       )}
       {showBatch && (
-        <BatchImportModal userId={userId} onClose={() => setShowBatch(false)} onDone={() => { void reload() }} />
+        <BatchImportModal
+          userId={userId}
+          existingKeys={existingKeys}
+          onClose={() => setShowBatch(false)}
+          onDone={() => { void reload() }}
+        />
+      )}
+      {showBatchUpdate && (
+        <BatchUpdateModal
+          movies={movies}
+          onClose={() => setShowBatchUpdate(false)}
+          onDone={() => { void reload() }}
+        />
       )}
       {showFilter && (
         <FilterModal

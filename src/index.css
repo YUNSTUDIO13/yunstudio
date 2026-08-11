@@ -61,6 +61,13 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
+/* 原生日期/时间控件跟随暗色：否则日历图标与下拉面板是系统白底黑字，在深色玻璃上突兀 */
+input[type='date'],
+input[type='month'],
+input[type='datetime-local'],
+input[type='time'] {
+  color-scheme: dark;
+}
 .glass-pill {
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(16px);
