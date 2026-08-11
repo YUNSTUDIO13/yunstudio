@@ -1752,13 +1752,11 @@ export default function MoviesPage() {
           const et = payload.eventType
           const oldId = payload.old?.id
           const newRow = payload.new as (Record<string, unknown> & { id?: string }) | undefined
-          // 删除：按 id 精确删本地（跨端删除一致性），绝不靠"猜孤儿"
+          // 删除：按 id 精确删本地 + 行级移除 state（跨端删除一致性），零整表重渲
           if (et === 'DELETE' || (oldId && !newRow?.id)) {
             if (oldId) {
-              void (async () => {
-                await db.movies.delete(oldId)
-                await reload()
-              })()
+              void db.movies.delete(oldId)
+              setMovies((prev) => prev.filter((m) => m.id !== oldId))
             }
             return
           }
@@ -1888,11 +1886,14 @@ export default function MoviesPage() {
 
   const confirmDelete = async () => {
     if (!del) return
-    await db.movies.delete(del.id)
-    await enqueueAndMaybeFlush('movies', 'delete', del.id)
-    await reload()
+    const id = del.id
+    // 本地优先：先即时从 state 移除 + 关弹窗（纯本地，零网络、零整表重渲染），杜绝手机端卡顿
+    setMovies((prev) => prev.filter((m) => m.id !== id))
     setSelected(null)
     setDel(null)
+    // 落本地 + 后台补传云端（fire-and-forget，绝不阻塞 UI）
+    await db.movies.delete(id)
+    void enqueueAndMaybeFlush('movies', 'delete', id)
   }
 
   const openMovie = (m: Movie) => {
