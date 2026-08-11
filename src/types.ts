@@ -253,3 +253,43 @@ export type AppInput = {
   target_url: string
   description?: string | null
 }
+
+// ============================================================
+// 观影（Movies）—— 个人影视库
+// 数据：本地 Dexie 优先 + outbox 补传 Supabase（与 apps 等模块一致的本地优先架构）
+// 封面：TMDB 返回的公网 poster URL；手动上传走 Supabase Storage(movie-covers bucket) 返回公链
+// 评分：personal_rating 优先；third_party_rating 为 TMDB 等第三方评分；两者皆有时双评展示（带"我/第三方"标识）
+// ============================================================
+export interface Movie {
+  id: string
+  user_id: string
+  title: string
+  year: number
+  cover: string // 封面图 URL（TMDB 公网 / Storage 公链）；为空时显示占位
+  personal_rating: number | null // 个人评分（0–10）
+  third_party_rating: number | null // 第三方评分（TMDB，0–10）
+  review: string // 个人短评
+  genre: string[] // 类型
+  region: string // 地区
+  duration: number // 时长（分钟）
+  watched_at: string // 观影日期（YYYY-MM-DD）
+  synced: boolean // 是否已同步第三方数据
+  cover_failed: boolean // 封面获取是否失败（用于标记手动获取）
+  created_at: string
+  updated_at: string
+}
+
+export type MovieInput = {
+  title: string
+  year: number
+  cover?: string
+  personal_rating?: number | null
+  third_party_rating?: number | null
+  review?: string
+  genre?: string[]
+  region?: string
+  duration?: number
+  watched_at?: string
+  synced?: boolean
+  cover_failed?: boolean
+}

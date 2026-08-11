@@ -27,7 +27,7 @@ function moduleIdFromPath(pathname: string): BuiltinModuleId | null {
   if (!m) return null
   const id = m[1]
   if (
-    ['overview', 'todos', 'requirements', 'sprints', 'bugs', 'nav-config', 'tag-dict', 'apps', 'ui-settings'].includes(
+    ['overview', 'todos', 'requirements', 'sprints', 'bugs', 'nav-config', 'tag-dict', 'apps', 'ui-settings', 'movies'].includes(
       id,
     )
   ) {

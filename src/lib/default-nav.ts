@@ -73,10 +73,17 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       groups: [{ id: 'g_apps_1', title: '全部应用', modules: ['apps'] }],
     },
     {
+      id: 'p_movies',
+      title: '观影',
+      iconKey: 'film',
+      order: 8,
+      groups: [{ id: 'g_movies_1', title: '观影志', modules: ['movies'] }],
+    },
+    {
       id: 'p_system_settings',
       title: '系统设置',
       iconKey: 'gear',
-      order: 8,
+      order: 9,
       groups: [
         { id: 'g_sys_1', title: '导航配置', modules: ['nav-config'] },
         { id: 'g_sys_2', title: '字典管理', modules: ['tag-dict'] },

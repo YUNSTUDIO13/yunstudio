@@ -12,6 +12,7 @@ import type {
   TagCategory,
   TagValue,
   App,
+  Movie,
 } from '../types'
 
 export type EntityTable =
@@ -23,6 +24,7 @@ export type EntityTable =
   | 'tag_categories'
   | 'tag_values'
   | 'apps'
+  | 'movies'
 
 export type SyncOpType = 'insert' | 'update' | 'delete'
 
@@ -49,6 +51,7 @@ interface LocalDB extends Dexie {
    *  用于阻断 60s 兜底扫描把刚清掉的通知又建回来。仅本机语义，不上云。 */
   cleared_notif_keys: Table<{ key: string; cleared_at: string }, string>
   apps: Table<App, string>
+  movies: Table<Movie, string>
   outbox: Table<OutboxOp, string>
 }
 
@@ -109,6 +112,22 @@ db.version(6).stores({
   tag_categories: 'id, user_id, updated_at, name',
   tag_values: 'id, category_id, updated_at',
   apps: 'id, user_id, updated_at',
+  movies: 'id, user_id, updated_at',
+  cleared_notif_keys: 'key, cleared_at',
+  outbox: 'id, table, rowId, createdAt',
+})
+
+// v7：新增 movies 表（个人影视库 / 观影志）
+db.version(7).stores({
+  todos: 'id, user_id, updated_at, tag_id',
+  requirements: 'id, user_id, updated_at, tag_id',
+  bugs: 'id, user_id, updated_at, tag_id',
+  sprints: 'id, user_id, updated_at, tag_id',
+  notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
+  tag_categories: 'id, user_id, updated_at, name',
+  tag_values: 'id, category_id, updated_at',
+  apps: 'id, user_id, updated_at',
+  movies: 'id, user_id, updated_at',
   cleared_notif_keys: 'key, cleared_at',
   outbox: 'id, table, rowId, createdAt',
 })
@@ -132,6 +151,8 @@ function tableRef<T>(table: EntityTable): Table<T> {
       return db.tag_values as unknown as Table<T>
     case 'apps':
       return db.apps as unknown as Table<T>
+    case 'movies':
+      return db.movies as unknown as Table<T>
   }
 }
 
@@ -167,6 +188,7 @@ const TABLES_WITH_USER_ID = new Set<EntityTable>([
   'tag_categories',
   'notifications',
   'apps',
+  'movies',
 ])
 
 /**

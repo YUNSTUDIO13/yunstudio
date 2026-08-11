@@ -11,6 +11,7 @@ export const BUILTIN_MODULE_IDS = [
   'tag-dict', // 字典管理（系统设置下的二级页）
   'apps', // 应用（个人应用导航 / 书签）
   'ui-settings', // UI 设置（指针主题 · 全局视觉）
+  'movies', // 观影（个人影视库 / 观影志）
 ] as const
 export type BuiltinModuleId = (typeof BUILTIN_MODULE_IDS)[number]
 
@@ -94,6 +95,13 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
     title: 'UI 设置',
     desc: '指针主题 · 光粒 / 流光特效 · 自定义颜色',
     route: '/modules/ui-settings',
+    defaultEnabled: true,
+  },
+  'movies': {
+    id: 'movies',
+    title: '观影',
+    desc: '个人影视库 · 封面/评分/短评 · 自动同步第三方',
+    route: '/modules/movies',
     defaultEnabled: true,
   },
 }

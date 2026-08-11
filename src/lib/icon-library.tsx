@@ -8,7 +8,7 @@ export type IconKey =
   | 'list' | 'grid' | 'pie' | 'bar' | 'wave'
   | 'users' | 'msg' | 'inbox' | 'tag' | 'link'
   | 'folder' | 'cube' | 'rocket' | 'spark' | 'flame'
-  | 'news'
+  | 'news' | 'film'
 
 // 每个图标提供一个 ReactNode；用统一描边粗细、类名，调用方靠外部 control 颜色
 const S = 'h-5 w-5'
@@ -46,6 +46,7 @@ export const ICONS: Record<IconKey, ReactNode> = {
   spark: svg(<><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></>),
   flame: svg(<><path d="M12 3c2 4 6 5 6 10a6 6 0 11-12 0c0-3 2-4 3-6 1 2 2 2 3-1z" /></>),
   news: svg(<><path d="M3 5h12a2 2 0 012 2v12H5a2 2 0 01-2-2z" /><path d="M3 5v12" /><path d="M8 9h6M8 12h6M8 15h4" /></>),
+  film: svg(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8" cy="8" r="1.2" fill="currentColor" /><circle cx="16" cy="8" r="1.2" fill="currentColor" /><circle cx="8" cy="16" r="1.2" fill="currentColor" /><circle cx="16" cy="16" r="1.2" fill="currentColor" /><path d="M12 4v16" /></>),
 }
 
 // 供配置页面板用的图标标签（中文短标签，避免选择时一脸懵）
@@ -55,7 +56,7 @@ export const ICON_LABELS: Record<IconKey, string> = {
   list: '列表', grid: '网格', pie: '饼图', bar: '柱状', wave: '波形',
   users: '团队', msg: '消息', inbox: '收件', tag: '标签', link: '链接',
   folder: '文件夹', cube: '立方', rocket: '火箭', spark: '闪光', flame: '火焰',
-  news: '资讯',
+  news: '资讯', film: '观影',
 }
 
 export const ICON_KEYS: IconKey[] = Object.keys(ICONS) as IconKey[]
