@@ -1,7 +1,7 @@
 // 观影模块（Movies / 观影志）
 // 布局与功能对齐桌面「工作台前端代码」的观影应用：
 //   顶部导航：透明→毛玻璃滚动吸附，仅【搜索 / 批量导入 / 新建】三个入口
-//   Hero：全屏电影封面 + 渐变叠加，随机主推影片左下角展示「标签 / 标题 / 评分 / 年代 / 地区 / 时长 / 简介 / 查看详情」
+//   （2026-08-11 已移除顶部 Hero 推荐模块；观影记录整体上移，顶部留白避开 fixed 导航）
 //   观影记录：横向滚动海报（160×240 竖版），点击打开详情
 //   详情弹窗：顶部大封面 + 渐变 + 同步/编辑 按钮 + 2×2 键值对信息 + 双评分并排 + 个人短评 + 同步状态
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -112,231 +112,6 @@ function PosterCard({ movie, onClick, fluid }: { movie: Movie; onClick: () => vo
         </div>
       </div>
     </button>
-  )
-}
-
-// ─── 全屏 Hero：背景封面 + 渐变 + 左下角信息 ────────────────────────────────
-function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => void }) {
-  const [err, setErr] = useState(false)
-  const rating = movie.personal_rating ?? movie.third_party_rating
-  return (
-    <section
-      // 桌面：section 全屏高（避开 dock / 留白），内部 60/40 分栏
-      // 移动：section 撑满左右屏宽（破栏 -mx-4 抵消主区 padding），高度自适应
-      className="relative w-full overflow-hidden md:h-screen md:min-h-0 md:w-screen md:-ml-[120px] md:-mr-6 md:-mt-6"
-      key={movie.id /* 切换影片触发淡入动效 */}
-    >
-      <style>{`
-        @keyframes heroFadeIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
-        @keyframes heroInfoIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
-      {/* ─────────── 桌面布局：左 60% 宽幅背景图 + 右 40% 信息+简介+演员表 ─────────── */}
-      <div className="hidden md:grid md:h-full md:w-full md:grid-cols-[60%_40%]">
-        {/* 左：宽幅剧情照（backdrop）占 60% 宽，整段高度撑满；object-contain 保持原图比例（不裁切），左右/上下自然留黑 */}
-        <div className="relative h-full overflow-hidden bg-black">
-          {(movie.backdrop || movie.cover) && !err ? (
-            <img
-              src={movie.backdrop || movie.cover}
-              alt={movie.title}
-              onError={() => setErr(true)}
-              className="absolute inset-0 h-full w-full object-contain"
-              style={{ animation: 'heroFadeIn 0.8s ease-out' }}
-            />
-          ) : (
-            <div
-              className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#1a1a2e] via-[#0a0a14] to-[#0c0c14]"
-              style={{ animation: 'heroFadeIn 0.8s ease-out' }}
-            >
-              <span className="font-serif text-[12rem] text-white/8">{movie.title.slice(0, 1)}</span>
-            </div>
-          )}
-          {/* 渐变：右边缘加重，让左右衔接处过渡自然 */}
-        </div>
-
-        {/* 右：信息块（沿用现有设计风格）——自然 flow，不用 justify-between 撑开 */}
-        <div
-          className="relative flex h-full flex-col gap-5 overflow-y-auto bg-gradient-to-b from-black/70 via-black/60 to-black/70 px-10 py-12 backdrop-blur-sm"
-          style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
-        >
-          {/* 顶部：标题区（紧凑） */}
-          <div className="space-y-4">
-            {(movie.genre ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-3 text-xs text-white/60">
-                {(movie.genre ?? []).slice(0, 3).map((g, i) => (
-                  <span key={g}>
-                    {g}
-                    {i < Math.min(2, movie.genre.length - 1) && <span className="ml-3 text-white/30">·</span>}
-                  </span>
-                ))}
-              </div>
-            )}
-            <h1 className="font-serif text-4xl font-semibold text-white md:text-5xl">{movie.title}</h1>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
-              <Stars value={rating ?? 0} size={14} />
-              {movie.personal_rating !== null && movie.personal_rating !== undefined && (
-                <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
-              )}
-              {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
-                <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
-              )}
-              <span className="text-white/30">·</span>
-              <span>{movie.year || '—'}</span>
-              {movie.region && (
-                <>
-                  <span className="text-white/30">·</span>
-                  <span>{movie.region}</span>
-                </>
-              )}
-              {movie.duration > 0 && (
-                <>
-                  <span className="text-white/30">·</span>
-                  <span>{movie.duration}分钟</span>
-                </>
-              )}
-            </div>
-            {movie.review && (
-              <p className="line-clamp-2 max-w-xl text-sm text-white/60">{movie.review}</p>
-            )}
-            <button
-              onClick={onViewDetails}
-              className="rounded-full bg-white/10 px-5 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
-            >
-              查看详情
-            </button>
-          </div>
-
-          {/* 分隔线 + 简介区（始终占位，无数据显「暂无简介」一行灰字） */}
-          <div className="mt-auto space-y-5 border-t border-white/10 pt-5">
-            <div>
-              <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">简介</div>
-              {movie.overview ? (
-                <p className="line-clamp-5 text-sm leading-relaxed text-ink-soft">{movie.overview}</p>
-              ) : (
-                <p className="text-sm italic text-ink-mute">暂无简介（部署新版 Edge Function 后自动获取）</p>
-              )}
-            </div>
-
-            <div>
-              <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">演员表</div>
-              {(movie.cast ?? []).length > 0 ? (
-                <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-sm text-ink-soft">
-                  {(movie.cast ?? []).slice(0, 12).map((c, i) => (
-                    <span key={`${c}-${i}`}>
-                      {c}
-                      {i < Math.min(11, movie.cast.length - 1) && <span className="ml-3 text-white/25">·</span>}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm italic text-ink-mute">暂无演员表（部署新版 Edge Function 后自动获取）</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ─────────── 移动布局：cover（竖版海报）撑满 + 紧凑信息块 + 下方简介演员表 ─────────── */}
-      <div
-        className="relative -mx-4 md:hidden"
-        style={{ animation: 'heroFadeIn 0.8s ease-out' }}
-      >
-        {/* 封面：竖版海报 cover（移动不展示宽幅剧情照，因竖屏展示易模糊） */}
-        {(movie.cover || movie.backdrop) && !err ? (
-          <img
-            src={movie.cover || movie.backdrop}
-            alt={movie.title}
-            onError={() => setErr(true)}
-            className="h-[68vh] min-h-[480px] w-full object-cover"
-          />
-        ) : (
-          <div className="grid h-[68vh] min-h-[480px] w-full place-items-center bg-gradient-to-br from-[#1a1a2e] via-[#0a0a14] to-[#0c0c14]">
-            <span className="font-serif text-[10rem] text-white/8">{movie.title.slice(0, 1)}</span>
-          </div>
-        )}
-        {/* 渐变叠加：底部黑色让文字清晰 */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-
-        {/* 信息块：紧凑（短评→按钮间距从默认 mt-auto 缩为 mt-2） */}
-        <div
-          className="absolute inset-x-0 bottom-0 flex flex-col gap-2 px-4 pb-6"
-          style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
-        >
-          {(movie.genre ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-2 text-[11px] text-white/60">
-              {(movie.genre ?? []).slice(0, 3).map((g, i) => (
-                <span key={g}>
-                  {g}
-                  {i < Math.min(2, movie.genre.length - 1) && <span className="ml-2 text-white/30">·</span>}
-                </span>
-              ))}
-            </div>
-          )}
-          <h1 className="font-serif text-3xl font-semibold text-white">{movie.title}</h1>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-white/80">
-            <Stars value={rating ?? 0} size={12} />
-            {movie.personal_rating !== null && movie.personal_rating !== undefined && (
-              <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
-            )}
-            {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
-              <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
-            )}
-            <span className="text-white/30">·</span>
-            <span>{movie.year || '—'}</span>
-            {movie.region && (
-              <>
-                <span className="text-white/30">·</span>
-                <span>{movie.region}</span>
-              </>
-            )}
-            {movie.duration > 0 && (
-              <>
-                <span className="text-white/30">·</span>
-                <span>{movie.duration}分钟</span>
-              </>
-            )}
-          </div>
-          {/* 短评 + 查看详情 紧凑（间距 mt-2，远小于桌面 mt-auto） */}
-          {movie.review && (
-            <p className="line-clamp-2 text-xs text-white/60">{movie.review}</p>
-          )}
-          <div className="mt-2">
-            <button
-              onClick={onViewDetails}
-              className="rounded-full bg-white/10 px-4 py-1 text-xs text-white backdrop-blur-md transition hover:bg-white/20"
-            >
-              查看详情
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 移动端：section 下方追加简介+演员表（在主区 px-4 留白内） */}
-      <div className="space-y-5 px-4 pb-6 pt-4 md:hidden">
-        {(movie.overview || (movie.cast ?? []).length > 0) && (
-          <>
-            {movie.overview && (
-              <div>
-                <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">简介</div>
-                <p className="text-sm leading-relaxed text-ink-soft">{movie.overview}</p>
-              </div>
-            )}
-            {(movie.cast ?? []).length > 0 && (
-              <div>
-                <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">演员表</div>
-                <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-ink-soft">
-                  {(movie.cast ?? []).slice(0, 8).map((c, i) => (
-                    <span key={`m-${c}-${i}`}>
-                      {c}
-                      {i < Math.min(7, movie.cast.length - 1) && <span className="ml-2 text-white/25">·</span>}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </section>
   )
 }
 
@@ -1385,7 +1160,7 @@ export default function MoviesPage() {
   const { user } = useAuth()
   const userId = user?.id ?? 'anonymous'
   const [movies, setMovies] = useState<Movie[]>([])
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [selected, setSelected] = useState<Movie | null>(null)
@@ -1395,7 +1170,6 @@ export default function MoviesPage() {
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER)
   const [del, setDel] = useState<Movie | null>(null)
   const [scrolled, setScrolled] = useState(false)
-  const [heroIndex, setHeroIndex] = useState(0)
 
   // 加载 + Realtime
   useEffect(() => {
@@ -1487,25 +1261,6 @@ export default function MoviesPage() {
 
   const activeFilterCount =
     filter.genres.length + filter.regions.length + filter.years.length + filter.ratings.length
-
-  // Hero 轮播：随机选至多 5 部，每 8s 切换
-  const heroCandidates = useMemo(() => {
-    if (visible.length === 0) return []
-    const arr = [...visible]
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[arr[i], arr[j]] = [arr[j], arr[i]]
-    }
-    return arr.slice(0, Math.min(5, arr.length))
-  }, [visible])
-
-  useEffect(() => {
-    if (heroCandidates.length <= 1) return
-    const t = setInterval(() => setHeroIndex((i) => (i + 1) % heroCandidates.length), 8000)
-    return () => clearInterval(t)
-  }, [heroCandidates.length])
-
-  const hero = heroCandidates.length ? heroCandidates[heroIndex % heroCandidates.length] : null
 
   const persist = useCallback(
     async (movie: Movie) => {
@@ -1629,13 +1384,8 @@ export default function MoviesPage() {
         )}
       </nav>
 
-      {/* Hero */}
-      {!loading && hero && (
-        <Hero movie={hero} onViewDetails={() => openMovie(hero)} />
-      )}
-
-      {/* 观影记录：横向滚动 */}
-      <section className="px-6 py-10 md:px-12 md:py-14">
+      {/* 观影记录：横向滚动（顶部留白避开 fixed 导航） */}
+      <section className="px-6 pt-24 pb-10 md:px-12 md:pt-28 md:pb-14">
         <h2 className="mb-5 text-base font-semibold text-white/90">
           观影记录
           <span className="ml-2 text-sm font-normal text-white/40">{visible.length} 部</span>
