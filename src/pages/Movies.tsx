@@ -11,7 +11,7 @@ import { db } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage, type TMDBCandidate } from '../lib/tmdb'
+import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage, normalizeRegion, type TMDBCandidate } from '../lib/tmdb'
 import type { Movie } from '../types'
 
 const SRC_THIRD = '第三方'
@@ -1216,12 +1216,14 @@ export default function MoviesPage() {
       return
     }
     const rows = await db.movies.where('user_id').equals(userId).toArray()
-    rows.sort(
+    // 兼容历史数据：地区字段可能在旧版函数时期存成了英文，统一中文化（已是中文则直通）
+    const norm = rows.map((m) => ({ ...m, region: normalizeRegion(m.region ?? '') }))
+    norm.sort(
       (a, b) =>
         String(b.watched_at ?? '').localeCompare(String(a.watched_at ?? '')) ||
         b.created_at.localeCompare(a.created_at),
     )
-    setMovies(rows)
+    setMovies(norm)
     setLoading(false)
   }, [user, userId])
 

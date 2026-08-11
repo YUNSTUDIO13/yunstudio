@@ -26,6 +26,46 @@ const MOCK_BACKDROPS = [
 const MOCK_GENRES = ['剧情', '爱情', '科幻', '犯罪', '喜剧', '悬疑', '动画', '动作']
 const MOCK_REGIONS = ['美国', '英国', '法国', '日本', '韩国', '中国']
 
+// ─── 地区兜底中文化（防御：即使 Edge Function 部署旧版返回英文，前端也转中文）──
+const REGION_CN: Record<string, string> = {
+  US: '美国', GB: '英国', CN: '中国', HK: '中国香港', TW: '中国台湾', MO: '中国澳门',
+  JP: '日本', KR: '韩国', KP: '朝鲜', IN: '印度', FR: '法国', DE: '德国', IT: '意大利',
+  ES: '西班牙', PT: '葡萄牙', RU: '俄罗斯', CA: '加拿大', AU: '澳大利亚', NZ: '新西兰',
+  BR: '巴西', MX: '墨西哥', AR: '阿根廷', NL: '荷兰', BE: '比利时', SE: '瑞典',
+  NO: '挪威', DK: '丹麦', FI: '芬兰', IE: '爱尔兰', CH: '瑞士', AT: '奥地利',
+  PL: '波兰', CZ: '捷克', HU: '匈牙利', GR: '希腊', TR: '土耳其', IL: '以色列',
+  EG: '埃及', ZA: '南非', TH: '泰国', VN: '越南', MY: '马来西亚', SG: '新加坡',
+  ID: '印度尼西亚', PH: '菲律宾', PK: '巴基斯坦', IR: '伊朗',
+}
+const REGION_EN: Record<string, string> = {
+  'United States of America': '美国', 'United States': '美国', 'USA': '美国', 'U.S.': '美国',
+  'United Kingdom': '英国', 'China': '中国', 'Hong Kong': '中国香港', 'Taiwan': '中国台湾',
+  'Macao': '中国澳门', 'Macau': '中国澳门', 'Japan': '日本', 'South Korea': '韩国',
+  'North Korea': '朝鲜', 'India': '印度', 'France': '法国', 'Germany': '德国', 'Italy': '意大利',
+  'Spain': '西班牙', 'Portugal': '葡萄牙', 'Russia': '俄罗斯', 'Russian Federation': '俄罗斯',
+  'Canada': '加拿大', 'Australia': '澳大利亚', 'New Zealand': '新西兰', 'Brazil': '巴西',
+  'Mexico': '墨西哥', 'Argentina': '阿根廷', 'Chile': '智利', 'Netherlands': '荷兰',
+  'Belgium': '比利时', 'Sweden': '瑞典', 'Norway': '挪威', 'Denmark': '丹麦', 'Finland': '芬兰',
+  'Ireland': '爱尔兰', 'Switzerland': '瑞士', 'Austria': '奥地利', 'Poland': '波兰',
+  'Czech Republic': '捷克', 'Hungary': '匈牙利', 'Greece': '希腊', 'Turkey': '土耳其',
+  'Israel': '以色列', 'Egypt': '埃及', 'South Africa': '南非', 'Thailand': '泰国',
+  'Vietnam': '越南', 'Malaysia': '马来西亚', 'Singapore': '新加坡',
+  'Indonesia': '印度尼西亚', 'Philippines': '菲律宾', 'Pakistan': '巴基斯坦', 'Iran': '伊朗',
+}
+/** 任意外文地区 → 中文（精确 → 大小写不敏感 → ISO 码 → 直通中文） */
+export function normalizeRegion(raw: string): string {
+  if (!raw) return ''
+  const r = raw.trim()
+  if (REGION_EN[r]) return REGION_EN[r]
+  const rLow = r.toLowerCase()
+  const hit = (Object.keys(REGION_EN) as string[]).find((k) => k.toLowerCase() === rLow)
+  if (hit) return REGION_EN[hit]
+  const iso = REGION_CN[r.toUpperCase()]
+  if (iso) return iso
+  // 已是中文则直通
+  return r
+}
+
 export interface TMDBCandidate {
   tmdb_id: number
   title: string
@@ -82,7 +122,7 @@ export async function fetchMovieByTitle(title: string, year: string): Promise<TM
         backdrop,
         third_party_rating: typeof data.vote_average === 'number' ? data.vote_average : null,
         genre: Array.isArray(data.genre) ? data.genre : [],
-        region: data.origin_country ?? '',
+        region: normalizeRegion(data.origin_country ?? ''),
         duration: typeof data.runtime === 'number' ? data.runtime : 0,
         year: data.release_date ? Number(String(data.release_date).slice(0, 4)) : Number(year) || 0,
         cover_failed: !cover,
