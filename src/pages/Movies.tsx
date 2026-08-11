@@ -1247,12 +1247,53 @@ function BatchUpdateModal({
     { title: string; status: 'updated' | 'nochange' | 'missing' | 'error'; msg?: string }[]
   >([])
 
-  /** 现有影片索引：去重键 → Movie */
+  /** 现有影片索引：去重键（名称+年代）→ Movie */
   const index = useMemo(() => {
     const m = new Map<string, Movie>()
     for (const mv of movies) m.set(movieKey(mv.title, mv.year), mv)
     return m
   }, [movies])
+
+  /** 现有影片索引：仅按名称（不敏感）→ 同名影片列表（用于「名称+年代」未中时的回退匹配） */
+  const byTitle = useMemo(() => {
+    const m = new Map<string, Movie[]>()
+    for (const mv of movies) {
+      const k = mv.title.trim().toLowerCase()
+      if (!m.has(k)) m.set(k, [])
+      m.get(k)!.push(mv)
+    }
+    return m
+  }, [movies])
+
+  /**
+   * 解析某行要更新的目标影片：
+   *  1) 精确（名称+年代）命中 → 直接用；
+   *  2) 否则仅按名称回退：库里同名唯一才认（填「导入时年代被 TMDB 改写」导致年代对不上的坑），
+   *     并在 note 标注年份差异供复核；
+   *  3) 同名多部 或 库中无同名 → 匹配不到（保持「绝不新建」铁律，跳过）。
+   */
+  const resolveTarget = (r: { title: string; year: string }): {
+    movie: Movie | null
+    byTitleOnly: boolean
+    note: string
+  } => {
+    const exact = index.get(movieKey(r.title, r.year))
+    if (exact) return { movie: exact, byTitleOnly: false, note: '' }
+    const sameTitle = byTitle.get(r.title.trim().toLowerCase()) ?? []
+    if (sameTitle.length === 1) {
+      const m = sameTitle[0]
+      return {
+        movie: m,
+        byTitleOnly: true,
+        note: `年份不一致（表 ${r.year || '—'} / 库 ${m.year || '—'}）·已按名称匹配`,
+      }
+    }
+    return {
+      movie: null,
+      byTitleOnly: false,
+      note: sameTitle.length > 1 ? '库中同名多部，无法判定年份，跳过' : '库中无同名影片，跳过',
+    }
+  }
 
   const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const text = e.clipboardData.getData('text/plain')
@@ -1279,10 +1320,10 @@ function BatchUpdateModal({
     setRows(parsed)
   }
 
-  // 预判：能匹配到现有影片的行数
+  // 预判：能匹配到现有影片的行数（精确 + 仅名称回退）
   const matchCount = useMemo(
-    () => rows.filter((r) => index.has(movieKey(r.title, r.year))).length,
-    [rows, index],
+    () => rows.filter((r) => resolveTarget(r).movie).length,
+    [rows, index, byTitle],
   )
 
   const startUpdate = async () => {
@@ -1292,10 +1333,10 @@ function BatchUpdateModal({
     setResults([])
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i]
-      const target = index.get(movieKey(r.title, r.year))
+      const { movie: target, byTitleOnly, note } = resolveTarget(r)
       // 匹配不到 → 跳过，绝不新建（皇上明确要求）
       if (!target) {
-        setResults((p) => [...p, { title: `${r.title}（${r.year || '—'}）`, status: 'missing' }])
+        setResults((p) => [...p, { title: `${r.title}（${r.year || '—'}）`, status: 'missing', msg: note }])
         setProgress({ done: i + 1, total: rows.length })
         continue
       }
@@ -1317,7 +1358,10 @@ function BatchUpdateModal({
         }
         await db.movies.put(updated)
         await enqueueAndMaybeFlush('movies', 'update', updated.id, updated)
-        setResults((p) => [...p, { title: target.title, status: 'updated' }])
+        setResults((p) => [
+          ...p,
+          { title: target.title, status: 'updated', msg: byTitleOnly ? note : undefined },
+        ])
       } catch (e) {
         setResults((p) => [
           ...p,
@@ -1370,8 +1414,9 @@ function BatchUpdateModal({
               <span className="text-ink-soft">个人评分</span>、<span className="text-ink-soft">观影时间</span>
             </p>
             <p className="text-accent/80">
-              仅按「名称 + 年代」匹配库中已有影片，更新 <span className="text-ink-soft">个人评分</span> 与{' '}
-              <span className="text-ink-soft">观影时间</span> 两个字段；匹配不到的行直接跳过，
+              优先按「名称 + 年代」匹配库中已有影片，更新 <span className="text-ink-soft">个人评分</span> 与{' '}
+              <span className="text-ink-soft">观影时间</span> 两个字段；若年代与库中（TMDB）不一致，
+              会自动回退「仅按名称」匹配（库里同名唯一才认）。匹配不到的行直接跳过，
               <span className="text-ink-soft">不会新建任何影片</span>。某列留空则保留该影片原值。
             </p>
           </div>
@@ -1421,7 +1466,8 @@ function BatchUpdateModal({
               </thead>
               <tbody>
                 {rows.slice(0, 50).map((r, i) => {
-                  const hit = index.has(movieKey(r.title, r.year))
+                  const res = resolveTarget(r)
+                  const hit = !!res.movie
                   return (
                     <tr key={i} className="border-b border-white/5 last:border-b-0 hover:bg-white/[0.03]">
                       <td className="px-3 py-2 text-center text-[11px] text-ink-mute">{i + 1}</td>
@@ -1429,8 +1475,8 @@ function BatchUpdateModal({
                       <td className="px-3 py-2 text-ink-mute">{r.year || '—'}</td>
                       <td className="px-3 py-2 text-ink-mute">{parseRating(r.rating) ?? '—'}</td>
                       <td className="px-3 py-2 text-ink-mute">{normalizeDate(r.watchedAt) || '—'}</td>
-                      <td className={`px-3 py-2 text-[11px] ${hit ? 'text-emerald-300' : 'text-amber-300'}`}>
-                        {hit ? '更新' : '库中无·跳过'}
+                      <td className={`px-3 py-2 text-[11px] ${hit ? (res.byTitleOnly ? 'text-amber-300' : 'text-emerald-300') : 'text-amber-300'}`}>
+                        {hit ? (res.byTitleOnly ? '按名称匹配' : '更新') : '库中无·跳过'}
                       </td>
                     </tr>
                   )
