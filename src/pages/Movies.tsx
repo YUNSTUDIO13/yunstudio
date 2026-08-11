@@ -1226,7 +1226,6 @@ export default function MoviesPage() {
   const [showFilter, setShowFilter] = useState(false)
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER)
   const [del, setDel] = useState<Movie | null>(null)
-  const [scrolled, setScrolled] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
   const isMobile = useMediaQuery('(max-width: 767px)')
   const [showFunc, setShowFunc] = useState(false)
@@ -1288,14 +1287,6 @@ export default function MoviesPage() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [user, userId])
-
-  // 滚动监听（导航透明→毛玻璃）
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 30)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
 
   const reload = useCallback(async () => {
     if (!user) {
@@ -1414,14 +1405,8 @@ export default function MoviesPage() {
 
   return (
     <div className="relative w-full">
-      {/* 顶部导航：透明 → 毛玻璃滚动吸附（仅 3 个入口：搜索 / 批量导入 / 新建） */}
-      <nav
-        className={`fixed left-0 right-0 top-0 z-30 transition-all duration-300 ${
-          scrolled
-            ? 'bg-black/40 backdrop-blur-xl border-b border-white/10'
-            : 'bg-transparent border-b border-transparent'
-        }`}
-      >
+      {/* 顶部导航：始终透明，无滚动磨砂底色（入口：搜索 / 筛选 / 功能） */}
+      <nav className="fixed left-0 right-0 top-0 z-30 bg-transparent border-b border-transparent">
         <div className="flex items-center justify-between gap-2.5 px-[10px] py-4 md:pl-[120px] md:pr-12">
           {/* 左：页面标题（与右侧按钮同 y 左对齐） */}
           <h1 className="flex items-baseline gap-1 text-base font-semibold text-white/90">
