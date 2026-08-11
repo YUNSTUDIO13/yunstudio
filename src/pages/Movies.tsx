@@ -12,6 +12,7 @@ import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage, normalizeRegion, type TMDBCandidate } from '../lib/tmdb'
+import { useMediaQuery } from '../lib/useMediaQuery'
 import type { Movie } from '../types'
 
 const SRC_THIRD = '第三方'
@@ -163,15 +164,13 @@ function StillThumb({
 }
 
 // ─── 详情弹窗（顶部封面 + 渐变 + 同步/编辑 按钮 + 键值对 + 双评分 + 短评） ───
-function MovieModal({
+function MovieDetailPanel({
   movie,
-  onClose,
   onSave,
   onSync,
   onDelete,
 }: {
   movie: Movie
-  onClose: () => void
   onSave: (m: Movie) => void
   onSync: (m: Movie) => Promise<Movie>
   onDelete: (m: Movie) => void
@@ -181,19 +180,8 @@ function MovieModal({
   const [syncing, setSyncing] = useState(false)
   const [lightbox, setLightbox] = useState<string | null>(null)
 
-  // 自实现全屏弹窗：锁滚动 + ESC 关闭（替代原 <Modal>）
-  useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = prev
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [onClose])
+  // 切换观影对象（PC 分栏点击不同卡片 / 移动端重开）时重置草稿
+  useEffect(() => { setDraft(movie) }, [movie])
 
   const handleSync = async () => {
     setSyncing(true)
@@ -210,22 +198,6 @@ function MovieModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      {/* 浮动关闭按钮 */}
-      <button
-        onClick={onClose}
-        aria-label="关闭"
-        className="fixed right-6 top-6 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
-      >
-        ✕
-      </button>
-
-      {/* 主体：无外框，居中且受最大宽度约束 */}
       <div
         className="mx-auto max-w-3xl pb-24"
         onClick={(e) => e.stopPropagation()}
@@ -506,7 +478,92 @@ function MovieModal({
           </div>
         </div>
       </div>
+    )
+  }
+
+function MovieModal({
+  movie,
+  onClose,
+  onSave,
+  onSync,
+  onDelete,
+}: {
+  movie: Movie
+  onClose: () => void
+  onSave: (m: Movie) => void
+  onSync: (m: Movie) => Promise<Movie>
+  onDelete: (m: Movie) => void
+}) {
+  // 全屏弹窗：锁滚动 + ESC 关闭（移动端 / 无分栏时复用）
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      {/* 浮动关闭按钮 */}
+      <button
+        onClick={onClose}
+        aria-label="关闭"
+        className="fixed right-6 top-6 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
+      >
+        ✕
+      </button>
+      <MovieDetailPanel movie={movie} onSave={onSave} onSync={onSync} onDelete={onDelete} />
     </div>
+  )
+}
+
+function MovieList({
+  visible,
+  movies,
+  onOpen,
+}: {
+  visible: Movie[]
+  movies: Movie[]
+  onOpen: (m: Movie) => void
+}) {
+  if (visible.length === 0) {
+    return (
+      <div className="py-16 text-center text-sm text-white/50">
+        {movies.length === 0
+          ? '还没有观影记录。点击右上角「新建」添加，或用「批量导入」一次加入多部。'
+          : '没有匹配的影片。'}
+      </div>
+    )
+  }
+  return (
+    <>
+      {/* 桌面：横向滚动轮播 */}
+      <div
+        className="hidden gap-4 overflow-x-auto pb-4 md:-mx-12 md:flex md:px-12"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}
+      >
+        {visible.map((m) => (
+          <PosterCard key={m.id} movie={m} onClick={() => onOpen(m)} />
+        ))}
+      </div>
+      {/* 手机：2 列网格，上下滚动 */}
+      <div className="grid grid-cols-2 gap-4 md:hidden">
+        {visible.map((m) => (
+          <PosterCard key={m.id} movie={m} fluid onClick={() => onOpen(m)} />
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -1170,6 +1227,19 @@ export default function MoviesPage() {
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER)
   const [del, setDel] = useState<Movie | null>(null)
   const [scrolled, setScrolled] = useState(false)
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  const [showFunc, setShowFunc] = useState(false)
+  const funcRef = useRef<HTMLDivElement>(null)
+
+  // 功能弹窗：点击外部关闭
+  useEffect(() => {
+    if (!showFunc) return
+    function onDoc(e: MouseEvent) {
+      if (funcRef.current && !funcRef.current.contains(e.target as Node)) setShowFunc(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [showFunc])
 
   // 加载 + Realtime
   useEffect(() => {
@@ -1190,7 +1260,15 @@ export default function MoviesPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'movies', filter: `user_id=eq.${userId}` },
-        () => {
+        (payload: { eventType?: string; old?: { id?: string } }) => {
+          // 显式删除事件：按 id 精确删本地（跨端删除一致性），绝不靠"猜孤儿"
+          if (payload.eventType === 'DELETE' && payload.old?.id) {
+            void (async () => {
+              await db.movies.delete(payload.old!.id as string)
+              await reload()
+            })()
+            return
+          }
           void (async () => {
             await seedFromServer('movies', userId)
             await reload()
@@ -1275,7 +1353,8 @@ export default function MoviesPage() {
 
   const handleSaveMovie = (updated: Movie) => {
     void persist({ ...updated, updated_at: new Date().toISOString() })
-    setSelected(null)
+    // PC 分栏：保存后保持详情栏打开（刷新草稿为最新）；移动端：关闭弹窗
+    setSelected(isMobile ? null : updated)
   }
 
   const handleNewMovie = (m: Movie) => {
@@ -1334,44 +1413,75 @@ export default function MoviesPage() {
         }`}
       >
         <div className="flex items-center justify-end gap-2.5 px-6 py-4 md:px-12">
+          {/* 搜索 */}
+          <button
+            onClick={() => setShowSearch((s) => !s)}
+            aria-label="搜索"
+            className="grid h-9 w-9 place-items-center rounded-full bg-white/10 backdrop-blur-md transition hover:bg-white/20"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+          {/* 筛选 */}
+          <button
+            onClick={() => setShowFilter(true)}
+            aria-label="筛选"
+            className={`relative grid h-9 w-9 place-items-center rounded-full backdrop-blur-md transition ${
+              activeFilterCount ? 'bg-accent/20 text-accent' : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            {activeFilterCount > 0 && (
+              <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-black">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          {/* 功能（圆形按钮，点击展开批量导入 / 新建） */}
+          <div className="relative" ref={funcRef}>
             <button
-              onClick={() => setShowFilter(true)}
-              aria-label="筛选"
-              className={`relative grid h-9 w-9 place-items-center rounded-full backdrop-blur-md transition ${
-                activeFilterCount ? 'bg-accent/20 text-accent' : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-              {activeFilterCount > 0 && (
-                <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-black">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setShowSearch((s) => !s)}
-              aria-label="搜索"
+              onClick={() => setShowFunc((f) => !f)}
+              aria-label="功能"
+              aria-haspopup="menu"
+              aria-expanded={showFunc}
               className="grid h-9 w-9 place-items-center rounded-full bg-white/10 backdrop-blur-md transition hover:bg-white/20"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <circle cx="12" cy="5" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="12" cy="19" r="1.6" />
               </svg>
             </button>
-            <button
-              onClick={() => setShowBatch(true)}
-              className="rounded-full bg-white/10 px-4 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
-            >
-              批量导入
-            </button>
-            <button
-              onClick={() => setShowNew(true)}
-              className="rounded-full bg-yellow-400 px-4 py-1.5 text-sm font-medium text-black transition hover:bg-yellow-300"
-            >
-              + 新建
-            </button>
+            {showFunc && (
+              <div className="animate-popover absolute right-0 top-11 z-40 w-40 overflow-hidden rounded-xl border border-white/10 bg-[#15151c]/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                <button
+                  onClick={() => { setShowFunc(false); setShowBatch(true) }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/85 transition hover:bg-white/10"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  批量导入
+                </button>
+                <button
+                  onClick={() => { setShowFunc(false); setShowNew(true) }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/85 transition hover:bg-white/10"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  新建
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         {showSearch && (
           <div className="border-t border-white/10 px-6 py-3 md:px-12">
@@ -1386,48 +1496,53 @@ export default function MoviesPage() {
         )}
       </nav>
 
-      {/* 观影记录：横向滚动（顶部留白避开 fixed 导航） */}
-      <section className="px-6 pt-24 pb-10 md:px-12 md:pt-28 md:pb-14">
-        <h2 className="mb-5 text-base font-semibold text-white/90">
-          观影记录
-          <span className="ml-2 text-sm font-normal text-white/40">{visible.length} 部</span>
-        </h2>
-        {visible.length === 0 ? (
-          <div className="py-16 text-center text-sm text-white/50">
-            {movies.length === 0
-              ? '还没有观影记录。点击右上角「新建」添加，或用「批量导入」一次加入多部。'
-              : '没有匹配的影片。'}
-          </div>
-        ) : (
-          <>
-            {/* 桌面：横向滚动轮播 */}
-            <div
-              className="hidden gap-4 overflow-x-auto pb-4 md:-mx-12 md:flex md:px-12"
-              style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}
+      {/* 观影记录：PC 分栏（左列表压缩 · 右详情 7:3） / 移动端全屏弹窗 */}
+      {selected && !isMobile ? (
+        <div className="grid grid-cols-[7fr_3fr]">
+          <section className="px-6 pb-10 pt-24 md:px-12 md:pb-14 md:pt-28">
+            <h2 className="mb-5 text-base font-semibold text-white/90">
+              观影记录
+              <span className="ml-2 text-sm font-normal text-white/40">{visible.length} 部</span>
+            </h2>
+            <MovieList visible={visible} movies={movies} onOpen={openMovie} />
+          </section>
+          <aside className="animate-slide-in sticky top-[72px] flex h-[calc(100vh-72px)] flex-col border-l border-white/10 bg-black/40 backdrop-blur-xl">
+            <button
+              onClick={() => setSelected(null)}
+              aria-label="关闭"
+              className="absolute right-5 top-5 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
             >
-              {visible.map((m) => (
-                <PosterCard key={m.id} movie={m} onClick={() => openMovie(m)} />
-              ))}
+              ✕
+            </button>
+            <div className="flex-1 overflow-y-auto">
+              <MovieDetailPanel
+                movie={selected}
+                onSave={handleSaveMovie}
+                onSync={handleSync}
+                onDelete={(m) => setDel(m)}
+              />
             </div>
-            {/* 手机：2 列网格，上下滚动 */}
-            <div className="grid grid-cols-2 gap-4 md:hidden">
-              {visible.map((m) => (
-                <PosterCard key={m.id} movie={m} fluid onClick={() => openMovie(m)} />
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* 弹窗 */}
-      {selected && (
-        <MovieModal
-          movie={selected}
-          onClose={() => setSelected(null)}
-          onSave={handleSaveMovie}
-          onSync={handleSync}
-          onDelete={(m) => setDel(m)}
-        />
+          </aside>
+        </div>
+      ) : (
+        <>
+          <section className="px-6 pt-24 pb-10 md:px-12 md:pt-28 md:pb-14">
+            <h2 className="mb-5 text-base font-semibold text-white/90">
+              观影记录
+              <span className="ml-2 text-sm font-normal text-white/40">{visible.length} 部</span>
+            </h2>
+            <MovieList visible={visible} movies={movies} onOpen={openMovie} />
+          </section>
+          {selected && (
+            <MovieModal
+              movie={selected}
+              onClose={() => setSelected(null)}
+              onSave={handleSaveMovie}
+              onSync={handleSync}
+              onDelete={(m) => setDel(m)}
+            />
+          )}
+        </>
       )}
       {showNew && (
         <NewMovieModal userId={userId} onClose={() => setShowNew(false)} onSave={handleNewMovie} />

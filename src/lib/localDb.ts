@@ -178,48 +178,26 @@ export async function localDelete(table: EntityTable, id: string): Promise<void>
   await tableRef(table).delete(id)
 }
 
-// 带 user_id 列的实体表：拉取时可安全按 user_id 回收孤儿行（云端已删除、本地残留）。
-// tag_values 无 user_id（归属 category_id），不参与回收，避免误删他人数据。
-const TABLES_WITH_USER_ID = new Set<EntityTable>([
-  'todos',
-  'requirements',
-  'sprints',
-  'bugs',
-  'tag_categories',
-  'notifications',
-  'apps',
-  'movies',
-])
-
 /**
  * 把云端行合并进本地（按 id upsert）。skipIds 里的本地未同步行不覆盖，保留用户离线编辑。
  *
- * 关键修复：同时删除「本地存在、云端已不存在、且非待同步」的孤儿行 —— 即回收被其它端删除的数据。
- * 否则一旦 Realtime 删除事件漏收（移动端后台挂起 / 网络抖动 / 重连间隙，极常见），
- * 刷新后本地脏行会永久残留，表现为"另一台设备删了，这台刷新还在"。
+ * ⚠️ 铁律（2026-08-11 修正，根治「刷新丢失」）：
+ * 本函数【绝不删除】任何本地行。任何删除都必须由显式操作触发——
+ *   ① 用户主动删除（confirmDelete → db.xxx.delete + outbox delete）；
+ *   ② Realtime 的 DELETE 事件（订阅回调里按 payload.old.id 精确删除）。
+ * 早期版本在此做「孤儿回收」（云端没有就删本地），看似能同步其它端的删除，
+ * 但在本地优先架构下极其危险：刷新时 seedFromServer 拉云端，若刚加的电影因 outbox 补传时序 /
+ * RLS 暂未进云端，或云端查询瞬间未返回该行，本地副本就被当孤儿删光——表现为「刷新必丢失」。
+ * 跨端删除一致性改由 ② 显式 Realtime DELETE 兜底，不再用「猜孤儿」的方式。
  */
 export async function mergeServerIntoLocal(
   table: EntityTable,
   serverRows: Record<string, unknown>[],
   skipIds: Set<string>,
-  userId: string,
+  _userId: string,
 ): Promise<void> {
-  // 云端无数据（表空或查询未返回任何行）：不合并、不回收，避免误删本地全部。
-  // 否则在「本地有数据、云端表刚建还是空」时，会把所有本地行当孤儿删光（表现为刷新丢失）。
-  if (!serverRows.length) return
   const toPut = serverRows.filter((r) => !skipIds.has(String(r.id)))
   if (toPut.length) await tableRef(table).bulkPut(toPut as never)
-
-  if (!TABLES_WITH_USER_ID.has(table)) return
-  const serverIds = new Set(serverRows.map((r) => String(r.id)))
-  const localRows = await localAll<Record<string, unknown>>(table, userId)
-  const orphans = localRows
-    .filter(
-      (r) =>
-        !serverIds.has(String(r.id)) && !skipIds.has(String(r.id)),
-    )
-    .map((r) => String(r.id))
-  if (orphans.length) await tableRef(table).bulkDelete(orphans as never)
 }
 
 /** 入队一条待同步操作 */
