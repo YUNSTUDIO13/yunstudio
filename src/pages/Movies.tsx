@@ -6,7 +6,7 @@
 //   详情弹窗：顶部大封面 + 渐变 + 同步/编辑 按钮 + 2×2 键值对信息 + 双评分并排 + 个人短评 + 同步状态
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ClipboardEvent } from 'react'
-import { Modal, Field, Input, Textarea, Button, ConfirmDialog } from '../components/ui'
+import { Modal, Field, Input, Textarea, Button, ConfirmDialog, lockBodyScroll, unlockBodyScroll, forceUnlockBodyScroll } from '../components/ui'
 import { db, pendingRowIds } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush, setSyncStatusHandler } from '../lib/sync'
 import { supabase } from '../lib/supabase'
@@ -561,19 +561,18 @@ function MovieModal({
   onDelete: (m: Movie) => void
 }) {
   // 全屏弹窗：锁滚动 + ESC 关闭（移动端 / 无分栏时复用）。
-  // 仅在挂载时加锁一次、卸载时解锁（依赖 []），用 ref 持有最新 onClose，避免 onClose 不稳定导致
-  // effect 反复重跑、cleanup 把 body.overflow 恢复成被污染的 'hidden' 而锁死全站滚动。
+  // 用 ref 持有最新 onClose；滚动锁走全局计数器（lockBodyScroll/unlockBodyScroll），
+  // 开弹窗 +1、关弹窗 -1，永远还原默认空串，杜绝 prev 污染导致的全站锁死。
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onCloseRef.current()
     }
     window.addEventListener('keydown', onKey)
+    lockBodyScroll()
     return () => {
-      document.body.style.overflow = prev
+      unlockBodyScroll()
       window.removeEventListener('keydown', onKey)
     }
   }, [])
@@ -1777,6 +1776,9 @@ export default function MoviesPage() {
     return () => { cancelled = true; window.clearInterval(timer) }
   }, [userId])
 
+  // 安全网：本页卸载（切换模块）时强制释放任何残留的滚动锁，避免跨路由后全站仍被锁死。
+  useEffect(() => () => { forceUnlockBodyScroll() }, [])
+
   useEffect(() => {
     if (!user) return
     const channel = supabase
@@ -1884,14 +1886,27 @@ export default function MoviesPage() {
   )
 
   const handleSaveMovie = (updated: Movie) => {
-    void persist({ ...updated, updated_at: new Date().toISOString() })
+    void (async () => {
+      try {
+        await persist({ ...updated, updated_at: new Date().toISOString() })
+      } catch (e) {
+        console.error('[movies] 保存落库失败:', e)
+      }
+    })()
     // PC 分栏：保存后保持详情栏打开（刷新草稿为最新）；移动端：关闭弹窗
     setSelected(isMobile ? null : updated)
   }
 
   const handleNewMovie = (m: Movie) => {
-    void persist(m)
+    // 先关弹窗（零阻塞、任何情况下都秒关），再后台落库；落库失败也不影响已关闭的弹窗。
     setShowNew(false)
+    void (async () => {
+      try {
+        await persist(m)
+      } catch (e) {
+        console.error('[movies] 新建落库失败:', e)
+      }
+    })()
   }
 
   const handleSync = async (m: Movie): Promise<Movie> => {

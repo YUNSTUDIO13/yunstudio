@@ -447,6 +447,26 @@ export function IconButton({
   )
 }
 
+/* ----------------------- 全局滚动锁（计数器式，永不粘连） ----------------------- */
+// 根因：旧的「记录 prev 再还原」方式在弹窗重渲染/嵌套场景下，cleanup 可能把 body.overflow
+// 还原成已被污染的 'hidden'，导致全站滚动永久锁死（删除/新建后列表滑不动）。
+// 计数器式：开弹窗 +1，关弹窗 -1；仅当 0→1 时置 hidden、1→0 时还原为默认空串，
+// 不依赖任何"上一次快照"，彻底杜绝 prev 污染与嵌套/重渲染导致的粘连。
+let _scrollLockCount = 0
+export function lockBodyScroll() {
+  _scrollLockCount += 1
+  if (_scrollLockCount === 1) document.body.style.overflow = 'hidden'
+}
+export function unlockBodyScroll() {
+  _scrollLockCount = Math.max(0, _scrollLockCount - 1)
+  if (_scrollLockCount === 0) document.body.style.overflow = ''
+}
+/** 兜底：任何时刻强制解锁（异常恢复用，不应常态调用） */
+export function forceUnlockBodyScroll() {
+  _scrollLockCount = 0
+  document.body.style.overflow = ''
+}
+
 /* ----------------------------- 弹窗 Modal ----------------------------- */
 export function Modal({
   open,
@@ -463,25 +483,24 @@ export function Modal({
   footer?: ReactNode
   maxWidth?: string
 }) {
-  // 用 ref 持有最新 onClose，避免把 onClose 放进依赖导致 open=true 期间 effect 反复重跑，
-  // 进而使 cleanup 把 body.overflow 恢复成已被污染的 'hidden' 而永远锁死滚动（删除后全站滑不动的根因）。
+  // 用 ref 持有最新 onClose，避免把 onClose 放进依赖导致 open=true 期间 effect 反复重跑。
   const onCloseRef = useRef(onClose)
   useEffect(() => {
     onCloseRef.current = onClose
   }, [onClose])
 
+  // 滚动锁：计数器式（见 lockBodyScroll/unlockBodyScroll），开弹窗 +1、关弹窗 -1，
+  // 永不依赖"记录上一次的 overflow"，彻底杜绝 prev 污染导致的全站锁死。
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onCloseRef.current()
     }
     window.addEventListener('keydown', onKey)
-    // 锁定背景滚动（仅在本次加锁前记录原始值，cleanup 时还原，杜绝 prev 污染）
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    lockBodyScroll()
     return () => {
       window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
+      unlockBodyScroll()
     }
   }, [open])
 
