@@ -120,12 +120,12 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
       {/* 左下角信息块：左封面（backdrop 优先，否则 cover）+ 右文字块 */}
       <div className="absolute inset-x-0 bottom-0 px-6 pb-12 md:px-0 md:pl-[104px] md:pr-12 md:pb-20">
         <div
-          className="flex max-w-4xl items-end gap-5"
+          className="flex max-w-4xl items-start gap-5"
           style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
         >
-          {/* 左侧封面：与「观影记录」海报同 2:3 竖版比例（180×270），object-cover 居中裁剪宽幅图 */}
+          {/* 左侧封面：与「观影记录」海报同 2:3 竖版比例（120×180），顶部对齐「爱情」标签行，整体高度不超过标题/评分/简介/按钮的信息块整段 */}
           {(movie.backdrop || movie.cover) && (
-            <div className="relative hidden h-[270px] w-[180px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block">
+            <div className="relative hidden aspect-[2/3] w-[120px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block">
               <img
                 src={movie.backdrop || movie.cover}
                 alt={movie.title}
@@ -134,7 +134,7 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
             </div>
           )}
           {/* 右侧文字块 */}
-          <div className="flex-1 space-y-3 pb-1">
+          <div className="flex-1 space-y-3">
             {(movie.genre ?? []).length > 0 && (
               <div className="flex flex-wrap gap-3 text-xs text-white/60">
                 {(movie.genre ?? []).slice(0, 3).map((g, i) => (
