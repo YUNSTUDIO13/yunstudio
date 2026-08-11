@@ -558,7 +558,7 @@ function MovieList({
         ))}
       </div>
       {/* 手机：2 列网格，上下滚动 */}
-      <div className="grid grid-cols-3 gap-3 md:hidden">
+      <div className="grid grid-cols-2 gap-2 md:hidden">
         {visible.map((m) => (
           <PosterCard key={m.id} movie={m} fluid onClick={() => onOpen(m)} />
         ))}
@@ -1422,7 +1422,7 @@ export default function MoviesPage() {
             : 'bg-transparent border-b border-transparent'
         }`}
       >
-        <div className="flex items-center justify-between gap-2.5 px-3 py-4 md:px-12">
+        <div className="flex items-center justify-between gap-2.5 px-3 py-4 md:pl-[120px] md:pr-12">
           {/* 左：页面标题（与右侧按钮同 y 左对齐） */}
           <h1 className="flex items-baseline gap-1 text-base font-semibold text-white/90">
             观影记录
@@ -1502,7 +1502,7 @@ export default function MoviesPage() {
           </div>
         </div>
         {showSearch && (
-          <div className="border-t border-white/10 px-3 py-3 md:px-12">
+          <div className="border-t border-white/10 px-3 py-3 md:pl-[120px] md:pr-12">
             <Input
               autoFocus
               value={search}
@@ -1515,7 +1515,7 @@ export default function MoviesPage() {
       </nav>
 
       {syncError && (
-        <div className="px-3 pt-[80px] md:px-12 md:pt-[92px]">
+        <div className="px-3 pt-[80px] md:pl-[120px] md:pr-12 md:pt-[92px]">
           <div className="mb-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
             {syncError}
           </div>
@@ -1525,7 +1525,7 @@ export default function MoviesPage() {
       {/* 观影记录：PC 分栏（左列表压缩 · 右详情 7:3） / 移动端全屏弹窗 */}
       {selected && !isMobile ? (
         <div className="grid grid-cols-[7fr_3fr]">
-          <section className="px-3 pb-10 pt-[80px] md:px-12 md:pb-14 md:pt-[92px]">
+          <section className="px-3 pb-10 pt-[80px] md:pr-12 md:pb-14 md:pt-[92px]">
             <MovieList visible={visible} movies={movies} onOpen={openMovie} />
           </section>
           <aside className="animate-slide-in sticky top-[68px] flex h-[calc(100vh-68px)] flex-col border-l border-white/10 bg-black/40 backdrop-blur-xl">
@@ -1548,7 +1548,7 @@ export default function MoviesPage() {
         </div>
       ) : (
         <>
-          <section className="px-3 pt-[80px] pb-10 md:px-12 md:pb-14 md:pt-[92px]">
+          <section className="px-3 pt-[80px] pb-10 md:pr-12 md:pb-14 md:pt-[92px]">
             <MovieList visible={visible} movies={movies} onOpen={openMovie} />
           </section>
           {selected && (

@@ -194,10 +194,26 @@ export async function mergeServerIntoLocal(
   table: EntityTable,
   serverRows: Record<string, unknown>[],
   skipIds: Set<string>,
-  _userId: string,
+  userId: string,
 ): Promise<void> {
+  const serverIds = new Set(serverRows.map((r) => String(r.id)))
+  // outbox 中尚待上传的行（本地新建/编辑/删除）一律不碰，避免「刷新丢失新建」回归
+  const pending = await pendingRowIds(table)
+
+  // 1) 云端有 → upsert 进本地（skipIds 里的本地编辑不覆盖）
   const toPut = serverRows.filter((r) => !skipIds.has(String(r.id)))
   if (toPut.length) await tableRef(table).bulkPut(toPut as never)
+
+  // 2) 跨端删除一致性：本地有、云端没有、且不在 outbox（非本地未同步新建）→ 清理本地。
+  //    修复「手机删了、PC 刷新后还在」：无痕模式正常正是因为本地无数据、直接 seed 云端（已删除）。
+  //    PC 端老本地残留靠此步在 seed 时回收；同时保留 Realtime DELETE 实时路径做即时清理。
+  const localRows = await tableRef(table).where('user_id').equals(userId).toArray()
+  const toDelete = localRows
+    .map((r) => String((r as { id: string }).id))
+    .filter((id) => !serverIds.has(id))
+    .filter((id) => !skipIds.has(id))
+    .filter((id) => !pending.has(id))
+  if (toDelete.length) await tableRef(table).bulkDelete(toDelete as never)
 }
 
 /** 入队一条待同步操作 */
