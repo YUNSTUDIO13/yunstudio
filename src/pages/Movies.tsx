@@ -1548,7 +1548,7 @@ export default function MoviesPage() {
         </div>
       ) : (
         <>
-          <section className="px-3 pt-[80px] pb-10 md:px-12 md:pb-14">
+          <section className="px-3 pt-[80px] pb-10 md:px-12 md:pb-14 md:pt-[92px]">
             <MovieList visible={visible} movies={movies} onOpen={openMovie} />
           </section>
           {selected && (
