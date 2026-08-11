@@ -4,6 +4,7 @@ import { useNav } from '../context/NavContext'
 import { BUILTIN_MODULES, BUILTIN_MODULE_IDS } from '../lib/builtin-modules'
 import { renderIcon, ICONS, ICON_KEYS, ICON_LABELS, type IconKey } from '../lib/icon-library'
 import type { NavPrimary } from '../lib/nav-types'
+import { DEFAULT_NAV_CONFIG } from '../lib/default-nav'
 
 // ============================================================
 // 子组件：图标选择器（24 宫格）
@@ -74,10 +75,20 @@ export default function NavConfigPage() {
         </Button>
       </header>
 
-      {/* 顶部独立卡片：系统设置（固定 dock 齿轮浮层的内容，可在此自定义） */}
+      {/* 顶部独立卡片：系统设置（固定 dock 齿轮浮层的内容，可在此自定义）
+          - 与 AppShell.settingsPrimary 同源兜底：config 缺 p_system_settings 时回落 DEFAULT，
+            保证卡片永远渲染（避免老账户无 p_system_settings 数据时整张卡消失）。 */}
       {(() => {
-        const sys = sortedPrimaries.find((p) => p.id === 'p_system_settings')
-        if (!sys) return null
+        const fromCfg = sortedPrimaries.find((p) => p.id === 'p_system_settings')
+        const sys: NavPrimary =
+          fromCfg ??
+          DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_system_settings') ?? {
+            id: 'p_system_settings',
+            title: '系统设置',
+            iconKey: 'gear',
+            order: 9999,
+            groups: [],
+          }
         return (
           <section className="glass-card p-5 ring-1 ring-accent/30">
             <div className="mb-3 flex items-start justify-between gap-3">
