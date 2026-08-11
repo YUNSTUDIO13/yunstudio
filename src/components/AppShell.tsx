@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../context/ProfileContext'
 import { useNav } from '../context/NavContext'
@@ -112,6 +112,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { profile } = useProfile()
   const { config, hydrated, findPrimaryByModule } = useNav()
   const location = useLocation()
+  const navigate = useNavigate()
   const isMobile = useMediaQuery('(max-width: 767px)')
 
   const [openPrimaryId, setOpenPrimaryId] = useState<string | null>(null)
@@ -424,7 +425,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => togglePrimary(p.id)}
+                  onClick={() =>
+                    p.directModule
+                      ? navigate(`/modules/${p.directModule}`)
+                      : togglePrimary(p.id)
+                  }
                   title={p.title}
                   aria-label={p.title}
                   aria-expanded={openPrimaryId === p.id}
