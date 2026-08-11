@@ -131,15 +131,15 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
         @keyframes heroInfoIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
       {/* ─────────── 桌面布局：左 60% 宽幅背景图 + 右 40% 信息+简介+演员表 ─────────── */}
-      <div className="hidden h-full w-full grid-cols-[60%_40%] md:grid">
-        {/* 左：宽幅剧情照（backdrop）缩小到 60% 宽，整段高度撑满；原模糊区域被裁掉 */}
-        <div className="relative overflow-hidden">
+      <div className="hidden md:grid md:h-full md:w-full md:grid-cols-[60%_40%]">
+        {/* 左：宽幅剧情照（backdrop）占 60% 宽，整段高度撑满；object-contain 保持原图比例（不裁切），左右/上下自然留黑 */}
+        <div className="relative h-full overflow-hidden bg-black">
           {(movie.backdrop || movie.cover) && !err ? (
             <img
               src={movie.backdrop || movie.cover}
               alt={movie.title}
               onError={() => setErr(true)}
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-contain"
               style={{ animation: 'heroFadeIn 0.8s ease-out' }}
             />
           ) : (
@@ -150,17 +150,15 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
               <span className="font-serif text-[12rem] text-white/8">{movie.title.slice(0, 1)}</span>
             </div>
           )}
-          {/* 左/底部加深渐变，让右侧信息块不被图片边缘干扰 */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/70" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/80 to-transparent" />
+          {/* 渐变：右边缘加重，让左右衔接处过渡自然 */}
         </div>
 
-        {/* 右：信息块（保留现有标题/评分/地区/时长/短评/查看详情）+ 新增简介/演员表 */}
+        {/* 右：信息块（沿用现有设计风格）——自然 flow，不用 justify-between 撑开 */}
         <div
-          className="relative flex h-full flex-col justify-between gap-6 overflow-y-auto bg-black/55 px-10 py-10 backdrop-blur-sm"
+          className="relative flex h-full flex-col gap-5 overflow-y-auto bg-gradient-to-b from-black/70 via-black/60 to-black/70 px-10 py-12 backdrop-blur-sm"
           style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
         >
-          {/* 上：标题 + 元信息 + 短评 + 按钮（沿用现有设计，字体不变） */}
+          {/* 顶部：标题区（紧凑） */}
           <div className="space-y-4">
             {(movie.genre ?? []).length > 0 && (
               <div className="flex flex-wrap gap-3 text-xs text-white/60">
@@ -207,30 +205,33 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
             </button>
           </div>
 
-          {/* 下：简介 + 演员表（仅在有数据时展示；设计风格与短评一致） */}
-          {(movie.overview || (movie.cast ?? []).length > 0) && (
-            <div className="space-y-5 border-t border-white/10 pt-5">
-              {movie.overview && (
-                <div>
-                  <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">简介</div>
-                  <p className="line-clamp-5 text-sm leading-relaxed text-ink-soft">{movie.overview}</p>
-                </div>
-              )}
-              {(movie.cast ?? []).length > 0 && (
-                <div>
-                  <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">演员表</div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-sm text-ink-soft">
-                    {(movie.cast ?? []).slice(0, 8).map((c, i) => (
-                      <span key={`${c}-${i}`}>
-                        {c}
-                        {i < Math.min(7, movie.cast.length - 1) && <span className="ml-3 text-white/25">·</span>}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+          {/* 分隔线 + 简介区（始终占位，无数据显「暂无简介」一行灰字） */}
+          <div className="mt-auto space-y-5 border-t border-white/10 pt-5">
+            <div>
+              <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">简介</div>
+              {movie.overview ? (
+                <p className="line-clamp-5 text-sm leading-relaxed text-ink-soft">{movie.overview}</p>
+              ) : (
+                <p className="text-sm italic text-ink-mute">暂无简介（部署新版 Edge Function 后自动获取）</p>
               )}
             </div>
-          )}
+
+            <div>
+              <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">演员表</div>
+              {(movie.cast ?? []).length > 0 ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-sm text-ink-soft">
+                  {(movie.cast ?? []).slice(0, 12).map((c, i) => (
+                    <span key={`${c}-${i}`}>
+                      {c}
+                      {i < Math.min(11, movie.cast.length - 1) && <span className="ml-3 text-white/25">·</span>}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm italic text-ink-mute">暂无演员表（部署新版 Edge Function 后自动获取）</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
