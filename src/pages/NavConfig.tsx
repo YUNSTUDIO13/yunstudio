@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Modal, Field, Input, Button, ConfirmDialog } from '../components/ui'
 import { useNav } from '../context/NavContext'
-import { BUILTIN_MODULES, BUILTIN_MODULE_IDS } from '../lib/builtin-modules'
+import { BUILTIN_MODULES, BUILTIN_MODULE_IDS, type BuiltinModuleId } from '../lib/builtin-modules'
 import { renderIcon, ICONS, ICON_KEYS, ICON_LABELS, type IconKey } from '../lib/icon-library'
 import type { NavPrimary } from '../lib/nav-types'
 import { DEFAULT_NAV_CONFIG } from '../lib/default-nav'
@@ -155,9 +155,15 @@ export default function NavConfigPage() {
                   <div className="truncate text-sm font-semibold text-ink-strong">
                     {p.title}
                   </div>
-                  <div className="text-xs text-ink-mute">
-                    {p.groups.length} 个二级列 · {p.groups.reduce((n, g) => n + g.modules.length, 0)} 个模块
-                  </div>
+                <div className="text-xs text-ink-mute">
+                  {p.directModule ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-accent">
+                      直接打开 · {BUILTIN_MODULES[p.directModule]?.title ?? p.directModule}
+                    </span>
+                  ) : (
+                    `${p.groups.length} 个二级列 · ${p.groups.reduce((n, g) => n + g.modules.length, 0)} 个模块`
+                  )}
+                </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <IconBtn
@@ -183,13 +189,15 @@ export default function NavConfigPage() {
                 </div>
               </div>
 
-              {/* 二级列子列表（复用 SecondaryList） */}
-              <SecondaryList
-                primaryId={p.id}
-                groups={p.groups}
-                onEditGroup={(groupId) => setEditingGroup({ primaryId: p.id, groupId })}
-                onAddGroup={() => setEditingGroup({ primaryId: p.id })}
-              />
+              {/* 二级列子列表（菜单模式才展示；直接模式已绑定单一模块） */}
+              {!p.directModule && (
+                <SecondaryList
+                  primaryId={p.id}
+                  groups={p.groups}
+                  onEditGroup={(groupId) => setEditingGroup({ primaryId: p.id, groupId })}
+                  onAddGroup={() => setEditingGroup({ primaryId: p.id })}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -236,11 +244,12 @@ export default function NavConfigPage() {
       {editingPrimary && (
         <PrimaryEditModal
           primary={editingPrimary.id ? sortedPrimaries.find((p) => p.id === editingPrimary.id) : undefined}
-          onSave={(title, iconKey) => {
+          allowDirect={editingPrimary.id !== 'p_system_settings'}
+          onSave={(title, iconKey, directModule) => {
             if (editingPrimary.id) {
-              actions.updatePrimary(editingPrimary.id, { title, iconKey })
+              actions.updatePrimary(editingPrimary.id, { title, iconKey, directModule })
             } else {
-              actions.addPrimary({ title, iconKey })
+              actions.addPrimary({ title, iconKey, directModule })
             }
             setEditingPrimary(null)
           }}
@@ -444,15 +453,20 @@ function IconBtn({
 // ============================================================
 function PrimaryEditModal({
   primary,
+  allowDirect = true,
   onSave,
   onClose,
 }: {
   primary?: NavPrimary
-  onSave: (title: string, iconKey: IconKey) => void
+  allowDirect?: boolean
+  onSave: (title: string, iconKey: IconKey, directModule: BuiltinModuleId | null) => void
   onClose: () => void
 }) {
   const [title, setTitle] = useState(primary?.title ?? '')
   const [iconKey, setIconKey] = useState<IconKey>(primary?.iconKey ?? 'list')
+  const [directModule, setDirectModule] = useState<BuiltinModuleId | null>(primary?.directModule ?? null)
+  const isDirect = !!directModule
+
   return (
     <Modal
       open
@@ -464,19 +478,71 @@ function PrimaryEditModal({
           <Button variant="soft" onClick={onClose}>
             取消
           </Button>
-          <Button onClick={() => title.trim() && onSave(title.trim(), iconKey)} disabled={!title.trim()}>
+          <Button
+            onClick={() => title.trim() && onSave(title.trim(), iconKey, directModule)}
+            disabled={!title.trim() || (isDirect && !directModule)}
+          >
             保存
           </Button>
         </>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <Field label="一级 Tab 名称" hint="必填">
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：工作 / 生活 / 学习" />
         </Field>
         <Field label="一级 Tab 图标">
           <IconPicker value={iconKey} onChange={setIconKey} />
         </Field>
+
+        {/* 点击行为：菜单模式 / 直接打开单一模块（二选一） */}
+        <Field label="点击行为" hint={allowDirect ? '二选一：悬停/点击弹菜单，或直接打开某个模块' : '系统设置固定为菜单模式'}>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => allowDirect && setDirectModule(null)}
+              className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                !isDirect ? 'border-ink-strong bg-brand-soft text-ink-strong' : 'border-line bg-canvas/40 text-ink-soft hover:border-ink-soft'
+              }`}
+            >
+              弹二级菜单
+            </button>
+            <button
+              type="button"
+              disabled={!allowDirect}
+              onClick={() => allowDirect && setDirectModule(directModule ?? 'overview')}
+              className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition disabled:opacity-40 ${
+                isDirect ? 'border-ink-strong bg-brand-soft text-ink-strong' : 'border-line bg-canvas/40 text-ink-soft hover:border-ink-soft'
+              }`}
+            >
+              直接打开模块
+            </button>
+          </div>
+        </Field>
+
+        {isDirect && (
+          <div className="space-y-2">
+            <div className="text-xs text-ink-mute">选择点击后直接打开的模块（单选）</div>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {BUILTIN_MODULE_IDS.map((mid) => {
+                const meta = BUILTIN_MODULES[mid]
+                const checked = directModule === mid
+                return (
+                  <button
+                    key={mid}
+                    type="button"
+                    onClick={() => setDirectModule(mid)}
+                    className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-xs transition ${
+                      checked ? 'border-ink-strong bg-brand-soft text-ink-strong' : 'border-line bg-canvas/40 text-ink-soft hover:border-ink-soft'
+                    }`}
+                  >
+                    <span className="font-semibold">{meta.title}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   )

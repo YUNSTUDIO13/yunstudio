@@ -26,6 +26,10 @@ export interface NavPrimary {
   iconKey: IconKey
   groups: SecondaryColumn[]
   order: number
+  // 直接模式：绑定单一三级模块，点击 dock 按钮直达该模块（与 groups 菜单模式互斥二选一）
+  //  - 有值（有效模块 id）：直接模式，忽略 groups
+  //  - null / 空：菜单模式，走二级列 + 三级模块菜单
+  directModule?: BuiltinModuleId | null
 }
 
 export interface NavConfig {

@@ -58,28 +58,34 @@ function PrimaryDockItem({
   isMobile: boolean
   onToggle: () => void
 }) {
-  // 一级 Tab 下首个三级模块作为「点击直达」目标
-  const firstModule = primary.groups.flatMap((g) => g.modules)[0]
-  const fallbackRoute = firstModule ? `/modules/${firstModule}` : '/modules/overview'
+  // 直接模式（directModule 绑定单一模块）：点击 dock 直达该模块，不弹菜单
+  const isDirect = !!primary.directModule
+  const targetModule = isDirect
+    ? primary.directModule
+    : primary.groups.flatMap((g) => g.modules)[0]
+  const fallbackRoute = targetModule ? `/modules/${targetModule}` : '/modules/overview'
 
   const handleClick = (e: React.MouseEvent) => {
     if (isMobile) {
-      e.preventDefault()
-      onToggle()
+      // 直接模式：让 Link 自然跳转，不打开底部 sheet
+      if (!isDirect) {
+        e.preventDefault()
+        onToggle()
+      }
     }
   }
 
   return (
     <div
       className="relative"
-      onMouseEnter={isMobile ? undefined : onOpen}
-      onMouseLeave={isMobile ? undefined : onScheduleClose}
+      onMouseEnter={isMobile || isDirect ? undefined : onOpen}
+      onMouseLeave={isMobile || isDirect ? undefined : onScheduleClose}
       data-mega-trigger
     >
       <Link
         to={fallbackRoute}
         onClick={handleClick}
-        onFocus={isMobile ? undefined : onOpen}
+        onFocus={isMobile || isDirect ? undefined : onOpen}
         title={primary.title}
         aria-haspopup="menu"
         aria-expanded={isOpen}

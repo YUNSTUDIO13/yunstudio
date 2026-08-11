@@ -22,8 +22,8 @@ import { readLastUserId, writeLastUserId } from './DashboardContext'
 // ============================================================
 interface NavActions {
   // 一级 Tab
-  addPrimary(input: { title: string; iconKey: IconKey }): NavPrimary
-  updatePrimary(id: string, patch: Partial<Pick<NavPrimary, 'title' | 'iconKey'>>): void
+  addPrimary(input: { title: string; iconKey: IconKey; directModule?: BuiltinModuleId | null }): NavPrimary
+  updatePrimary(id: string, patch: Partial<Pick<NavPrimary, 'title' | 'iconKey' | 'directModule'>>): void
   removePrimary(id: string): void
   movePrimary(id: string, direction: 'up' | 'down'): void
   // 二级列
@@ -72,6 +72,9 @@ function migrateConfig(cfg: NavConfig): NavConfig {
   // 诊断：若旧配置含已下线的模块（如 KPI 刚下线），记录便于排查「hover 导航整屏清除」根因
   const invalid: string[] = []
   for (const p of cfg.primaries) {
+    if (p.directModule && !(BUILTIN_MODULE_IDS as readonly string[]).includes(p.directModule)) {
+      invalid.push(p.directModule)
+    }
     for (const g of p.groups) {
       for (const m of g.modules) {
         if (!(BUILTIN_MODULE_IDS as readonly string[]).includes(m)) invalid.push(m)
@@ -88,6 +91,10 @@ function migrateConfig(cfg: NavConfig): NavConfig {
     ...cfg,
     primaries: cfg.primaries.map((p) => ({
       ...p,
+      directModule:
+        p.directModule && (BUILTIN_MODULE_IDS as readonly string[]).includes(p.directModule)
+          ? p.directModule
+          : null,
       groups: p.groups.map((g) => ({
         ...g,
         modules: g.modules.filter((m) => (BUILTIN_MODULE_IDS as readonly string[]).includes(m)),
@@ -95,7 +102,7 @@ function migrateConfig(cfg: NavConfig): NavConfig {
     })),
   }
 
-  let primaries = sanitized.primaries.map((p) => {
+  let primaries: NavPrimary[] = sanitized.primaries.map((p) => {
     if (p.id === 'p_settings') {
       return { ...p, id: 'p_nav_settings', title: p.title === '设置' ? '导航设置' : p.title }
     }
@@ -321,6 +328,7 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const findPrimaryByModule = useCallback(
     (moduleId: BuiltinModuleId): NavPrimary | null => {
       for (const p of config.primaries) {
+        if (p.directModule && p.directModule === moduleId) return p
         if (p.groups.some((g) => g.modules.includes(moduleId))) return p
       }
       return null
@@ -351,15 +359,17 @@ export function NavProvider({ children }: { children: ReactNode }) {
     }
 
     return {
-      addPrimary({ title, iconKey }) {
+      addPrimary({ title, iconKey, directModule = null }) {
         const newP: NavPrimary = {
           id: uid('p'),
           title,
           iconKey,
+          directModule,
           order: config.primaries.length
             ? Math.max(...config.primaries.map((p) => p.order)) + 1
             : 1,
-          groups: [{ id: uid('g'), title: '默认', modules: [] }],
+          // 直接模式：绑定单一模块，无二级列载体；菜单模式：补一个默认空二级列
+          groups: directModule ? [] : [{ id: uid('g'), title: '默认', modules: [] }],
         }
         commit({ ...config, primaries: [...config.primaries, newP] })
         return newP
@@ -368,7 +378,19 @@ export function NavProvider({ children }: { children: ReactNode }) {
       updatePrimary(id, patch) {
         commit({
           ...config,
-          primaries: config.primaries.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+          primaries: config.primaries.map((p) => {
+            if (p.id !== id) return p
+            const next = { ...p, ...patch }
+            // directModule 变化时同步处理二级列：直接模式清空、回到菜单模式补默认空列
+            if (patch.directModule !== undefined) {
+              if (patch.directModule) {
+                next.groups = []
+              } else if (next.groups.length === 0) {
+                next.groups = [{ id: uid('g'), title: '默认', modules: [] }]
+              }
+            }
+            return next
+          }),
         })
       },
 
