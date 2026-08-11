@@ -463,20 +463,27 @@ export function Modal({
   footer?: ReactNode
   maxWidth?: string
 }) {
+  // 用 ref 持有最新 onClose，避免把 onClose 放进依赖导致 open=true 期间 effect 反复重跑，
+  // 进而使 cleanup 把 body.overflow 恢复成已被污染的 'hidden' 而永远锁死滚动（删除后全站滑不动的根因）。
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     window.addEventListener('keydown', onKey)
-    // 锁定背景滚动
+    // 锁定背景滚动（仅在本次加锁前记录原始值，cleanup 时还原，杜绝 prev 污染）
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 

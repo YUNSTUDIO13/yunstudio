@@ -560,19 +560,23 @@ function MovieModal({
   onSync: (m: Movie) => Promise<Movie>
   onDelete: (m: Movie) => void
 }) {
-  // 全屏弹窗：锁滚动 + ESC 关闭（移动端 / 无分栏时复用）
+  // 全屏弹窗：锁滚动 + ESC 关闭（移动端 / 无分栏时复用）。
+  // 仅在挂载时加锁一次、卸载时解锁（依赖 []），用 ref 持有最新 onClose，避免 onClose 不稳定导致
+  // effect 反复重跑、cleanup 把 body.overflow 恢复成被污染的 'hidden' 而锁死全站滚动。
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div
