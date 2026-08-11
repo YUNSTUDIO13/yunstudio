@@ -57,10 +57,10 @@ export default function Login() {
         <div className="mb-6 text-center">
           <img
             src={logoUrl}
-            alt="个人工作台"
+            alt="YUNSTUDIO"
             className="mx-auto mb-3 h-14 w-14 rounded-2xl object-cover shadow-card"
           />
-          <h1 className="text-xl font-semibold text-ink-strong">个人工作台</h1>
+          <h1 className="text-xl font-semibold text-ink-strong">YUNSTUDIO</h1>
           <p className="mt-1 text-sm text-ink-soft">
             联网 · 多端同步 · 数据不出域
           </p>
