@@ -697,7 +697,7 @@ function NewMovieModal({
   onClose: () => void
   onSave: (m: Movie) => void
 }) {
-  const [draft, setDraft] = useState({ title: '', year: '', cover: '', personalRating: '', review: '', watchedAt: '' })
+  const [draft, setDraft] = useState({ title: '', year: '', cover: '', personalRating: '', review: '', watchedAt: '', genre: '', region: '' })
   const [preview, setPreview] = useState<Partial<Movie>>({})
   const [fetching, setFetching] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -729,6 +729,12 @@ function NewMovieModal({
           backdrop = b || ''
         }
         setPreview({ ...data, cover, backdrop })
+        // 类型/地区：仅在用户尚未手动填写时，用 TMDB 建议值预填（用户填了则保留覆盖）
+        setDraft((d) => ({
+          ...d,
+          genre: d.genre ? d.genre : (data.genre ?? []).join(' / '),
+          region: d.region ? d.region : (data.region ?? ''),
+        }))
         setCandidates(data.candidates ?? [])
         setSelectedCandidateIdx(0)
       } finally {
@@ -786,8 +792,10 @@ function NewMovieModal({
       review: draft.review.trim(),
       overview: preview.overview ?? '',
       cast: preview.cast ?? [],
-      genre: preview.genre ?? [],
-      region: preview.region ?? '',
+      genre: draft.genre.trim()
+        ? draft.genre.split(/[,，/]/).map((s) => s.trim()).filter(Boolean)
+        : preview.genre ?? [],
+      region: draft.region.trim() || preview.region || '',
       duration: preview.duration ?? 0,
       watched_at: normalizeDate(draft.watchedAt) || nowIso.slice(0, 10),
       synced: !!preview.cover,
@@ -898,6 +906,20 @@ function NewMovieModal({
                 />
               </label>
             </div>
+          </Field>
+          <Field label="类型" hint="多个用「/」分隔，如 剧情 / 科幻">
+            <Input
+              value={draft.genre}
+              onChange={(e) => setDraft({ ...draft, genre: e.target.value })}
+              placeholder="TMDB 自动带出，可修改"
+            />
+          </Field>
+          <Field label="地区">
+            <Input
+              value={draft.region}
+              onChange={(e) => setDraft({ ...draft, region: e.target.value })}
+              placeholder="TMDB 自动带出，可修改"
+            />
           </Field>
           <Field label="个人评分 (0–10)" hint="留空则使用第三方评分">
             <Input
