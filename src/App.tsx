@@ -9,6 +9,7 @@ import { NewsProvider } from './context/NewsContext'
 import { TagsProvider } from './context/TagsContext'
 import { NotificationsProvider } from './context/NotificationsContext'
 import { NavProvider } from './context/NavContext'
+import { UIProvider } from './context/UIContext'
 import { DashboardProvider } from './context/DashboardContext'
 import SyncEngine from './components/SyncEngine'
 import AuthGate from './components/AuthGate'
@@ -30,18 +31,20 @@ export default function App() {
                     <NewsProvider>
                       <DashboardProvider>
                         <NavProvider>
-                          <HashRouter>
-                            <AuthGate>
-                              <AppShell>
-                                <Routes>
-                                  <Route path="/" element={<Navigate to="/modules/overview" replace />} />
-                                  <Route path="/modules/:id" element={<ModulePage />} />
-                                  <Route path="/account" element={<AccountPage />} />
-                                  <Route path="*" element={<Navigate to="/modules/overview" replace />} />
-                                </Routes>
-                              </AppShell>
-                            </AuthGate>
-                          </HashRouter>
+                          <UIProvider>
+                            <HashRouter>
+                              <AuthGate>
+                                <AppShell>
+                                  <Routes>
+                                    <Route path="/" element={<Navigate to="/modules/overview" replace />} />
+                                    <Route path="/modules/:id" element={<ModulePage />} />
+                                    <Route path="/account" element={<AccountPage />} />
+                                    <Route path="*" element={<Navigate to="/modules/overview" replace />} />
+                                  </Routes>
+                                </AppShell>
+                              </AuthGate>
+                            </HashRouter>
+                          </UIProvider>
                         </NavProvider>
                       </DashboardProvider>
                     </NewsProvider>

@@ -80,6 +80,7 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       groups: [
         { id: 'g_sys_1', title: '导航配置', modules: ['nav-config'] },
         { id: 'g_sys_2', title: '字典管理', modules: ['tag-dict'] },
+        { id: 'g_sys_3', title: 'UI 设置', modules: ['ui-settings'] },
       ],
     },
   ],

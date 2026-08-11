@@ -12,6 +12,7 @@ import Avatar from './Avatar'
 import type { BuiltinModuleId } from '../lib/builtin-modules'
 import type { NavPrimary } from '../lib/nav-types'
 import AuroraBackground from '../design/AuroraBackground'
+import CursorFX from './CursorFX'
 
 // ============================================================
 // 工具
@@ -26,7 +27,7 @@ function moduleIdFromPath(pathname: string): BuiltinModuleId | null {
   if (!m) return null
   const id = m[1]
   if (
-    ['overview', 'todos', 'requirements', 'sprints', 'bugs', 'nav-config', 'tag-dict', 'apps'].includes(
+    ['overview', 'todos', 'requirements', 'sprints', 'bugs', 'nav-config', 'tag-dict', 'apps', 'ui-settings'].includes(
       id,
     )
   ) {
@@ -205,6 +206,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         groups: [
           { id: 'g_sys_1', title: '导航配置', modules: ['nav-config'] },
           { id: 'g_sys_2', title: '字典管理', modules: ['tag-dict'] },
+          { id: 'g_sys_3', title: 'UI 设置', modules: ['ui-settings'] },
         ],
       }
     )
@@ -230,6 +232,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative min-h-screen bg-canvas text-ink-strong">
       <AuroraBackground />
+      <CursorFX />
       {/* ===== 桌面：左上悬浮 dock（主页 + 一级 Tab） ===== */}
       <aside
         className="

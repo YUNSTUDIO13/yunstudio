@@ -10,6 +10,7 @@ export const BUILTIN_MODULE_IDS = [
   'nav-config', // 导航配置本身是个内置模块（角色「配置后台」）
   'tag-dict', // 字典管理（系统设置下的二级页）
   'apps', // 应用（个人应用导航 / 书签）
+  'ui-settings', // UI 设置（指针主题 · 全局视觉）
 ] as const
 export type BuiltinModuleId = (typeof BUILTIN_MODULE_IDS)[number]
 
@@ -86,6 +87,13 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
     title: '应用',
     desc: '个人应用导航 · 图标跳转 · 新增 / 编辑 / 删除',
     route: '/modules/apps',
+    defaultEnabled: true,
+  },
+  'ui-settings': {
+    id: 'ui-settings',
+    title: 'UI 设置',
+    desc: '指针主题 · 光粒 / 流光特效 · 自定义颜色',
+    route: '/modules/ui-settings',
     defaultEnabled: true,
   },
 }

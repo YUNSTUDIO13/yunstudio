@@ -130,7 +130,7 @@ function migrateConfig(cfg: NavConfig): NavConfig {
   // 让下游 moveSecondary / removeSecondary / addSecondary / setGroupModules 等 actions 都能命中。
   // 重要：种入后**绝不**在后续加载中回填 nav-config / tag-dict —— 系统设置模块与其他一级 Tab 行为
   // 完全一致，用户对二级列的增删改必须被尊重并持久化，禁止「诈尸」式自动恢复。
-  const sysIdx = primaries.findIndex((p) => p.id === 'p_system_settings')
+  let sysIdx = primaries.findIndex((p) => p.id === 'p_system_settings')
   const defaultSys = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_system_settings')
   if (sysIdx < 0 && defaultSys) {
     const seedGroups = defaultSys.groups.map((g) => ({ ...g, id: uid('g') }))
@@ -144,6 +144,25 @@ function migrateConfig(cfg: NavConfig): NavConfig {
         groups: seedGroups,
       },
     ]
+    sysIdx = primaries.length - 1
+  }
+
+  // UI 设置模块（2026-08-11）：向老账户的 p_system_settings 下一次性追加「UI 设置」二级列，
+  // 包含默认 ui-settings 模块（一次性前向迁移，与 news/apps 同源；用户后续删除不再自动恢复）。
+  if (sysIdx >= 0 && defaultSys) {
+    const sysP = primaries[sysIdx]
+    const hasUISettings = sysP.groups.some((g) => g.modules.includes('ui-settings'))
+    if (!hasUISettings) {
+      const uiGroup = defaultSys.groups.find((g) => g.modules.includes('ui-settings'))
+      if (uiGroup) {
+        const newGroup = { ...uiGroup, id: uid('g') }
+        primaries = [
+          ...primaries.slice(0, sysIdx),
+          { ...sysP, groups: [...sysP.groups, newGroup] },
+          ...primaries.slice(sysIdx + 1),
+        ]
+      }
+    }
   }
 
   return { ...cfg, primaries }
