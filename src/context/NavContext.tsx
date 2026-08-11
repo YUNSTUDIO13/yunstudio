@@ -127,12 +127,31 @@ function migrateConfig(cfg: NavConfig): NavConfig {
 
   // 字典管理（2026-08-10）：合并升级后若 p_system_settings 缺 nav-config / tag-dict 任一，
   // 按默认补齐对应二级列（不破坏用户的自定义二级列）。
-  const sysIdx = primaries.findIndex((p) => p.id === 'p_system_settings')
+  // 2026-08-11：老账户 config 可能整体缺失 p_system_settings（如早期版本未自动种入）。
+  // 在数据层兜底新增一条默认 primary，确保下游 moveSecondary/removeSecondary/addSecondary 等
+  // actions 都能命中目标（行为对齐其他一级 Tab）。用户自定义不丢失：migrate 幂等，
+  // 仅在缺失时新增，不覆盖已有自定义内容。
+  let sysIdx = primaries.findIndex((p) => p.id === 'p_system_settings')
+  const defaultSys = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_system_settings')
+  if (sysIdx < 0 && defaultSys) {
+    // 复制默认的 groups 并给每个 group 重新生成 id，避免与现有 primary 的 group id 冲突
+    const seedGroups = defaultSys.groups.map((g) => ({ ...g, id: uid('g') }))
+    primaries = [
+      ...primaries,
+      {
+        id: 'p_system_settings',
+        title: defaultSys.title,
+        iconKey: defaultSys.iconKey,
+        order: defaultSys.order,
+        groups: seedGroups,
+      },
+    ]
+    sysIdx = primaries.length - 1
+  }
   if (sysIdx >= 0) {
     const sysP = primaries[sysIdx]
     const hasNavCfg = sysP.groups.some((g) => g.modules.includes('nav-config'))
     const hasTagDict = sysP.groups.some((g) => g.modules.includes('tag-dict'))
-    const defaultSys = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_system_settings')
     let groups = sysP.groups
     if (defaultSys) {
       if (!hasNavCfg) {

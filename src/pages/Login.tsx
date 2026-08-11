@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { Field, Input, Button, Modal } from '../components/ui'
+import logoUrl from '/logo.jpg'
 
 type Mode = 'login' | 'register'
 type Msg = { type: 'ok' | 'err'; text: string } | null
@@ -54,9 +55,11 @@ export default function Login() {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo + 标题 */}
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-ink-strong text-white shadow-card">
-            <span className="text-base font-bold tracking-widest">W</span>
-          </div>
+          <img
+            src={logoUrl}
+            alt="个人工作台"
+            className="mx-auto mb-3 h-14 w-14 rounded-2xl object-cover shadow-card"
+          />
           <h1 className="text-xl font-semibold text-ink-strong">个人工作台</h1>
           <p className="mt-1 text-sm text-ink-soft">
             联网 · 多端同步 · 数据不出域
