@@ -90,7 +90,7 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
   const rating = movie.personal_rating ?? movie.third_party_rating
   return (
     <section
-      className="relative h-[78vh] min-h-[560px] overflow-hidden md:w-screen md:-ml-[120px] md:-mr-6"
+      className="relative h-[78vh] min-h-[560px] w-full overflow-hidden md:h-screen md:min-h-0 md:w-screen md:-ml-[120px] md:-mr-6 md:-mt-6"
       key={movie.id /* 切换影片触发淡入动效 */}
     >
       <style>{`
@@ -268,26 +268,6 @@ function MovieModal({
           </div>
         </div>
 
-        {/* 操作按钮行（顶在封面下方，与封面之间留自然间距） */}
-        <div className="flex items-center justify-end gap-2 px-6 pt-6 md:px-10">
-          {!editing && (
-            <Button variant="soft" onClick={handleSync} disabled={syncing}>
-              {syncing ? '同步中…' : draft.cover_failed ? '手动获取封面' : '同步数据'}
-            </Button>
-          )}
-          <Button
-            variant={editing ? 'primary' : 'soft'}
-            onClick={editing ? handleSave : () => setEditing(true)}
-          >
-            {editing ? '保存' : '编辑'}
-          </Button>
-          {editing && (
-            <Button variant="ghost" onClick={() => { setDraft(movie); setEditing(false) }}>
-              取消
-            </Button>
-          )}
-        </div>
-
         {/* 编辑态：封面字段 */}
         {editing && (
           <div className="mt-8 px-6 md:px-10">
@@ -390,8 +370,8 @@ function MovieModal({
           )}
         </div>
 
-        {/* 底部同步状态 + 删除 */}
-        <div className="mt-16 flex items-center justify-between border-t border-white/10 px-6 pt-6 md:px-10">
+        {/* 底部：同步状态 + 操作按钮（同步 / 编辑 / 取消 / 删除 全部并排） */}
+        <div className="mt-16 flex flex-col gap-4 border-t border-white/10 px-6 pt-6 md:px-10">
           <div className="flex items-center gap-2">
             <span
               className="h-1.5 w-1.5 rounded-full"
@@ -401,11 +381,31 @@ function MovieModal({
               {draft.synced ? '已同步第三方数据' : '未同步，点击「同步数据」获取封面 / 评分等信息'}
             </span>
           </div>
-          {!editing && (
-            <Button variant="ghost" className="!text-danger hover:!bg-danger/10" onClick={() => onDelete(draft)}>
-              删除
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {!editing && (
+              <>
+                <Button variant="soft" onClick={handleSync} disabled={syncing}>
+                  {syncing ? '同步中…' : draft.cover_failed ? '手动获取封面' : '同步数据'}
+                </Button>
+                <Button variant="soft" onClick={() => setEditing(true)}>
+                  编辑
+                </Button>
+                <Button variant="ghost" className="!text-danger hover:!bg-danger/10" onClick={() => onDelete(draft)}>
+                  删除
+                </Button>
+              </>
+            )}
+            {editing && (
+              <>
+                <Button variant="ghost" onClick={() => { setDraft(movie); setEditing(false) }}>
+                  取消
+                </Button>
+                <Button variant="primary" onClick={handleSave}>
+                  保存
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
