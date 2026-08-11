@@ -120,15 +120,12 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
       {/* 左下角信息块：左封面（backdrop 优先，否则 cover）+ 右文字块 */}
       <div className="absolute inset-x-0 bottom-0 px-6 pb-12 md:px-0 md:pl-[104px] md:pr-12 md:pb-20">
         <div
-          className="flex max-w-4xl items-stretch gap-5"
+          className="flex max-w-4xl items-start gap-5"
           style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
         >
-          {/* 左侧封面：与「观影记录」海报同 2:3 竖版比例，高度撑满 flex 容器 —— 顶边对齐「爱情」标签行，底边对齐「查看详情」按钮底边 */}
+          {/* 左侧封面：与「观影记录」海报完全同尺寸 160×240（严格 2:3 竖版），顶部对齐「爱情」标签行 */}
           {(movie.backdrop || movie.cover) && (
-            <div
-              className="relative hidden h-full w-auto shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block"
-              style={{ aspectRatio: '2 / 3' }}
-            >
+            <div className="relative hidden h-[240px] w-[160px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block">
               <img
                 src={movie.backdrop || movie.cover}
                 alt={movie.title}
@@ -137,45 +134,47 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
             </div>
           )}
           {/* 右侧文字块 */}
-          <div className="flex-1 space-y-3">
-            {(movie.genre ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-3 text-xs text-white/60">
-                {(movie.genre ?? []).slice(0, 3).map((g, i) => (
-                  <span key={g}>
-                    {g}
-                    {i < Math.min(2, movie.genre.length - 1) && <span className="ml-3 text-white/30">·</span>}
-                  </span>
-                ))}
+          <div className="flex h-[240px] flex-1 flex-col justify-between">
+            <div className="space-y-3">
+              {(movie.genre ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-3 text-xs text-white/60">
+                  {(movie.genre ?? []).slice(0, 3).map((g, i) => (
+                    <span key={g}>
+                      {g}
+                      {i < Math.min(2, movie.genre.length - 1) && <span className="ml-3 text-white/30">·</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <h1 className="font-serif text-4xl font-semibold text-white md:text-6xl">{movie.title}</h1>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
+                <Stars value={rating ?? 0} size={14} />
+                {movie.personal_rating !== null && movie.personal_rating !== undefined && (
+                  <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
+                )}
+                {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
+                  <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
+                )}
+                <span className="text-white/30">·</span>
+                <span>{movie.year || '—'}</span>
+                {movie.region && (
+                  <>
+                    <span className="text-white/30">·</span>
+                    <span>{movie.region}</span>
+                  </>
+                )}
+                {movie.duration > 0 && (
+                  <>
+                    <span className="text-white/30">·</span>
+                    <span>{movie.duration}分钟</span>
+                  </>
+                )}
               </div>
-            )}
-            <h1 className="font-serif text-4xl font-semibold text-white md:text-6xl">{movie.title}</h1>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
-              <Stars value={rating ?? 0} size={14} />
-              {movie.personal_rating !== null && movie.personal_rating !== undefined && (
-                <span className="font-semibold text-white">{movie.personal_rating.toFixed(1)}</span>
-              )}
-              {movie.third_party_rating !== null && movie.third_party_rating !== undefined && (
-                <span className="text-white/60">{movie.third_party_rating.toFixed(1)}</span>
-              )}
-              <span className="text-white/30">·</span>
-              <span>{movie.year || '—'}</span>
-              {movie.region && (
-                <>
-                  <span className="text-white/30">·</span>
-                  <span>{movie.region}</span>
-                </>
-              )}
-              {movie.duration > 0 && (
-                <>
-                  <span className="text-white/30">·</span>
-                  <span>{movie.duration}分钟</span>
-                </>
+              {movie.review && (
+                <p className="max-w-2xl line-clamp-2 text-sm text-white/60">{movie.review}</p>
               )}
             </div>
-            {movie.review && (
-              <p className="max-w-2xl line-clamp-2 text-sm text-white/60">{movie.review}</p>
-            )}
-            <div className="pt-2">
+            <div>
               <button
                 onClick={onViewDetails}
                 className="rounded-full bg-white/10 px-5 py-1.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
