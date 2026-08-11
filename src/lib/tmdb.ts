@@ -1,27 +1,14 @@
 // TMDB 同步框架（观影模块）
-// 当前为「有 key 走真实 TMDB、无 key 走 mock」的运行时切换实现：
-//  - 配置了 VITE_TMDB_API_KEY 即自动启用真实接口，无需改动任何调用方代码；
-//  - 未配置时走 mock（纯前端演示，随机 ~12% 封面失败以演示「手动获取」）。
-//
-// 统一约定：
-//  - fetchMovieByTitle(title, year)：按名称+年代获取封面/评分/类型/地区/时长/年代
-//  - syncMovie(movie)：对已有影片重新拉取第三方数据（封面失败可重试）
-//  - 封面获取失败时返回 cover: '' 且 cover_failed: true，由调用方标记并提示「手动获取」
+// 数据获取走 Supabase Edge Function 代理（tmdb-proxy），TMDB_API_KEY 仅存于服务端密钥，
+// 前端只 invoke 函数、绝不持有 key。图片经 image.tmdb.org 公开 CDN 直拉（无需 key），
+// 前端 canvas 压缩为 WebP 后上传 Supabase Storage（movie-covers 桶），最终存 Storage URL。
+// 未部署 Edge Function / invoke 失败时自动回退 mock，保证 UI 不崩。
 import { supabase } from './supabase'
 import type { Movie } from '../types'
 
-// ─── 真实 TMDB 接入点（配置 VITE_TMDB_API_KEY 后自动启用）─────────────────────
-const TMDB_API_KEY = (import.meta.env.VITE_TMDB_API_KEY as string | undefined) ?? ''
-const TMDB_BASE = 'https://api.themoviedb.org/3'
-const TMDB_IMG = 'https://image.tmdb.org/t/p/w500'
-// TMDB genre id → 中文名（search 接口只返回 genre_ids 数组）
-const GENRE_MAP: Record<number, string> = {
-  28: '动作', 12: '冒险', 16: '动画', 35: '喜剧', 80: '犯罪', 18: '剧情',
-  14: '奇幻', 27: '恐怖', 9648: '悬疑', 10749: '爱情', 878: '科幻', 53: '惊悚',
-  10752: '战争', 37: '西部',
-}
+const TMDB_IMG = 'https://image.tmdb.org/t/p'
 
-// ─── Mock 数据（占位封面，纯前端演示，不含真实版权内容）────────────────────────
+// ─── Mock 数据（兜底，纯前端演示，不含真实版权内容）────────────────────────
 const MOCK_COVERS = [
   'https://images.unsplash.com/photo-1574267432553-4b4628081c31?w=600&h=900&fit=crop&auto=format',
   'https://images.unsplash.com/photo-1535016120720-40c646be5580?w=600&h=900&fit=crop&auto=format',
@@ -41,7 +28,7 @@ const MOCK_REGIONS = ['美国', '英国', '法国', '日本', '韩国', '中国'
 
 export interface TMDBMovieData {
   cover: string
-  backdrop: string // 宽幅背景图（TMDB backdrop_path / 抽样的横版剧照）
+  backdrop: string // 宽幅背景图（TMDB backdrop_path / 横版剧照）
   third_party_rating: number | null
   genre: string[]
   region: string
@@ -52,37 +39,34 @@ export interface TMDBMovieData {
 
 /**
  * 按观影名称 + 年代获取第三方数据。
- * 返回 TMDBMovieData 子集（封面/评分/类型/地区/时长/年代/封面失败标记）。
+ * 优先走 Edge Function 代理（key 不出服务端）；失败/未配置时回退 mock。
  */
 export async function fetchMovieByTitle(title: string, year: string): Promise<TMDBMovieData> {
-  // —— 真实实现（仅在配置了 VITE_TMDB_API_KEY 时启用）——
-  if (TMDB_API_KEY) {
-    const y = year ? `&year=${encodeURIComponent(year)}` : ''
-    const res = await fetch(`${TMDB_BASE}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}${y}`)
-    const json = await res.json()
-    const m = json.results?.[0]
-    if (!m) {
+  // —— 优先：Edge Function 代理 ——
+  try {
+    const { data, error } = await supabase.functions.invoke('tmdb-proxy', {
+      body: { title, year },
+    })
+    if (!error && data && data.found) {
+      const cover = data.poster_path ? `${TMDB_IMG}/w500${data.poster_path}` : ''
+      const backdrop = data.backdrop_path ? `${TMDB_IMG}/w780${data.backdrop_path}` : ''
       return {
-        cover: '', backdrop: '', third_party_rating: null, genre: [], region: '', duration: 0,
-        year: Number(year) || 0, cover_failed: true,
+        cover,
+        backdrop,
+        third_party_rating: typeof data.vote_average === 'number' ? data.vote_average : null,
+        genre: Array.isArray(data.genre) ? data.genre : [],
+        region: data.origin_country ?? '',
+        duration: typeof data.runtime === 'number' ? data.runtime : 0,
+        year: data.release_date ? Number(String(data.release_date).slice(0, 4)) : Number(year) || 0,
+        cover_failed: !cover,
       }
     }
-    const cover = m.poster_path ? `${TMDB_IMG}${m.poster_path}` : ''
-    // 宽幅背景图：TMDB 的 backdrop_path 是 16:9 横版（如 /abc.jpg），前端可拼 `https://image.tmdb.org/t/p/w780{backdrop_path}`
-    const backdrop = m.backdrop_path ? `https://image.tmdb.org/t/p/w780${m.backdrop_path}` : ''
-    return {
-      cover,
-      backdrop,
-      third_party_rating: typeof m.vote_average === 'number' ? Number(m.vote_average.toFixed(1)) : null,
-      genre: ((m.genre_ids ?? []) as number[]).map((id) => GENRE_MAP[id]).filter((g): g is string => Boolean(g)),
-      region: (m.origin_country ?? [])[0] ?? '',
-      duration: m.runtime ?? 0,
-      year: m.release_date ? Number(m.release_date.slice(0, 4)) : (Number(year) || 0),
-      cover_failed: !cover,
-    }
+    if (error) console.warn('[tmdb] invoke error, fallback mock:', error.message)
+  } catch (e) {
+    console.warn('[tmdb] invoke failed, fallback mock:', e)
   }
 
-  // —— Mock 实现（演示用，无需 key）——
+  // —— Mock 兜底 ——
   await new Promise((r) => setTimeout(r, 600 + Math.random() * 500))
   const ok = Math.random() > 0.12 // ~12% 概率封面获取失败，用于演示「手动获取」
   const yr = parseInt(year, 10) || 0
@@ -105,16 +89,59 @@ export async function syncMovie(movie: Movie): Promise<TMDBMovieData> {
   return fetchMovieByTitle(movie.title, String(movie.year))
 }
 
+// ─── 图片压缩 + 上传 Storage（关键：压缩到极致且清晰）─────────────────────
+async function blobToWebp(blob: Blob, quality = 0.82): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return blob
+  ctx.drawImage(bitmap, 0, 0)
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('canvas.toBlob failed'))),
+      'image/webp',
+      quality,
+    )
+  })
+}
+
+/** 通用：传入 blob，压缩为 webp（若 webp 反而更大则保留原图） */
+async function compressToWebpIfSmaller(blob: Blob, quality = 0.82): Promise<Blob> {
+  try {
+    const webp = await blobToWebp(blob, quality)
+    return webp.size < blob.size * 1.05 ? webp : blob
+  } catch {
+    return blob
+  }
+}
+
 /**
- * 上传封面到 Supabase Storage（movie-covers bucket，公开读、仅本人写）。
- * 返回公网 URL，可直接存 movies.cover 字段并跨端同步。
+ * 拉取 TMDB 公开 CDN 图片 → 压缩为 WebP → 上传 Storage movie-covers/{userId}/{uuid}.webp
+ * 返回 Storage 公网 URL（替代 TMDB CDN 直链，自托管、可长期保存、跨端一致）。
  */
-export async function uploadMovieCover(file: File, userId: string): Promise<string> {
-  const ext = (file.name.split('.').pop() || 'png').toLowerCase()
-  const path = `${userId}/${crypto.randomUUID()}.${ext}`
+export async function uploadTmdbImage(tmdbUrl: string, userId: string): Promise<string> {
+  const res = await fetch(tmdbUrl)
+  if (!res.ok) throw new Error(`fetch tmdb image failed: ${res.status}`)
+  const orig = await res.blob()
+  const blob = await compressToWebpIfSmaller(orig, 0.82)
+  const path = `${userId}/${crypto.randomUUID()}.webp`
   const { error } = await supabase.storage
     .from('movie-covers')
-    .upload(path, file, { upsert: false, contentType: file.type || 'image/png' })
+    .upload(path, blob, { upsert: false, contentType: 'image/webp' })
+  if (error) throw error
+  const { data } = supabase.storage.from('movie-covers').getPublicUrl(path)
+  return data.publicUrl
+}
+
+/** 用户手动上传本地图片 → 同样压缩为 WebP → 上传 Storage */
+export async function uploadMovieCover(file: File, userId: string): Promise<string> {
+  const blob = await compressToWebpIfSmaller(file, 0.82)
+  const path = `${userId}/${crypto.randomUUID()}.webp`
+  const { error } = await supabase.storage
+    .from('movie-covers')
+    .upload(path, blob, { upsert: false, contentType: 'image/webp' })
   if (error) throw error
   const { data } = supabase.storage.from('movie-covers').getPublicUrl(path)
   return data.publicUrl

@@ -8,6 +8,7 @@ create table if not exists public.movies (
   title               text not null,
   year                int,
   cover               text not null default '',
+  backdrop            text not null default '',  -- 剧情照片 / 宽幅背景图（TMDB backdrop_path）
   personal_rating     numeric(3,1),              -- 个人评分 0–10
   third_party_rating  numeric(3,1),              -- 第三方评分（TMDB）0–10
   review              text not null default '',
@@ -86,3 +87,14 @@ drop policy if exists movie_covers_delete on storage.objects;
 create policy movie_covers_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'movie-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 若 movies 表已存在（早于 backdrop 列加入前建表），补列（幂等）
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'movies' and column_name = 'backdrop'
+  ) then
+    alter table public.movies add column backdrop text not null default '';
+  end if;
+end $$;

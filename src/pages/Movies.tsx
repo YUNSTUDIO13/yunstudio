@@ -10,7 +10,8 @@ import { db } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { fetchMovieByTitle, syncMovie, uploadMovieCover } from '../lib/tmdb'
+import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage } from '../lib/tmdb'
+import * as XLSX from 'xlsx'
 import type { Movie } from '../types'
 
 const SRC_THIRD = '第三方'
@@ -504,7 +505,18 @@ function NewMovieModal({
       setFetching(true)
       try {
         const data = await fetchMovieByTitle(title, year)
-        setPreview(data)
+        let cover = data.cover
+        let backdrop = data.backdrop
+        // 自动压缩上传到 Storage，存公网 URL（失败则留空，cover_failed 提示手动获取）
+        if (cover || backdrop) {
+          const [c, b] = await Promise.all([
+            cover ? uploadTmdbImage(cover, userId).catch(() => '') : Promise.resolve(''),
+            backdrop ? uploadTmdbImage(backdrop, userId).catch(() => '') : Promise.resolve(''),
+          ])
+          cover = c || ''
+          backdrop = b || ''
+        }
+        setPreview({ ...data, cover, backdrop })
       } finally {
         setFetching(false)
       }
@@ -648,66 +660,185 @@ function NewMovieModal({
   )
 }
 
-// ─── 批量导入弹窗 ───────────────────────────────────────────────────────────
+// ─── 批量导入弹窗（Excel/CSV + 逐行富化 + 压缩上传 + 进度 + 容错）─────────────
 function BatchImportModal({
+  userId,
   onClose,
-  onImport,
+  onDone,
 }: {
+  userId: string
   onClose: () => void
-  onImport: (rows: { title: string; year: string }[]) => void
+  onDone: () => void
 }) {
-  const [text, setText] = useState('')
-  const [parsed, setParsed] = useState<{ title: string; year: string }[]>([])
+  const [phase, setPhase] = useState<'idle' | 'importing' | 'done'>('idle')
+  const [rows, setRows] = useState<{ title: string; year: string }[]>([])
+  const [fileErr, setFileErr] = useState('')
+  const [progress, setProgress] = useState({ done: 0, total: 0 })
+  const [results, setResults] = useState<{ title: string; ok: boolean; msg?: string; hasCover?: boolean }[]>([])
+  const [dragging, setDragging] = useState(false)
 
-  const parse = (raw: string) => {
-    const rows = raw
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const parts = line.split(/[,，\t｜|]/).map((s) => s.trim()).filter(Boolean)
-        return { title: parts[0] ?? '', year: parts[1] ?? '' }
-      })
-      .filter((r) => r.title)
-    setParsed(rows)
+  const parseFile = async (file: File) => {
+    setFileErr('')
+    try {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][]
+      const parsed = matrix
+        .map((r) => ({ title: String(r[0] ?? '').trim(), year: String(r[1] ?? '').trim() }))
+        .filter((r) => r.title)
+      if (!parsed.length) {
+        setFileErr('未识别到「名称 + 年代」数据，请确认文件前两列分别为 名称、年代')
+        return
+      }
+      setRows(parsed)
+    } catch (e) {
+      setFileErr('解析失败：' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+
+  const startImport = async () => {
+    if (!rows.length) return
+    setPhase('importing')
+    setProgress({ done: 0, total: rows.length })
+    setResults([])
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]
+      try {
+        const data = await fetchMovieByTitle(r.title, r.year)
+        let cover = ''
+        let backdrop = ''
+        // 压缩上传到 Storage（失败则留空，标 cover_failed 交手动获取）
+        if (data.cover) cover = await uploadTmdbImage(data.cover, userId).catch(() => '')
+        if (data.backdrop) backdrop = await uploadTmdbImage(data.backdrop, userId).catch(() => '')
+        const nowIso = new Date().toISOString()
+        const movie: Movie = {
+          id: crypto.randomUUID(),
+          user_id: userId,
+          title: r.title,
+          year: data.year || parseInt(r.year, 10) || new Date().getFullYear(),
+          cover,
+          backdrop,
+          personal_rating: null,
+          third_party_rating: data.third_party_rating ?? null,
+          review: '',
+          genre: data.genre ?? [],
+          region: data.region ?? '',
+          duration: data.duration ?? 0,
+          watched_at: nowIso.slice(0, 10),
+          synced: !!(cover || backdrop),
+          cover_failed: !cover,
+          created_at: nowIso,
+          updated_at: nowIso,
+        }
+        await db.movies.put(movie)
+        await enqueueAndMaybeFlush('movies', 'insert', movie.id, movie)
+        setResults((p) => [...p, { title: r.title, ok: true, hasCover: !!cover }])
+      } catch (e) {
+        setResults((p) => [...p, { title: r.title, ok: false, msg: e instanceof Error ? e.message : String(e) }])
+      }
+      setProgress({ done: i + 1, total: rows.length })
+      if (i < rows.length - 1) await new Promise((res) => setTimeout(res, 250)) // 节流，避免触发 TMDB/Storage 限流
+    }
+    setPhase('done')
   }
 
   return (
     <Modal
       open
-      title="批量导入"
+      title="批量导入（Excel / CSV）"
       onClose={onClose}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button onClick={() => parsed.length && onImport(parsed)} disabled={!parsed.length}>
-            导入 {parsed.length ? `${parsed.length} 部` : ''}
-          </Button>
-        </>
+        phase === 'idle' ? (
+          <>
+            <Button variant="ghost" onClick={onClose}>取消</Button>
+            <Button onClick={startImport} disabled={!rows.length}>
+              开始获取并导入 {rows.length ? `${rows.length} 部` : ''}
+            </Button>
+          </>
+        ) : phase === 'done' ? (
+          <Button onClick={() => { onDone(); onClose() }}>完成</Button>
+        ) : (
+          <Button disabled>导入中…</Button>
+        )
       }
     >
-      <p className="mb-3 text-sm text-ink-soft">每行一部，格式：电影名称，年代</p>
-      <Textarea
-        value={text}
-        autoFocus
-        onChange={(e) => { setText(e.target.value); parse(e.target.value) }}
-        placeholder={'奥本海默，2023\n瞬息全宇宙，2022\n坠落的审判，2023'}
-        rows={8}
-      />
-      {parsed.length > 0 && (
-        <div className="mt-4">
-          <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">识别到 {parsed.length} 部影片</div>
-          <div className="max-h-44 space-y-1 overflow-auto">
-            {parsed.map((row, i) => (
+      {phase === 'idle' && (
+        <>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragging(false)
+              const f = e.dataTransfer.files?.[0]
+              if (f) void parseFile(f)
+            }}
+            className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${dragging ? 'border-accent bg-accent/5' : 'border-white/15'}`}
+          >
+            <p className="text-sm text-ink-soft">拖入 Excel / CSV 文件，或</p>
+            <label className="inline-flex cursor-pointer items-center rounded-lg bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/20">
+              选择文件
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void parseFile(f) }}
+              />
+            </label>
+            <p className="text-xs text-ink-mute">支持 .xlsx / .xls / .csv，前两列分别为「名称、年代」</p>
+          </div>
+          {fileErr && <p className="mt-3 text-xs text-danger">{fileErr}</p>}
+          {rows.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">识别到 {rows.length} 部影片</div>
+              <div className="max-h-44 space-y-1 overflow-auto">
+                {rows.slice(0, 50).map((r, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft"
+                    style={{ background: 'rgba(255,255,255,0.03)' }}
+                  >
+                    <span className="w-5 text-[11px] text-ink-mute">{i + 1}</span>
+                    <span className="flex-1 truncate">{r.title}</span>
+                    <span className="text-ink-mute">{r.year || '—'}</span>
+                    <span className="h-2 w-2 rounded-full bg-[#4ade80]" />
+                  </div>
+                ))}
+                {rows.length > 50 && (
+                  <div className="px-2 py-1 text-[11px] text-ink-mute">…其余 {rows.length - 50} 部省略显示</div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      {phase !== 'idle' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-ink-soft">导入进度</span>
+            <span className="text-ink-mute">{progress.done} / {progress.total}</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full bg-accent transition-all"
+              style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
+            />
+          </div>
+          <div className="max-h-52 space-y-1 overflow-auto">
+            {results.map((r, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft"
+                className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
                 style={{ background: 'rgba(255,255,255,0.03)' }}
               >
-                <span className="w-5 text-[11px] text-ink-mute">{i + 1}</span>
-                <span className="flex-1 truncate">{row.title}</span>
-                <span className="text-ink-mute">{row.year || '—'}</span>
-                <span className="h-2 w-2 rounded-full bg-[#4ade80]" />
+                <span className={`h-2 w-2 shrink-0 rounded-full ${r.ok ? 'bg-[#4ade80]' : 'bg-[#f87171]'}`} />
+                <span className="flex-1 truncate text-ink-soft">{r.title}</span>
+                {r.ok ? (
+                  r.hasCover ? <span className="text-[11px] text-ink-mute">封面✓</span> : <span className="text-[11px] text-[#f87171]">无封面</span>
+                ) : (
+                  <span className="text-[11px] text-[#f87171]">{(r.msg ?? '').slice(0, 20)}</span>
+                )}
               </div>
             ))}
           </div>
@@ -836,59 +967,29 @@ export default function MoviesPage() {
 
   const handleSync = async (m: Movie): Promise<Movie> => {
     const data = await syncMovie(m)
+    // 若本地缺封面/剧照，从 TMDB 拉取并压缩上传到 Storage（失败则留空）
+    let cover = m.cover
+    let backdrop = m.backdrop
+    if (!cover && data.cover) cover = await uploadTmdbImage(data.cover, userId).catch(() => '')
+    if (!backdrop && data.backdrop) backdrop = await uploadTmdbImage(data.backdrop, userId).catch(() => '')
     const updated: Movie = {
       ...m,
-      cover: m.cover || data.cover || '',
-      backdrop: m.backdrop || data.backdrop || '',
+      cover,
+      backdrop,
       third_party_rating: data.third_party_rating ?? m.third_party_rating,
       genre: m.genre.length ? m.genre : data.genre ?? [],
       region: m.region || data.region || '',
       duration: m.duration > 0 ? m.duration : data.duration ?? 0,
       year: data.year || m.year,
       synced: true,
-      cover_failed: !m.cover && !data.cover,
+      cover_failed: !cover,
       updated_at: new Date().toISOString(),
     }
     await persist(updated)
     return updated
   }
 
-  const handleBatchImport = async (rows: { title: string; year: string }[]) => {
-    setShowBatch(false)
-    if (!user) return
-    const nowIso = new Date().toISOString()
-    const created: Movie[] = rows.map((r) => ({
-      id: crypto.randomUUID(),
-      user_id: userId,
-      title: r.title,
-      year: parseInt(r.year, 10) || new Date().getFullYear(),
-      cover: '',
-      backdrop: '',
-      personal_rating: null,
-      third_party_rating: null,
-      review: '',
-      genre: [],
-      region: '',
-      duration: 0,
-      watched_at: nowIso.slice(0, 10),
-      synced: false,
-      cover_failed: false,
-      created_at: nowIso,
-      updated_at: nowIso,
-    }))
-    for (const m of created) {
-      await db.movies.put(m)
-      await enqueueAndMaybeFlush('movies', 'insert', m.id, m)
-    }
-    await reload()
-    // 后台自动同步第三方数据
-    for (const m of created) {
-      void (async () => {
-        const updated = await handleSync(m)
-        void updated
-      })()
-    }
-  }
+  // 批量导入逻辑已内联至 BatchImportModal（逐行 fetch → 压缩上传 Storage → 落 Dexie + outbox，含进度与逐行容错）
 
   const confirmDelete = async () => {
     if (!del) return
@@ -994,7 +1095,7 @@ export default function MoviesPage() {
         <NewMovieModal userId={userId} onClose={() => setShowNew(false)} onSave={handleNewMovie} />
       )}
       {showBatch && (
-        <BatchImportModal onClose={() => setShowBatch(false)} onImport={handleBatchImport} />
+        <BatchImportModal userId={userId} onClose={() => setShowBatch(false)} onDone={() => { void reload() }} />
       )}
 
       <ConfirmDialog
