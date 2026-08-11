@@ -130,7 +130,7 @@ export default function Overview() {
             case 'w_todo_ring':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
+          <Card style={{ height: '100%', padding: '15px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
             <CardHeader
               title="今日完成"
               style={{ marginBottom: 0 }}
@@ -166,7 +166,7 @@ export default function Overview() {
             case 'w_todo_stream':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Card style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '15px' }}>
             <CardHeader title="待办" icon={<PulseDot color="rgba(255,255,255,0.2)" />} />
             {topTodos.length === 0 ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 130 }}>
@@ -224,7 +224,7 @@ export default function Overview() {
             case 'w_todo_progress':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
+          <Card style={{ height: '100%', padding: '15px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
             <CardHeader title="整体进度" style={{ marginBottom: 0 }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <Display size={isMobile ? 32 : 28}>{reqPct}%</Display>
@@ -242,7 +242,7 @@ export default function Overview() {
             case 'w_req_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
+          <Card style={{ height: '100%', padding: '15px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
             <CardHeader title="需求概览" icon={<IconFile />} style={{ marginBottom: 0 }} />
             <Display size={isMobile ? 32 : 28}>{reqActive}</Display>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
@@ -255,7 +255,7 @@ export default function Overview() {
             case 'w_sprint_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column' }}>
+          <Card style={{ height: '100%', padding: '15px', display: 'flex', flexDirection: 'column' }}>
             <CardHeader title="迭代概览" icon={<IconClock />} />
             {activeSprint ? (
               <>
@@ -281,7 +281,7 @@ export default function Overview() {
             case 'w_bug_summary':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: isMobile ? '14px 16px' : '12px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'hidden' }}>
+          <Card style={{ height: '100%', padding: '15px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
             <CardHeader title="缺陷概览" icon={<IconBell />} style={{ marginBottom: 0 }} />
             <Display size={isMobile ? 32 : 28}>{bugOpen}</Display>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
