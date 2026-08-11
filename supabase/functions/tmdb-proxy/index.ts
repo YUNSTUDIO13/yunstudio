@@ -73,39 +73,66 @@ serve(async (req: Request) => {
     Authorization: `Bearer ${TMDB_API_KEY}`,
   }
 
+  // search 加 language=zh-CN 让 TMDB 返回中文地区/标题；取前 8 个候选供前端选择
   const searchRes = await fetch(
-    `${TMDB_BASE}/search/movie?query=${encodeURIComponent(title)}${year}`,
+    `${TMDB_BASE}/search/movie?language=zh-CN&query=${encodeURIComponent(title)}${year}`,
     { headers: tmdbHeaders },
   )
   const searchJson = await searchRes.json()
-  const m = searchJson.results?.[0]
-  if (!m) {
-    return new Response(JSON.stringify({ found: false }), {
+  type SR = {
+    id: number
+    title?: string
+    original_title?: string
+    poster_path?: string | null
+    backdrop_path?: string | null
+    release_date?: string
+    vote_average?: number
+    genre_ids?: number[]
+    origin_country?: string[]
+  }
+  const candidates = ((searchJson.results ?? []) as SR[]).slice(0, 8).map((r) => ({
+    tmdb_id: r.id,
+    title: r.title ?? r.original_title ?? '',
+    year: r.release_date ? Number(String(r.release_date).slice(0, 4)) : 0,
+    poster_path: r.poster_path ?? '',
+    backdrop_path: r.backdrop_path ?? '',
+    vote_average: typeof r.vote_average === 'number' ? Number(r.vote_average.toFixed(1)) : null,
+    origin_country: (r.origin_country ?? [])[0] ?? '',
+  }))
+  const first = candidates[0]
+  if (!first) {
+    return new Response(JSON.stringify({ found: false, candidates: [] }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  // 详情接口补 runtime（search 不含）
+  // 详情接口补 runtime / 中文地区名 / 完整类型（search 不含这些）
   let runtime = 0
+  let region = ''
+  let genre: string[] = []
   try {
-    const detRes = await fetch(`${TMDB_BASE}/movie/${m.id}`, { headers: tmdbHeaders })
+    const detRes = await fetch(
+      `${TMDB_BASE}/movie/${first.tmdb_id}?language=zh-CN`,
+      { headers: tmdbHeaders },
+    )
     const det = await detRes.json()
     runtime = det.runtime ?? 0
+    const pc = det.production_countries ?? []
+    region = (pc[0]?.name as string) || first.origin_country || ''
+    const gids = (det.genres ?? []).map((g: { id: number }) => g.id)
+    genre = gids.map((id: number) => GENRE_MAP[id]).filter(Boolean)
   } catch { /* ignore */ }
-
-  const genre = ((m.genre_ids ?? []) as number[])
-    .map((id: number) => GENRE_MAP[id])
-    .filter(Boolean)
 
   return new Response(
     JSON.stringify({
       found: true,
-      poster_path: m.poster_path ?? '',
-      backdrop_path: m.backdrop_path ?? '',
-      vote_average: typeof m.vote_average === 'number' ? Number(m.vote_average.toFixed(1)) : null,
+      candidates,
+      poster_path: first.poster_path,
+      backdrop_path: first.backdrop_path,
+      vote_average: first.vote_average,
       genre,
-      origin_country: (m.origin_country ?? [])[0] ?? '',
-      release_date: m.release_date ?? '',
+      origin_country: region,
+      release_date: first.year ? `${first.year}-01-01` : '',
       runtime,
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
