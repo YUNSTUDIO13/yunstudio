@@ -123,18 +123,14 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
           className="flex max-w-4xl items-end gap-5"
           style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
         >
-          {/* 左侧封面：高度 = 信息块整体高度；宽幅图（backdrop）展示横版，竖版（cover）自动按比例显示 */}
+          {/* 左侧封面：与「观影记录」海报同 2:3 竖版比例（180×270），object-cover 居中裁剪宽幅图 */}
           {(movie.backdrop || movie.cover) && (
-            <div className="relative hidden h-[200px] w-[300px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10 md:block">
+            <div className="relative hidden h-[270px] w-[180px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block">
               <img
                 src={movie.backdrop || movie.cover}
                 alt={movie.title}
                 className="h-full w-full object-cover"
               />
-              {/* 标识：横版=剧照/背景图，竖版=海报 */}
-              <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/80 backdrop-blur-md">
-                {movie.backdrop ? '剧照' : '海报'}
-              </span>
             </div>
           )}
           {/* 右侧文字块 */}
