@@ -2014,20 +2014,6 @@ export default function MoviesPage() {
               </span>
             )}
           </button>
-          {/* 刷新（主动从云端拉取并本地对账：补手机端新建、PC 未收到 Realtime 时手动补） */}
-          <button
-            onClick={refreshFromCloud}
-            disabled={refreshing}
-            aria-label="从云端刷新"
-            className={`grid h-9 w-9 place-items-center rounded-full backdrop-blur-md transition ${
-              refreshing ? 'bg-white/20 text-accent' : 'bg-white/10 text-white hover:bg-white/20'
-            }`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={refreshing ? 'animate-spin' : ''}>
-              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-              <polyline points="21 3 21 9 15 9" />
-            </svg>
-          </button>
           {/* 功能（圆形按钮，点击展开批量导入 / 新建） */}
           <div className="relative" ref={funcRef}>
             <button
@@ -2067,6 +2053,17 @@ export default function MoviesPage() {
                     <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
                   </svg>
                   批量更新
+                </button>
+                {/* 刷新（从云端拉取并本地对账） */}
+                <button
+                  onClick={() => { setShowFunc(false); void refreshFromCloud() }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/85 transition hover:bg-white/10"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                    <polyline points="21 3 21 9 15 9" />
+                  </svg>
+                  刷新（从云端同步）
                 </button>
                 <button
                   onClick={() => { setShowFunc(false); setShowNew(true) }}
