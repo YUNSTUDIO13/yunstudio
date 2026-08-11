@@ -120,12 +120,15 @@ function Hero({ movie, onViewDetails }: { movie: Movie; onViewDetails: () => voi
       {/* 左下角信息块：左封面（backdrop 优先，否则 cover）+ 右文字块 */}
       <div className="absolute inset-x-0 bottom-0 px-6 pb-12 md:px-0 md:pl-[104px] md:pr-12 md:pb-20">
         <div
-          className="flex max-w-4xl items-start gap-5"
+          className="flex max-w-4xl items-stretch gap-5"
           style={{ animation: 'heroInfoIn 0.6s ease-out 0.2s both' }}
         >
-          {/* 左侧封面：与「观影记录」海报同 2:3 竖版比例（120×180），顶部对齐「爱情」标签行，整体高度不超过标题/评分/简介/按钮的信息块整段 */}
+          {/* 左侧封面：与「观影记录」海报同 2:3 竖版比例，高度撑满 flex 容器 —— 顶边对齐「爱情」标签行，底边对齐「查看详情」按钮底边 */}
           {(movie.backdrop || movie.cover) && (
-            <div className="relative hidden aspect-[2/3] w-[120px] shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block">
+            <div
+              className="relative hidden h-full w-auto shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 md:block"
+              style={{ aspectRatio: '2 / 3' }}
+            >
               <img
                 src={movie.backdrop || movie.cover}
                 alt={movie.title}
