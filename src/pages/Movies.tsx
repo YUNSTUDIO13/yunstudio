@@ -1507,7 +1507,7 @@ export default function MoviesPage() {
       </nav>
 
       {syncError && (
-        <div className="px-6 pt-24 md:px-12 md:pt-28">
+        <div className="px-6 pt-[92px] md:px-12">
           <div className="mb-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
             {syncError}
           </div>
@@ -1517,14 +1517,14 @@ export default function MoviesPage() {
       {/* 观影记录：PC 分栏（左列表压缩 · 右详情 7:3） / 移动端全屏弹窗 */}
       {selected && !isMobile ? (
         <div className="grid grid-cols-[7fr_3fr]">
-          <section className="px-6 pb-10 pt-24 md:px-12 md:pb-14 md:pt-28">
-            <h2 className="mb-5 text-base font-semibold text-white/90">
+          <section className="px-6 pb-10 pt-[92px] md:px-12 md:pb-14 md:pt-[92px]">
+            <h2 className="mb-6 text-base font-semibold text-white/90">
               观影记录
               <span className="ml-2 text-sm font-normal text-white/40">{visible.length} 部</span>
             </h2>
             <MovieList visible={visible} movies={movies} onOpen={openMovie} />
           </section>
-          <aside className="animate-slide-in sticky top-[72px] flex h-[calc(100vh-72px)] flex-col border-l border-white/10 bg-black/40 backdrop-blur-xl">
+          <aside className="animate-slide-in sticky top-[68px] flex h-[calc(100vh-68px)] flex-col border-l border-white/10 bg-black/40 backdrop-blur-xl">
             <button
               onClick={() => setSelected(null)}
               aria-label="关闭"
@@ -1544,8 +1544,8 @@ export default function MoviesPage() {
         </div>
       ) : (
         <>
-          <section className="px-6 pt-24 pb-10 md:px-12 md:pt-28 md:pb-14">
-            <h2 className="mb-5 text-base font-semibold text-white/90">
+          <section className="px-6 pt-[92px] pb-10 md:px-12 md:pb-14">
+            <h2 className="mb-6 text-base font-semibold text-white/90">
               观影记录
               <span className="ml-2 text-sm font-normal text-white/40">{visible.length} 部</span>
             </h2>
