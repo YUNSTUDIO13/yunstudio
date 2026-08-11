@@ -156,7 +156,7 @@ export default function Overview() {
               }
             />
             <Display size={isMobile ? 32 : 28}>{doneTodos}</Display>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 'auto' }}>
               <MetricPill label={`已完成 ${doneTodos}`} color={C.accent} bg={C.accentSoft} />
               <MetricPill label={`总完成度 ${todayPct}%`} color={C.green} bg="rgba(94,234,212,.09)" />
             </div>
@@ -232,7 +232,7 @@ export default function Overview() {
                 <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 'auto' }}>
               <MetricPill label={`已上线 ${reqLaunched}`} color={C.green} bg="rgba(94,234,212,.09)" />
               <MetricPill label={`待上线 ${reqPendingLaunch}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
@@ -245,7 +245,7 @@ export default function Overview() {
           <Card style={{ height: '100%', padding: '15px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
             <CardHeader title="需求概览" icon={<IconFile />} style={{ marginBottom: 0 }} />
             <Display size={isMobile ? 32 : 28}>{reqActive}</Display>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 'auto' }}>
               <MetricPill label={`待评审 ${reqInReview}`} color={C.amber} bg="rgba(251,191,36,.09)" />
               <MetricPill label={`研发中 ${reqInDev}`} color={C.accent} bg={C.accentSoft} />
             </div>
@@ -284,7 +284,7 @@ export default function Overview() {
           <Card style={{ height: '100%', padding: '15px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
             <CardHeader title="缺陷概览" icon={<IconBell />} style={{ marginBottom: 0 }} />
             <Display size={isMobile ? 32 : 28}>{bugOpen}</Display>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 2 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 'auto' }}>
               <MetricPill label={`致命 ${bugCritical}`} color={C.red} bg="rgba(248,113,113,.09)" />
               <MetricPill label={`严重 ${bugSevere}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
