@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ClipboardEvent } from 'react'
 import { Modal, Field, Input, Textarea, Button, ConfirmDialog } from '../components/ui'
-import { db } from '../lib/localDb'
+import { db, pendingRowIds } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush, setSyncStatusHandler } from '../lib/sync'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -1725,13 +1725,17 @@ export default function MoviesPage() {
     let cancelled = false
     async function load() {
       setLoading(true)
-      // 本地优先：先立即从 IndexedDB 秒出数据（首屏不卡），再后台静默与云端对齐
+      // 本地优先：先立即从 IndexedDB 秒出数据（首屏不卡）
       await reload()
       if (cancelled) return
-      await seedFromServer('movies', userId)
-      if (cancelled) return
-      // 云端对齐完成后再刷一次（反映跨端更新 / 跨端删除回收）
-      await reload()
+      // 仅当本地无数据时才全量注水（首装/清缓存）；已有本地数据时依赖 Realtime 行级增量同步，
+      // 避免每次进页面都 bulkPut 177 行导致手机端卡顿（删除等操作的后台对齐同理）。
+      const localCount = await db.movies.where('user_id').equals(userId).count()
+      if (localCount === 0) {
+        await seedFromServer('movies', userId)
+        if (cancelled) return
+        await reload()
+      }
     }
     void load()
     return () => { cancelled = true }
@@ -1744,19 +1748,31 @@ export default function MoviesPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'movies', filter: `user_id=eq.${userId}` },
-        (payload: { eventType?: string; old?: { id?: string } }) => {
-          // 显式删除事件：按 id 精确删本地（跨端删除一致性），绝不靠"猜孤儿"
-          if (payload.eventType === 'DELETE' && payload.old?.id) {
-            void (async () => {
-              await db.movies.delete(payload.old!.id as string)
-              await reload()
-            })()
+        (payload: { eventType?: string; old?: { id?: string }; new?: Record<string, unknown> }) => {
+          const et = payload.eventType
+          const oldId = payload.old?.id
+          const newRow = payload.new as (Record<string, unknown> & { id?: string }) | undefined
+          // 删除：按 id 精确删本地（跨端删除一致性），绝不靠"猜孤儿"
+          if (et === 'DELETE' || (oldId && !newRow?.id)) {
+            if (oldId) {
+              void (async () => {
+                await db.movies.delete(oldId)
+                await reload()
+              })()
+            }
             return
           }
-          void (async () => {
-            await seedFromServer('movies', userId)
-            await reload()
-          })()
+          // 新增/更新：用 payload.new 做行级精准 upsert，避免回显时全量重拉 177 行（手机端卡顿根因）。
+          // 保护本地未同步编辑：该行在 outbox/pending 中则跳过，不覆盖本地最新（LWW 一致）。
+          if (newRow?.id) {
+            void (async () => {
+              const pending = await pendingRowIds('movies')
+              if (!pending.has(String(newRow.id))) {
+                await db.movies.put(newRow as unknown as Movie)
+              }
+              await reload()
+            })()
+          }
         },
       )
       .subscribe()
