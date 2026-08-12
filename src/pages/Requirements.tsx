@@ -398,7 +398,7 @@ export default function Requirements() {
         return (
           <div
             key={q.priority}
-            style={{ ...glass.card, borderRadius: 18, padding: '22px 24px', minHeight: 200, position: 'relative', overflow: 'hidden' }}
+            style={{ ...glass.card, borderRadius: 18, padding: '16px', minHeight: 200, position: 'relative', overflow: 'hidden' }}
           >
             <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 50%, transparent)' }} />
             <div className="mb-3 flex items-center justify-between gap-2">
