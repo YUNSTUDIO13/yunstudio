@@ -527,21 +527,64 @@ function MovieDetailPanel({
               {draft.synced ? '已同步第三方数据' : '未同步，点击「同步数据」获取封面 / 评分等信息'}
             </span>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
             {!editing && (
               <>
-                <Button variant="soft" onClick={() => setShowReserve(true)}>
-                  预约观看
-                </Button>
-                <Button variant="soft" onClick={handleSync} disabled={syncing}>
-                  {syncing ? '同步中…' : draft.cover_failed ? '手动获取封面' : '同步数据'}
-                </Button>
-                <Button variant="soft" onClick={() => setEditing(true)}>
-                  编辑
-                </Button>
-                <Button variant="ghost" className="!text-danger hover:!bg-danger/10" onClick={() => onDelete(draft)}>
-                  删除
-                </Button>
+                {/* 预约观看：提醒图标 */}
+                <button
+                  type="button"
+                  onClick={() => setShowReserve(true)}
+                  title="预约观看"
+                  aria-label="预约观看"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M6 8a6 6 0 0112 0c0 7 3 7 3 9H3c0-2 3-2 3-9z" />
+                    <path d="M10 21a2 2 0 004 0" />
+                  </svg>
+                </button>
+                {/* 同步数据：刷新图标 */}
+                <button
+                  type="button"
+                  onClick={handleSync}
+                  disabled={syncing}
+                  title={syncing ? '同步中…' : draft.cover_failed ? '手动获取封面' : '同步数据'}
+                  aria-label="同步数据"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20 disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M21 12a9 9 0 11-3-6.7L21 8" />
+                    <path d="M21 3v5h-5" />
+                  </svg>
+                </button>
+                {/* 编辑：铅笔图标 */}
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  title="编辑"
+                  aria-label="编辑"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" />
+                  </svg>
+                </button>
+                {/* 删除：垃圾桶图标（保留红色危险暗示） */}
+                <button
+                  type="button"
+                  onClick={() => onDelete(draft)}
+                  title="删除"
+                  aria-label="删除"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-danger/10 text-danger backdrop-blur-md transition hover:bg-danger/20"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                </button>
               </>
             )}
             {editing && (
