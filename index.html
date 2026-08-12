@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="zh-CN" data-skin="flat-dark">
+<html lang="zh-CN" data-skin="flat-light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0E1015" />
+    <meta name="theme-color" content="#F9FAFB" />
     <script>
       // 首屏去闪：在绘制前同步设置 data-skin 与状态栏颜色，避免先闪液态玻璃再切换
       // 根因：React 的 AppShell useEffect 在首帧绘制后才执行，<html> 彼时还无 data-skin，
       // 基础（液态玻璃）样式会先绘制约 0.5s 再被覆盖。此脚本在 <head> 阻塞执行，先于首次 paint。
       (function () {
         try {
-          var DEFAULT_SKIN = 'flat-dark';
+          var DEFAULT_SKIN = 'flat-light';
           var THEME_COLORS = { 'liquid-glass': '#040408', 'flat-dark': '#0E1015', 'flat-light': '#F9FAFB' };
           var VALID = { 'liquid-glass': 1, 'flat-dark': 1, 'flat-light': 1 };
           var skin = DEFAULT_SKIN;

@@ -39,25 +39,25 @@ export interface ThemeConfig {
   color: string
 }
 
-/** 全站皮肤 id：flat-dark（默认，ByeWind 暗色系） / liquid-glass（经典沉浸玻璃） / flat-light（ByeWind 白色扁平，浅底卡片） */
+/** 全站皮肤 id：flat-light（默认，ByeWind 白色仪表板） / flat-dark（ByeWind 暗色扁平） / liquid-glass（经典沉浸玻璃） */
 export type SkinId = 'liquid-glass' | 'flat-dark' | 'flat-light'
 
 export const SKIN_LABELS: Record<SkinId, { title: string; desc: string }> = {
+  'flat-light': {
+    title: '纯白简约',
+    desc: '默认风格·ByeWind 白色仪表板——白底卡片 + 极淡边 + 深字 + 克制蓝强调，去除毛玻璃与极光，强光环境下长时间阅读更舒服，与 eCommerce 参考图一致',
+  },
   'flat-dark': {
     title: '现代仪表板',
-    desc: '默认风格·ByeWind 暗色系——柔和深蓝黑底 + 浅一档卡 + 极细边 + 18px 圆角，几乎无阴影，靠卡片与背景亮度差自然浮起，去除所有毛玻璃与极光',
+    desc: 'ByeWind 暗色系——柔和深蓝黑底 + 浅一档卡 + 极细边 + 18px 圆角，几乎无阴影，靠卡片与背景亮度差自然浮起，去除所有毛玻璃与极光',
   },
   'liquid-glass': {
     title: '液态玻璃',
     desc: '经典沉浸风格——深色玻璃拟态 + 极光氛围，沉浸感强，适合桌面/带独显设备（可在皮肤页随时切回）',
   },
-  'flat-light': {
-    title: '纯白简约',
-    desc: 'ByeWind 白色风格——白底卡片 + 极淡边 + 深字 + 克制蓝强调，去除毛玻璃与极光，强光环境下长时间阅读更舒服',
-  },
 }
 
-export const SKIN_IDS: SkinId[] = ['flat-dark', 'liquid-glass', 'flat-light']
+export const SKIN_IDS: SkinId[] = ['flat-light', 'flat-dark', 'liquid-glass']
 
 /** UI 设置总配置（按用户持久化到 user_configs / kind='ui_settings'） */
 export interface UISettingsConfig {
@@ -85,7 +85,7 @@ export function defaultUISettings(): UISettingsConfig {
       particles: { enabled: true, color: DEFAULT_THEME_COLOR.particles },
       comet: { enabled: true, color: DEFAULT_THEME_COLOR.comet },
     },
-    skin: 'flat-dark',   // 默认皮肤改为 ByeWind 暗色系（老用户若已存皮肤则 hydrate 保留，不受影响）
+    skin: 'flat-light',  // 默认皮肤改为 ByeWind 白色仪表板（老用户若已存皮肤则 hydrate 保留，不受影响）
   }
 }
 
