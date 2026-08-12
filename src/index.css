@@ -49,8 +49,18 @@ nav.fixed,
   border-bottom-color: transparent !important;
 }
 
-/* ---- 全局：.border-line 用 var（穿透三皮肤） ---- */
-.border-line {
+/* ---- 全局：.border-line 用 var（穿透三皮肤，2026-08-12 #5 治本） ----
+   根因：tailwind.config.js 里 line:'#26262E'，Tailwind 编译出 .border-line{border-color:rgb(38,38,46)}
+   静态 utility，把"白底黑分割线"焊死在 css 里。前面在 flat-light 段写过的覆盖 + index.css 顶部
+   的 .border-line{...!important} 都只是覆盖规则，specificity 与 Tailwind 同级 (0,1,0)，理论上
+   !important 胜出，但实测用户浏览器仍看到深色——必然是 SW 缓存住旧 utility 没拿到我们的覆盖。
+   治法：① tailwind.config.js 让 line='var(--c-line)'，Tailwind 生成的 utility 本身就引用变量，
+         任何 css 版本都会跟着皮肤走；
+         ② 此处把覆盖升到 'html .border-line' (specificity 0,1,1)，压过 Tailwind utility (0,1,0)，
+            即使 SW 缓存住旧 utility 也能强制用 var(--c-line) 覆盖；
+         ③ :root + flat-light + flat-dark 三段都已经定义 --c-line（暗色 8% 白边 / 亮色 6% 黑边）。*/
+html .border-line,
+html [data-skin] .border-line {
   border-color: var(--c-line) !important;
 }
 

@@ -10,7 +10,7 @@ export default {
         'ink-strong': '#ECECF4',  // 主文本（近白）
         'ink-soft': '#9A9CA8',    // 副文本
         'ink-mute': '#6B6E78',    // 弱化文本
-        line: '#26262E',          // 细线/边框（玻璃边由 .glass-* 提供）
+        line: 'var(--c-line)',     // 细线/边框引用 --c-line（2026-08-12 #5 治本：不再让 Tailwind 编译出 rgb(38,38,46) 硬编码 utility，把"白底黑分割线"焊死在 css 里；现在 utility 本身就跟着皮肤走）
         brand: '#7c85f5',         // 主按钮（靛紫，渐变由 ui Button 处理）
         'brand-soft': '#1A1A24',  // 次按钮底
         accent: '#7c85f5',        // 靛紫强调

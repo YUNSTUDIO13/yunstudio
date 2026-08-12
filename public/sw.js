@@ -14,6 +14,14 @@
  *   MegaMenu 三级菜单 hover 用 accent 高亮。皇上根因排查后确认"不是 SW 缓存问题，
  *   是修复只在 [data-skin=flat-light] 段生效"。本次把全部 5 个 bug 都做到 :root 默认值 +
  *   三皮肤覆盖，**绝不再依赖单段**。客户端请卸载 PWA 重装或 Ctrl+Shift+R 硬刷。
+ *
+ * 2026-08-12 #5 「分割线治本」—— 根因是 tailwind.config.js 里 line:'#26262E' 硬编码，
+ *   Tailwind 编译出 .border-line{border-color:rgb(38,38,46)} 静态 utility 把"白底黑分割线"
+ *   焊死，flat-light 下用 !important 覆盖也压不住（用户浏览器 SW 缓存到旧 utility）。
+ *   治法：① tailwind.config.js 让 line='var(--c-line)'，utility 本身引用变量；
+ *         ② index.css 把 .border-line 覆盖升到 'html .border-line' (specificity 0,1,1)
+ *            压过 Tailwind (0,1,0)，双保险。本轮 sw.js bytes 必然变更，触发客户端 install +
+ *            清旧 cache —— 即使 PWA 不重开也能拿到新壳。
  */
 const VERSION = '__SW_VERSION__';
 const APP_SHELL = [
