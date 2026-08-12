@@ -4,7 +4,10 @@
 export default function AuroraBackground() {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      <div style={{ position: 'absolute', inset: 0, background: '#040408' }} />
+      {/* 顶层画布：顶部一小段融入 theme_color(#0d0c1a) 再过渡到底色 #040408。
+          目的：让状态栏(系统层theme_color)与网页内容的边界同色，视觉上消除安卓Chrome在
+          standalone模式下绘制的系统级状态栏分隔线(灰线)。 */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, #0d0c1a 0%, #0d0c1a 7%, #040408 26%)' }} />
       {/* 顶部极光带 —— 让沉浸式状态栏透出有质感的紫调极光而非死黑画布（状态栏高度区域即其下缘） */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: '42vh',
