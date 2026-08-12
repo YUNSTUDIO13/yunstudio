@@ -1,5 +1,15 @@
 import { useEffect, useRef } from 'react'
-import { THEME_IDS, THEME_LABELS, useUI, type ThemeId, type UISettingsConfig } from '../context/UIContext'
+import {
+  THEME_IDS,
+  THEME_LABELS,
+  SKIN_IDS,
+  SKIN_LABELS,
+  useUI,
+  useSkin,
+  type ThemeId,
+  type SkinId,
+  type UISettingsConfig,
+} from '../context/UIContext'
 import { renderIcon } from '../lib/icon-library'
 
 // ============================================================
@@ -189,10 +199,133 @@ function ThemePreview({ themeId, color }: { themeId: ThemeId; color: string }) {
 }
 
 // ============================================================
+// 皮肤预览缩略（手写样式展示皮肤的"真容"，不依赖 .glass-card / data-skin）
+// ============================================================
+function SkinPreview({ skinId }: { skinId: SkinId }) {
+  // 两套皮肤色板：与 index.css 覆盖层的值严格一致，保证所见即所得
+  const palette = skinId === 'liquid-glass'
+    ? {
+        bg: '#0e0e16',
+        cardBg: 'rgba(255,255,255,0.038)',
+        cardBorder: 'rgba(255,255,255,0.08)',
+        radius: 20,
+        accent: '#7c85f5',
+        text: 'rgba(255,255,255,0.88)',
+        mute: 'rgba(255,255,255,0.55)',
+        hint: 'rgba(255,255,255,0.10)',
+      }
+    : {
+        bg: '#000',
+        cardBg: '#0a0a0a',
+        cardBorder: '#1a1a1a',
+        radius: 24,
+        accent: '#3b82f6',
+        text: 'rgba(255,255,255,0.92)',
+        mute: 'rgba(255,255,255,0.6)',
+        hint: '#1a1a1a',
+      }
+  return (
+    <div
+      className="flex h-32 w-full flex-col gap-1.5 overflow-hidden rounded-xl p-2"
+      style={{ backgroundColor: palette.bg }}
+    >
+      <div
+        className="flex-1 overflow-hidden p-2"
+        style={{
+          backgroundColor: palette.cardBg,
+          border: `1px solid ${palette.cardBorder}`,
+          borderRadius: palette.radius,
+        }}
+      >
+        <div
+          className="text-[11px] font-semibold leading-tight"
+          style={{ color: palette.text }}
+        >
+          卡片标题
+        </div>
+        <div className="mt-0.5 text-[9px]" style={{ color: palette.mute }}>
+          副标题/描述文字
+        </div>
+        <div className="mt-1.5 flex items-center gap-1">
+          <span
+            className="rounded-full px-2 py-0.5 text-[8px] font-medium"
+            style={{ backgroundColor: palette.accent, color: '#fff' }}
+          >
+            主按钮
+          </span>
+          <span
+            className="rounded-full px-2 py-0.5 text-[8px]"
+            style={{
+              backgroundColor: palette.hint,
+              color: palette.mute,
+            }}
+          >
+            胶囊
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// 皮肤选择卡
+// ============================================================
+function SkinCard({
+  skinId,
+  active,
+  onSelect,
+}: {
+  skinId: SkinId
+  active: boolean
+  onSelect: () => void
+}) {
+  const meta = SKIN_LABELS[skinId]
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      className={`
+        group relative flex flex-col gap-3 rounded-2xl border p-4 text-left transition
+        ${active
+          ? 'border-accent bg-accent/5 shadow-glow'
+          : 'border-line bg-surface/40 hover:border-ink-strong/60'}
+      `}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-ink-strong">{meta.title}</div>
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">{meta.desc}</p>
+        </div>
+        {/* 选中指示器 */}
+        <span
+          className={`
+            grid h-5 w-5 shrink-0 place-items-center rounded-full border transition
+            ${active ? 'border-accent bg-accent text-white' : 'border-line bg-transparent'}
+          `}
+        >
+          {active && (
+            <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 10l3 3 7-7" />
+            </svg>
+          )}
+        </span>
+      </div>
+      <SkinPreview skinId={skinId} />
+      <div className="text-[11px] text-ink-mute">
+        {active ? '当前生效 · 即时切换' : '点击切换到此皮肤'}
+      </div>
+    </button>
+  )
+}
+
+// ============================================================
 // 主页面
 // ============================================================
 export default function UISettings() {
-  const { settings, update, reset } = useUI()
+  const { settings, update, reset, setSkin } = useUI()
+  const currentSkin = useSkin()
 
   // 总开关
   const setEnabled = (enabled: boolean) => update({ enabled })
@@ -259,11 +392,31 @@ export default function UISettings() {
           </button>
         </div>
 
-        {!settings.enabled && (
-          <div className="mt-3 rounded-lg border border-line bg-surface/60 px-3 py-2 text-xs text-ink-soft">
-            ⓘ 总开关关闭，下方主题即使勾选也不会渲染。
-          </div>
-        )}
+{!settings.enabled && (
+        <div className="mt-3 rounded-lg border border-line bg-surface/60 px-3 py-2 text-xs text-ink-soft">
+          ⓘ 总开关关闭，下方主题即使勾选也不会渲染。
+        </div>
+      )}
+      </section>
+
+      {/* 皮肤 */}
+      <section className="flex flex-col gap-3">
+        <h2 className="px-1 text-sm font-semibold uppercase tracking-wider text-ink-soft">
+          皮肤
+        </h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {SKIN_IDS.map((id) => (
+            <SkinCard
+              key={id}
+              skinId={id}
+              active={currentSkin === id}
+              onSelect={() => setSkin(id)}
+            />
+          ))}
+        </div>
+        <p className="mt-1 px-1 text-xs text-ink-soft">
+          皮肤仅影响全站视觉（背景、卡片、圆角），与上方的指针特效独立，可自由组合。
+        </p>
       </section>
 
       {/* 主题列表 */}

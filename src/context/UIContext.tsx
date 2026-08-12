@@ -39,13 +39,31 @@ export interface ThemeConfig {
   color: string
 }
 
+/** 全站皮肤 id：liquid-glass（默认，老用户无感） / flat-dark（参照图风格，去毛玻璃） */
+export type SkinId = 'liquid-glass' | 'flat-dark'
+
+export const SKIN_LABELS: Record<SkinId, { title: string; desc: string }> = {
+  'liquid-glass': {
+    title: '液态玻璃',
+    desc: '当前默认风格——深色玻璃拟态 + 极光氛围，沉浸感强，适合桌面/带独显设备',
+  },
+  'flat-dark': {
+    title: '纯黑扁平',
+    desc: '参照深色仪表板风格——纯黑底 + 实色边框 + 圆角放大，去除所有毛玻璃与极光，性能更轻',
+  },
+}
+
+export const SKIN_IDS: SkinId[] = ['liquid-glass', 'flat-dark']
+
 /** UI 设置总配置（按用户持久化到 user_configs / kind='ui_settings'） */
 export interface UISettingsConfig {
-  version: 1
+  version: 2
   /** 总开关：默认关闭；关闭时全局指针特效一律不渲染 */
   enabled: boolean
   /** 各主题配置；颜色独立 */
   themes: Record<ThemeId, ThemeConfig>
+  /** 全站皮肤（独立于指针特效，可自由组合） */
+  skin: SkinId
   /** 编辑时间戳 ISO（与 nav / dashboard 对齐，便于多端 last-write-wins） */
   updated_at?: string
 }
@@ -57,27 +75,38 @@ const DEFAULT_THEME_COLOR: Record<ThemeId, string> = {
 
 export function defaultUISettings(): UISettingsConfig {
   return {
-    version: 1,
+    version: 2,
     enabled: false,
     themes: {
       particles: { enabled: true, color: DEFAULT_THEME_COLOR.particles },
       comet: { enabled: true, color: DEFAULT_THEME_COLOR.comet },
     },
+    skin: 'liquid-glass',
   }
 }
 
 function isUISettings(x: unknown): x is UISettingsConfig {
-  return !!x && typeof x === 'object' && (x as UISettingsConfig).version === 1
-    && typeof (x as UISettingsConfig).enabled === 'boolean'
-    && !!(x as UISettingsConfig).themes
+  if (!x || typeof x !== 'object') return false
+  const v = (x as { version?: unknown }).version
+  if (v !== 1 && v !== 2) return false
+  const cfg = x as UISettingsConfig
+  if (typeof cfg.enabled !== 'boolean') return false
+  if (!cfg.themes) return false
+  return true
 }
 
-/** 兜底合并：缺字段时回填默认值（向后兼容老版本配置） */
+const VALID_SKINS: readonly string[] = SKIN_IDS
+
+/** 兜底合并：缺字段时回填默认值（向后兼容老版本 v1 配置） */
 function hydrate(s: UISettingsConfig): UISettingsConfig {
   const def = defaultUISettings()
   return {
     ...def,
     ...s,
+    version: 2,
+    skin: VALID_SKINS.includes((s as Partial<UISettingsConfig>).skin ?? '')
+      ? ((s as UISettingsConfig).skin as SkinId)
+      : def.skin,
     themes: {
       particles: { ...def.themes.particles, ...(s.themes?.particles ?? {}) },
       comet: { ...def.themes.comet, ...(s.themes?.comet ?? {}) },
@@ -92,6 +121,10 @@ interface UIContextValue {
   update: (patch: Partial<UISettingsConfig> | ((s: UISettingsConfig) => UISettingsConfig)) => void
   /** 重置默认 */
   reset: () => void
+  /** 当前皮肤（已 hydrate 过） */
+  skin: SkinId
+  /** 快速 set 皮肤（独立轴，绕过 themes，便于在 AppShell 同步 DOM） */
+  setSkin: (s: SkinId) => void
 }
 
 const UIContext = createContext<UIContextValue | null>(null)
@@ -259,9 +292,21 @@ export function UIProvider({ children }: { children: ReactNode }) {
     void persist(defaultUISettings())
   }, [persist])
 
+  const setSkin = useCallback(
+    (next: SkinId) => update({ skin: next }),
+    [update],
+  )
+
   const value = useMemo<UIContextValue>(
-    () => ({ settings, hydrated, update, reset }),
-    [settings, hydrated, update, reset],
+    () => ({
+      settings,
+      hydrated,
+      update,
+      reset,
+      skin: settings.skin,
+      setSkin,
+    }),
+    [settings, hydrated, update, reset, setSkin],
   )
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>
@@ -279,4 +324,9 @@ export function useSettingsRef() {
   const ref = useRef(settings)
   ref.current = settings
   return ref
+}
+
+/** 取当前皮肤（已被 hydrate） */
+export function useSkin(): SkinId {
+  return useUI().skin
 }

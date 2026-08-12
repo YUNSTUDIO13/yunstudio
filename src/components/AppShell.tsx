@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../context/ProfileContext'
 import { useNav } from '../context/NavContext'
+import { useSkin } from '../context/UIContext'
 import { renderIcon } from '../lib/icon-library'
 import logoUrl from '/logo.jpg'
 import { useMediaQuery } from '../lib/useMediaQuery'
@@ -111,9 +112,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { profile } = useProfile()
   const { config, hydrated, findPrimaryByModule } = useNav()
+  const skin = useSkin()
   const location = useLocation()
   const navigate = useNavigate()
   const isMobile = useMediaQuery('(max-width: 767px)')
+
+  // 把当前皮肤同步到 <html data-skin="...">，CSS 用属性选择器限定覆盖
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.documentElement.dataset.skin = skin
+    return () => {
+      // 不主动清，React 卸载时清掉即可
+    }
+  }, [skin])
 
   const [openPrimaryId, setOpenPrimaryId] = useState<string | null>(null)
   // 系统设置（固定 dock 入口）的独立展开状态；与 openPrimaryId 互斥
@@ -238,7 +249,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative min-h-screen bg-canvas text-ink-strong">
-      <AuroraBackground />
+      {/* flat-dark 皮肤：去掉极光氛围背景（性能顺带收益），液态玻璃保留 */}
+      {skin === 'liquid-glass' && <AuroraBackground />}
       <CursorFX />
       {/* ===== 桌面：左上悬浮 dock（主页 + 一级 Tab） ===== */}
       <aside
