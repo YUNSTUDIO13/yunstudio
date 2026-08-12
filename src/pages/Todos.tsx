@@ -540,6 +540,14 @@ export default function Todos() {
                                   </a>
                                 )}
                               </div>
+                              {t.note && (
+                                <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
+                                  <div className="break-words">
+                                    <span className="text-ink-mute/80">备注：</span>
+                                    <span>{t.note}</span>
+                                  </div>
+                                </div>
+                              )}
                               <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">
                                 Score {computeScore(t)}
                                 {risk === 'overdue'
