@@ -215,14 +215,21 @@ function SkinPreview({ skinId }: { skinId: SkinId }) {
         hint: 'rgba(255,255,255,0.10)',
       }
     : {
-        bg: '#000',
-        cardBg: '#0a0a0a',
-        cardBorder: '#1a1a1a',
-        radius: 24,
-        accent: '#3b82f6',
-        text: 'rgba(255,255,255,0.92)',
-        mute: 'rgba(255,255,255,0.6)',
-        hint: '#1a1a1a',
+        // 与 src/index.css [data-skin='flat-dark'] 段的 var(--xxx) 严格一致
+        bg: '#0E1015',                                     // 画布：柔和深蓝黑
+        cardBg: '#1A1C22',                                 // 卡：比画布亮 8%
+        cardBorder: 'rgba(255,255,255,0.06)',              // 0.5px 极细边（用 box-shadow 实现）
+        radius: 18,                                        // 卡圆角（参考图 16-20）
+        accent: 'rgba(255,255,255,0.08)',                  // 选中态：克制
+        accentBorder: 'rgba(255,255,255,0.45)',            // 选中态边
+        primaryBtnBg: 'linear-gradient(180deg, #ffffff 0%, #e8e8ec 100%)',  // 主按钮白底
+        primaryBtnColor: '#0a0a0a',
+        text: '#ffffff',
+        base: 'rgba(255,255,255,0.92)',
+        mute: 'rgba(255,255,255,0.65)',
+        sub: 'rgba(255,255,255,0.42)',
+        hint: 'rgba(255,255,255,0.06)',                    // 次级胶囊底
+        hintBorder: 'rgba(255,255,255,0.07)',
       }
   return (
     <div
@@ -233,7 +240,7 @@ function SkinPreview({ skinId }: { skinId: SkinId }) {
         className="flex-1 overflow-hidden p-2"
         style={{
           backgroundColor: palette.cardBg,
-          border: `1px solid ${palette.cardBorder}`,
+          boxShadow: `0 0 0 0.5px ${palette.cardBorder}, 0 1px 3px rgba(0,0,0,0.25)`,
           borderRadius: palette.radius,
         }}
       >
@@ -248,16 +255,21 @@ function SkinPreview({ skinId }: { skinId: SkinId }) {
         </div>
         <div className="mt-1.5 flex items-center gap-1">
           <span
-            className="rounded-full px-2 py-0.5 text-[8px] font-medium"
-            style={{ backgroundColor: palette.accent, color: '#fff' }}
+            className="rounded-md px-2 py-0.5 text-[8px] font-semibold"
+            style={{
+              backgroundImage: palette.primaryBtnBg,
+              color: palette.primaryBtnColor,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            }}
           >
             主按钮
           </span>
           <span
-            className="rounded-full px-2 py-0.5 text-[8px]"
+            className="rounded-md px-2 py-0.5 text-[8px]"
             style={{
               backgroundColor: palette.hint,
               color: palette.mute,
+              boxShadow: `0 0 0 0.5px ${palette.hintBorder}`,
             }}
           >
             胶囊

@@ -135,158 +135,187 @@ input[type='time'] {
 }
 
 /* ============================================================
- * 纯黑扁平皮肤（flat-dark）覆盖层
- * 设计：5 阶灰度层级 + 边缘高光 + 白底主按钮去紫
- * 性能：0 动画 / 0 backdrop-filter，仅 box-shadow 提供层次
+ * 纯黑扁平皮肤（flat-dark）覆盖层 —— "ByeWind 仪表板" 风格
+ * 目标：在深色画布上用"浅一档的卡片"自然浮起，极弱边、极弱阴影
+ * 设计特征：柔和深蓝黑画布 / 卡 #1A1C22 / 边 0.5px 极细 / 圆角 18px / 0 inset 阴影
+ * 性能：0 动画 + 0 backdrop-filter + 0 重绘阴影层
  * ============================================================ */
 
-/* 全局：5 阶灰度 + 画布纯黑 */
+/* ---- 全局：5 阶灰度 + 柔和深蓝黑画布（不像纯#000 那么硬） ---- */
 [data-skin='flat-dark'] {
-  --ink-strong: #ffffff;                       /* 主标题：纯白 */
-  --ink-base: rgba(255, 255, 255, 0.92);        /* 正文 */
-  --ink-soft: rgba(255, 255, 255, 0.72);        /* 辅助（↑ 提亮，原 0.55 太弱） */
-  --ink-mute: rgba(255, 255, 255, 0.5);         /* 弱化（↑ 提亮，原 0.4 太弱） */
-  --ink-subtle: rgba(255, 255, 255, 0.32);      /* placeholder / disabled */
+  --ink-strong: #ffffff;
+  --ink-base: rgba(255, 255, 255, 0.92);
+  --ink-soft: rgba(255, 255, 255, 0.65);     /* 辅助（贴近参考图二级灰度） */
+  --ink-mute: rgba(255, 255, 255, 0.42);      /* 弱化（避免在纯#000 上"黑乎乎"） */
+  --ink-subtle: rgba(255, 255, 255, 0.28);    /* placeholder / disabled */
+  --canvas: #0E1015;                          /* 主画布（带一点蓝调，比#000 温润） */
+  --surface: #15181E;                         /* 输入框/小容器底（介于画布和卡之间） */
+  --card: #1A1C22;                            /* 通用卡（比画布亮 8%，自然浮起） */
+  --modal: #1F2128;                           /* 弹层/Modal（比卡再亮一档，更跳出） */
+  --edge: rgba(255, 255, 255, 0.06);          /* 0.5px 边（用 box-shadow 实现 0.5px） */
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.25);    /* 极弱投影，无 inset */
   color-scheme: dark;
 }
 [data-skin='flat-dark'] body {
-  background-color: #000;
-  color: rgba(255, 255, 255, 0.92);
+  background-color: var(--canvas);
+  color: var(--ink-base);
 }
 
-/* Tailwind 语义类覆盖：把 ink-strong/soft/mute 提到新值 */
-[data-skin='flat-dark'] .text-ink-strong { color: #ffffff !important; }
-[data-skin='flat-dark'] .text-ink-base   { color: rgba(255, 255, 255, 0.92) !important; }
-[data-skin='flat-dark'] .text-ink-soft   { color: rgba(255, 255, 255, 0.72) !important; }
-[data-skin='flat-dark'] .text-ink-mute   { color: rgba(255, 255, 255, 0.5) !important; }
-[data-skin='flat-dark'] .text-ink-subtle { color: rgba(255, 255, 255, 0.32) !important; }
-[data-skin='flat-dark'] .border-line     { border-color: rgba(255, 255, 255, 0.08) !important; }
+/* ---- Tailwind 语义类：把 ink 全部提到灰度（参考图风格） ---- */
+[data-skin='flat-dark'] .text-ink-strong { color: var(--ink-strong) !important; }
+[data-skin='flat-dark'] .text-ink-base   { color: var(--ink-base) !important; }
+[data-skin='flat-dark'] .text-ink-soft   { color: var(--ink-soft) !important; }
+[data-skin='flat-dark'] .text-ink-mute   { color: var(--ink-mute) !important; }
+[data-skin='flat-dark'] .text-ink-subtle { color: var(--ink-subtle) !important; }
+[data-skin='flat-dark'] .border-line     { border-color: rgba(255, 255, 255, 0.07) !important; }
 
-/* 通用卡：#0d0d0d 比画布亮 13/255，比 Modal 暗，配 1px 半透白边 + 顶部金属高光 */
+/* ============================================================
+ * 卡片三种层次（看图：画布 < 输入框 < 通用卡 < 弹层）
+ * 全部用 0.5px 边（box-shadow 实现）+ 极弱投影 + 0 inset
+ * ============================================================ */
+
+/* 通用卡 .glass-card：#1A1C22，靠"比画布浅一档"自然浮起 */
 [data-skin='flat-dark'] .glass-card {
-  background: #0d0d0d;
+  background: var(--card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 24px;
+  border: 0;                                  /* 边用 box-shadow 实现 0.5px */
+  border-radius: 18px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),       /* 顶部金属高光 */
-    inset 0 -1px 0 rgba(0, 0, 0, 0.45),             /* 底部暗边 */
-    0 0 0 0.5px rgba(255, 255, 255, 0.025);          /* 极细外缘描边 */
+    0 0 0 0.5px var(--edge),                  /* 极细外缘描边 */
+    0 1px 3px rgba(0, 0, 0, 0.25);            /* 极弱投影 */
 }
 
-/* Modal/容器：#131313 比卡亮，自然浮起，更强的高光 */
+/* 容器/Modal .glass-panel：#1F2128，比卡亮一档更跳出 */
 [data-skin='flat-dark'] .glass-panel {
-  background: #131313;
+  background: var(--modal);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 24px;
+  border: 0;
+  border-radius: 18px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 0 0 0.5px rgba(255, 255, 255, 0.04),
-    0 24px 60px rgba(0, 0, 0, 0.4);
+    0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.5);             /* Modal 用稍深的浮起阴影 */
 }
 
-/* 输入框：#080808 凹陷感（比画布亮但比卡深） */
+/* 输入框 .glass-input：#15181E，介于画布和卡之间，扁平不凹陷 */
 [data-skin='flat-dark'] .glass-input {
-  background: #080808;
+  background: var(--surface);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 0;
   border-radius: 12px;
   box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.5),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.015);
+    0 0 0 0.5px var(--edge);                  /* 极细边 */
 }
-
-/* focus：纯白光环，替代紫边 */
 [data-skin='flat-dark'] .glass-input:focus,
 [data-skin='flat-dark'] .glass-input:focus-within,
 [data-skin='flat-dark'] .glass-input:focus-visible {
-  border-color: rgba(255, 255, 255, 0.5) !important;
   box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.5),
-    0 0 0 3px rgba(255, 255, 255, 0.06) !important;
+    0 0 0 0.5px rgba(255, 255, 255, 0.45),
+    0 0 0 3px rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Pill/Chip：pill 用半透白浅底，比卡略亮 */
+/* Pill/Chip：浅底白圆角，比卡略亮一点 */
 [data-skin='flat-dark'] .glass-pill {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 0;
   border-radius: 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.07);
 }
 
-/* 关掉所有 Tailwind 的 backdrop-blur-*（圆按钮/详情模态/mega sheet 覆盖层等） */
+/* 关掉所有 Tailwind 的 backdrop-blur-*（圆按钮/详情 Modal/mega sheet 覆盖层等） */
 [data-skin='flat-dark'] [class*='backdrop-blur'] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-/* =============================================================
- * 主按钮去紫：用白底黑字替代 from-[#7c85f5]→to-[#c084fc] 渐变
+/* ============================================================
+ * 主按钮：白底黑字 + 14px 圆角（保留上轮"去紫"语义，简化阴影）
  * 通过属性选择器反命中所有"主按钮位置"，不动 React 组件
- * ============================================================= */
+ * ============================================================ */
 [data-skin='flat-dark'] button[class*='bg-gradient-to-br'],
 [data-skin='flat-dark'] a[class*='bg-gradient-to-br'],
 [data-skin='flat-dark'] span[class*='bg-gradient-to-br'] {
-  background-image: linear-gradient(180deg, #ffffff 0%, #d4d4d8 100%) !important;
+  background-image: linear-gradient(180deg, #ffffff 0%, #e8e8ec 100%) !important;
   color: #0a0a0a !important;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 0 !important;
+  border-radius: 14px !important;
   text-shadow: none !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
   font-weight: 600 !important;
 }
 [data-skin='flat-dark'] button[class*='bg-gradient-to-br']:hover,
 [data-skin='flat-dark'] a[class*='bg-gradient-to-br']:hover {
-  background-image: linear-gradient(180deg, #ffffff 0%, #e4e4e7 100%) !important;
+  background-image: linear-gradient(180deg, #ffffff 0%, #f3f3f6 100%) !important;
   opacity: 1 !important;
 }
 [data-skin='flat-dark'] button[class*='bg-gradient-to-br']:disabled,
 [data-skin='flat-dark'] a[class*='bg-gradient-to-br']:disabled {
-  background-image: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(212,212,216,0.4) 100%) !important;
+  background-image: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(232,232,236,0.4) 100%) !important;
   color: rgba(10, 10, 10, 0.4) !important;
   cursor: not-allowed;
 }
 
-/* =============================================================
+/* ============================================================
+ * 辅助按钮 / 圆按钮：浅一档半透白底 + 极弱边
+ * ============================================================ */
+
+/* 次按钮（小圆按钮 / 工具栏按钮，半透白底） */
+[data-skin='flat-dark'] .bg-white\/10 {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.05);
+}
+
+/* dock 一级 Tab 默认态：稍亮内底（比画布亮 5%） */
+[data-skin='flat-dark'] .border-white\/10 {
+  border-color: transparent !important;
+}
+
+/* ============================================================
  * accent / brand 去紫：text/border/bg/ring 全部转白色调
  * 保留语义色（success/warning/danger）不动 —— 它们是功能色
- * ============================================================= */
+ * ============================================================ */
 [data-skin='flat-dark'] .text-accent,
 [data-skin='flat-dark'] .text-brand { color: #ffffff !important; }
 
 [data-skin='flat-dark'] .border-accent,
 [data-skin='flat-dark'] .border-accent\/40,
-[data-skin='flat-dark'] .border-accent\/60 { border-color: rgba(255, 255, 255, 0.4) !important; }
+[data-skin='flat-dark'] .border-accent\/60 {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
 
 [data-skin='flat-dark'] .bg-accent,
 [data-skin='flat-dark'] .bg-accent\/5,
 [data-skin='flat-dark'] .bg-accent\/10,
 [data-skin='flat-dark'] .bg-accent\/15,
 [data-skin='flat-dark'] .bg-accent\/20 {
-  background-color: rgba(255, 255, 255, 0.92) !important;
-  color: #0a0a0a !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
 }
 
+/* 选中态：参考图是淡淡的高亮，比 .bg-accent/15 更克制 */
+[data-skin='flat-dark'] .bg-accent\/15 {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* 选中态文字：白色 + 微妙的发光圈（替代紫光环） */
 [data-skin='flat-dark'] .ring-accent,
 [data-skin='flat-dark'] [class*='ring-accent'] {
-  --tw-ring-color: rgba(255, 255, 255, 0.4) !important;
+  --tw-ring-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* 选中指示器：accent 背景图标反向（白底黑图标，保留识别但去掉紫色） */
 [data-skin='flat-dark'] .bg-accent svg,
 [data-skin='flat-dark'] .bg-accent\/5 svg,
-[data-skin='flat-dark'] .bg-accent\/15 svg { color: #0a0a0a !important; }
+[data-skin='flat-dark'] .bg-accent\/12 svg,
+[data-skin='flat-dark'] .bg-accent\/15 svg { color: #ffffff !important; }
 
-/* 进度条 / KPI 渐变：从紫 → 白到中性灰（保留视觉的"进度"感，去紫） */
+/* ============================================================
+ * 进度条 / KPI 渐变：从紫 → 白到中性灰（保留视觉的"进度"感，去紫）
+ * ============================================================ */
 [data-skin='flat-dark'] [class*='from-indigo-'][class*='to-violet-'],
 [data-skin='flat-dark'] [class*='from-[#7c85f5]'][class*='to-[#c084fc]'] {
   --tw-gradient-from: #fafafa var(--tw-gradient-from-position) !important;
@@ -294,17 +323,17 @@ input[type='time'] {
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
 }
 
-/* 强调色圆点 / 装饰渐变（不为按钮的）：让品牌色调保持可见但去紫饱和 */
+/* 强调色文字（次级紫）改为灰白系 */
 [data-skin='flat-dark'] .text-indigo-300,
 [data-skin='flat-dark'] .text-violet-300,
-[data-skin='flat-dark'] .text-brand-soft { color: rgba(255, 255, 255, 0.7) !important; }
+[data-skin='flat-dark'] .text-brand-soft { color: rgba(255, 255, 255, 0.6) !important; }
 
-/* Scrollbar：加深 */
+/* Scrollbar：极弱（不喧宾夺主，参考图风格） */
 [data-skin='flat-dark'] ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
 }
 [data-skin='flat-dark'] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* 选中态文字：纯白（替代紫） */
@@ -313,7 +342,14 @@ input[type='time'] {
   color: #ffffff;
 }
 
-/* box-shadow glow 装饰：去紫光，换"白光" */
+/* box-shadow glow 装饰：白光圈（替代紫光） */
 [data-skin='flat-dark'] .shadow-glow {
-  box-shadow: 0 0 24px rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* 链接色：默认白（参考图几乎所有链接都是白） */
+[data-skin='flat-dark'] a.text-accent,
+[data-skin='flat-dark'] .text-\[\#7592D6\],
+[data-skin='flat-dark'] .text-\[\#A276E5\] {
+  color: #ffffff !important;
 }

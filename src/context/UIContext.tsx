@@ -39,7 +39,7 @@ export interface ThemeConfig {
   color: string
 }
 
-/** 全站皮肤 id：liquid-glass（默认，老用户无感） / flat-dark（参照图风格，去毛玻璃） */
+/** 全站皮肤 id：liquid-glass（默认，老用户无感） / flat-dark（ByeWind 风格，去毛玻璃） */
 export type SkinId = 'liquid-glass' | 'flat-dark'
 
 export const SKIN_LABELS: Record<SkinId, { title: string; desc: string }> = {
@@ -48,8 +48,8 @@ export const SKIN_LABELS: Record<SkinId, { title: string; desc: string }> = {
     desc: '当前默认风格——深色玻璃拟态 + 极光氛围，沉浸感强，适合桌面/带独显设备',
   },
   'flat-dark': {
-    title: '纯黑扁平',
-    desc: '参照深色仪表板风格——纯黑底 + 实色边框 + 圆角放大，去除所有毛玻璃与极光，性能更轻',
+    title: '现代仪表板',
+    desc: 'ByeWind 风格——柔和深蓝黑底 + 浅一档卡 + 极细边 + 18px 圆角，几乎无阴影，靠卡片与背景亮度差自然浮起，去除所有毛玻璃与极光',
   },
 }
 
