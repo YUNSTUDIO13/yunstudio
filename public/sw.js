@@ -87,33 +87,26 @@ self.addEventListener('fetch', (event) => {
   // 跨域（Supabase API、字体 CDN）不缓存，直连网络，保证实时数据
   if (url.origin !== self.location.origin) return;
 
-  // 导航请求：network-first + no-cache，回退缓存 index.html（SPA 单页）
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req, { cache: 'no-cache' })
-        .then((resp) => {
-          const copy = resp.clone();
-          caches.open(VERSION).then((c) => c.put('./index.html', copy));
-          return resp;
-        })
-        .catch(() => caches.match('./index.html').then((r) => r || caches.match('./')))
-    );
-    return;
-  }
-
-  // 同源静态资源：stale-while-revalidate
+  // 同源资源：network-first —— 永远优先直连最新构建，仅当网络失败（离线）才回退缓存。
+  // 2026-08-12 #9 根治「PWA 缓存焊死、刷新无数次仍无变化」：
+  //   旧的 stale-while-revalidate 会先返回旧缓存、后台才更新，导致用户看到的永远是旧壳；
+  //   network-first 保证每次（重新打开/刷新）都先拉最新，离线才有兜底。
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((resp) => {
-          if (resp && resp.status === 200 && resp.type === 'basic') {
-            const copy = resp.clone();
-            caches.open(VERSION).then((c) => c.put(req, copy));
-          }
-          return resp;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(req)
+      .then((resp) => {
+        if (resp && resp.status === 200 && resp.type === 'basic') {
+          const copy = resp.clone();
+          caches.open(VERSION).then((c) => c.put(req, copy));
+        }
+        return resp;
+      })
+      .catch(() =>
+        caches.match(req).then((cached) =>
+          cached ||
+          (req.mode === 'navigate'
+            ? caches.match('./index.html').then((r) => r || caches.match('./'))
+            : undefined)
+        )
+      )
   );
 });
