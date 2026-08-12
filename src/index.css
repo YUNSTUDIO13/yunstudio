@@ -154,6 +154,29 @@ input[type='time'] {
   --modal: #1F2128;                           /* 弹层/Modal（比卡再亮一档，更跳出） */
   --edge: rgba(255, 255, 255, 0.06);          /* 0.5px 边（用 box-shadow 实现 0.5px） */
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.25);    /* 极弱投影，无 inset */
+
+  /* === 玻璃 var 重定义：去毛玻璃化（半透白底 → 实色 + blur none + 去内 inset 高光） === */
+  /* card：原 rgba(.038) + blur(32)+saturate+inset 高光 → #1A1C22 + 不模糊 + 极弱边 */
+  --glass-card-bg: #1A1C22;
+  --glass-card-blur: none;
+  --glass-card-border: 0;
+  --glass-card-shadow: 0 0 0 0.5px rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.25);
+
+  /* input：原 rgba(.03) + blur(12) + inset 凹陷 → #15181E + 不模糊 + 0 inset */
+  --glass-input-bg: #15181E;
+  --glass-input-blur: none;
+  --glass-input-border: 0;
+  --glass-input-shadow: 0 0 0 0.5px rgba(255,255,255,0.06);
+
+  /* pill：原 rgba(.06) + blur(16) + 1px 内高光 → 浅实色 + 不模糊 + 0 inset */
+  --glass-pill-bg: rgba(255,255,255,0.05);
+  --glass-pill-blur: none;
+  --glass-pill-border: 0;
+  --glass-pill-shadow: 0 0 0 0.5px rgba(255,255,255,0.07);
+
+  /* 进度条/KPI 紫蓝渐变 → 白到中性灰（去紫） */
+  --grad-progress: linear-gradient(90deg, #fafafa, rgba(255,255,255,0.25));
+
   color-scheme: dark;
 }
 [data-skin='flat-dark'] body {

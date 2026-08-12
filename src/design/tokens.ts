@@ -2,10 +2,10 @@
 // 来源：C:\Users\hp\Desktop\高级简约UI\src\App.tsx 的 C / glass 常量
 
 export const C = {
-  accent: '#7c85f5',
-  accentSoft: 'rgba(124,133,245,0.15)',
-  accentBorder: 'rgba(124,133,245,0.28)',
-  accentGlow: 'rgba(124,133,245,0.22)',
+  accent: 'var(--c-accent, #7c85f5)',
+  accentSoft: 'var(--c-accent-soft, rgba(124,133,245,0.15))',
+  accentBorder: 'var(--c-accent-border, rgba(124,133,245,0.28))',
+  accentGlow: 'var(--c-accent-glow, rgba(124,133,245,0.22))',
   green: '#5eead4',
   amber: '#fbbf24',
   red: '#f87171',
@@ -18,14 +18,15 @@ export const C = {
 
 export const glass = {
   card: {
-    background: 'rgba(255,255,255,0.038)',
-    backdropFilter: 'blur(32px) saturate(180%) brightness(1.04)',
-    WebkitBackdropFilter: 'blur(32px) saturate(180%) brightness(1.04)',
-    border: '1px solid rgba(255,255,255,0.07)',
+    background: 'var(--glass-card-bg, rgba(255,255,255,0.038))',
+    backdropFilter: 'var(--glass-card-blur, blur(32px) saturate(180%) brightness(1.04))',
+    WebkitBackdropFilter: 'var(--glass-card-blur, blur(32px) saturate(180%) brightness(1.04))',
+    border: 'var(--glass-card-border, 1px solid rgba(255,255,255,0.07))',
     boxShadow:
-      'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.15), 0 12px 48px rgba(0,0,0,0.4)',
+      'var(--glass-card-shadow, inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.15), 0 12px 48px rgba(0,0,0,0.4))',
   },
   dock: {
+    // dock 是悬浮圆角胶囊，不参与去玻璃化（陛下原话："dock 保持悬浮圆角设计"）
     background: 'rgba(255,255,255,0.06)',
     backdropFilter: 'blur(48px) saturate(220%) brightness(1.08)',
     WebkitBackdropFilter: 'blur(48px) saturate(220%) brightness(1.08)',
@@ -34,17 +35,17 @@ export const glass = {
       'inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 80px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.03)',
   },
   input: {
-    background: 'rgba(255,255,255,0.03)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+    background: 'var(--glass-input-bg, rgba(255,255,255,0.03))',
+    backdropFilter: 'var(--glass-input-blur, blur(12px))',
+    WebkitBackdropFilter: 'var(--glass-input-blur, blur(12px))',
+    border: 'var(--glass-input-border, 1px solid rgba(255,255,255,0.06))',
+    boxShadow: 'var(--glass-input-shadow, inset 0 1px 3px rgba(0,0,0,0.2))',
   },
   pill: {
-    background: 'rgba(255,255,255,0.06)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(255,255,255,0.09)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+    background: 'var(--glass-pill-bg, rgba(255,255,255,0.06))',
+    backdropFilter: 'var(--glass-pill-blur, blur(16px))',
+    WebkitBackdropFilter: 'var(--glass-pill-blur, blur(16px))',
+    border: 'var(--glass-pill-border, 1px solid rgba(255,255,255,0.09))',
+    boxShadow: 'var(--glass-pill-shadow, inset 0 1px 0 rgba(255,255,255,0.08))',
   },
 }

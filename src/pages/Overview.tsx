@@ -37,8 +37,8 @@ function MetricPill({ label, color, bg }: { label: string; color: string; bg: st
         borderRadius: 5,
         padding: '2px 7px',
         letterSpacing: '.02em',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        backdropFilter: 'var(--glass-pill-blur, blur(8px))',
+        WebkitBackdropFilter: 'var(--glass-pill-blur, blur(8px))',
         whiteSpace: 'nowrap',
         flexShrink: 0,
       }}
@@ -229,7 +229,7 @@ export default function Overview() {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <Display size={isMobile ? 32 : 28}>{reqPct}%</Display>
               <div style={{ flex: 1, position: 'relative', height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'visible' }}>
-                <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
+                <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: 'var(--grad-progress, linear-gradient(90deg,#7c85f5,#c084fc))', borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 'auto' }}>
@@ -263,7 +263,7 @@ export default function Overview() {
                   {activeSprint.name}
                 </div>
                 <div className="relative" style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginTop: 14, marginBottom: 10, overflow: 'visible' }}>
-                  <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${Math.round(activeSprint.progress)}%`, background: `linear-gradient(90deg,${C.accent},#c084fc)`, borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
+                  <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${Math.round(activeSprint.progress)}%`, background: 'var(--grad-progress, linear-gradient(90deg,#7c85f5,#c084fc))', borderRadius: 2, boxShadow: `0 0 10px ${C.accentGlow}` }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: C.textSub }}>
                   <span>{activeSprint.status}</span>

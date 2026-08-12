@@ -184,8 +184,8 @@ export function Badge({ label, color, bg }: { label: string; color: string; bg: 
         borderRadius: 5,
         padding: '2.5px 8px',
         letterSpacing: '.02em',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        backdropFilter: 'var(--glass-pill-blur, blur(8px))',
+        WebkitBackdropFilter: 'var(--glass-pill-blur, blur(8px))',
       }}
     >
       {label}
@@ -237,8 +237,8 @@ export function FilterPill({ label, active }: { label: string; active?: boolean 
         alignItems: 'center',
         gap: 5,
         background: active ? C.accentSoft : hov ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        backdropFilter: 'var(--glass-pill-blur, blur(12px))',
+        WebkitBackdropFilter: 'var(--glass-pill-blur, blur(12px))',
         border: `1px solid ${active ? C.accentBorder : hov ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)'}`,
         borderRadius: 8,
         padding: '6px 12px',
