@@ -21,7 +21,7 @@ export default function AuroraBackground() {
         top: '-20%', left: '-5%',
         background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.13) 0%, transparent 62%)',
         filter: 'blur(50px)',
-        animation: 'aurora-drift-a 22s ease-in-out infinite',
+        willChange: 'transform',
       }} />
       {/* aurora layer 2 — purple, bottom-right */}
       <div style={{
@@ -29,7 +29,7 @@ export default function AuroraBackground() {
         bottom: '-15%', right: '5%',
         background: 'radial-gradient(ellipse at center, rgba(192,132,252,0.11) 0%, transparent 60%)',
         filter: 'blur(55px)',
-        animation: 'aurora-drift-b 28s ease-in-out infinite',
+        willChange: 'transform',
       }} />
       {/* aurora layer 3 — teal accent, mid */}
       <div style={{
@@ -37,7 +37,7 @@ export default function AuroraBackground() {
         top: '38%', right: '20%',
         background: 'radial-gradient(circle, rgba(56,189,248,0.055) 0%, transparent 62%)',
         filter: 'blur(45px)',
-        animation: 'aurora-drift-c 18s ease-in-out infinite',
+        willChange: 'transform',
       }} />
       {/* very subtle dot grid */}
       <div style={{
