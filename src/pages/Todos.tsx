@@ -506,7 +506,7 @@ export default function Todos() {
                       return (
                         <li
                           key={t.id}
-                          className={`rounded-xl border border-line bg-canvas/40 p-1.5 md:p-3 ${t.done ? 'opacity-60' : ''}`}
+                          className={`rounded-xl border border-line bg-canvas/40 px-[3px] pb-[3px] pt-[6px] md:p-3 ${t.done ? 'opacity-60' : ''}`}
                         >
                           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                             <div className="min-w-0 flex-1">
