@@ -11,8 +11,11 @@ import { db, pendingRowIds } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush, setSyncStatusHandler } from '../lib/sync'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { useTodos } from '../context/TodosContext'
 import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage, normalizeRegion, type TMDBCandidate } from '../lib/tmdb'
 import { useMediaQuery } from '../lib/useMediaQuery'
+import { localInputToIso } from '../lib/datetime'
+import { TagPicker } from '../components/TagPicker'
 import type { Movie } from '../types'
 
 const SRC_THIRD = '第三方'
@@ -238,6 +241,7 @@ function MovieDetailPanel({
   const [draft, setDraft] = useState<Movie>(movie)
   const [syncing, setSyncing] = useState(false)
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [showReserve, setShowReserve] = useState(false)
 
   // 切换观影对象（PC 分栏点击不同卡片 / 移动端重开）时重置草稿
   useEffect(() => { setDraft(movie) }, [movie])
@@ -342,6 +346,12 @@ function MovieDetailPanel({
             value={draft.watched_at ?? ''}
             editing={editing}
             onChange={(v) => setDraft({ ...draft, watched_at: normalizeDate(v) })}
+          />
+          <InfoField
+            label="观影次数"
+            value={String(draft.view_count ?? 0)}
+            editing={editing}
+            onChange={(v) => setDraft({ ...draft, view_count: parseInt(v, 10) || 0 })}
           />
         </div>
 
@@ -520,6 +530,9 @@ function MovieDetailPanel({
           <div className="flex flex-wrap items-center justify-end gap-2">
             {!editing && (
               <>
+                <Button variant="soft" onClick={() => setShowReserve(true)}>
+                  预约观看
+                </Button>
                 <Button variant="soft" onClick={handleSync} disabled={syncing}>
                   {syncing ? '同步中…' : draft.cover_failed ? '手动获取封面' : '同步数据'}
                 </Button>
@@ -543,9 +556,112 @@ function MovieDetailPanel({
             )}
           </div>
         </div>
+
+        <ReserveWatchModal movie={draft} open={showReserve} onClose={() => setShowReserve(false)} />
       </div>
     )
   }
+
+// 预约观看弹窗：直接复用待办新建接口，自动生成一条绑定电影的待办。
+// 标题=预约观看《片名》、优先级固定 P0、截止时间/标签自选、备注预填。
+// 该待办被人工勾选完成时，TodosContext 会触发对应电影 view_count +1（见 toggleDone 计数守卫）。
+function ReserveWatchModal({
+  movie,
+  open,
+  onClose,
+}: {
+  movie: Movie
+  open: boolean
+  onClose: () => void
+}) {
+  const { addTodo } = useTodos()
+  const [deadline, setDeadline] = useState('') // datetime-local 输入值
+  const [tag, setTag] = useState<string | null>(null)
+  const [note, setNote] = useState('好的电影，值得反复品鉴~')
+  const [submitting, setSubmitting] = useState(false)
+
+  // 每次打开重置表单（避免上次的截止时间/标签残留）
+  useEffect(() => {
+    if (open) {
+      setDeadline('')
+      setTag(null)
+      setNote('好的电影，值得反复品鉴~')
+      setSubmitting(false)
+    }
+  }, [open])
+
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    try {
+      await addTodo({
+        title: `预约观看《${movie.title}》`,
+        priority: 'P0',
+        deadline_at: localInputToIso(deadline),
+        tag_id: tag,
+        note,
+        movie_id: movie.id,
+      })
+      onClose()
+    } catch (e) {
+      console.error('[movies] 创建预约观看待办失败:', e)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="预约观看"
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onClose} disabled={submitting}>
+            取消
+          </Button>
+          <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? '创建中…' : '创建待办'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        {/* 标题预览（自动填充，不可改） */}
+        <Field label="待办标题（自动生成）">
+          <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-ink-soft">
+            预约观看《{movie.title}》
+          </div>
+        </Field>
+
+        {/* 优先级：固定 P0 */}
+        <Field label="优先级">
+          <div className="inline-flex items-center rounded-full bg-[#f5222d]/15 px-3 py-1 text-xs font-semibold text-[#ff7875]">
+            P0
+          </div>
+        </Field>
+
+        {/* 截止时间：datetime-local 自选 */}
+        <Field label="截止时间">
+          <Input
+            type="datetime-local"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+          />
+        </Field>
+
+        {/* 标签：单选 chip 自选 */}
+        <Field label="标签">
+          <TagPicker value={tag} onChange={setTag} />
+        </Field>
+
+        {/* 备注：预填可改 */}
+        <Field label="备注">
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+        </Field>
+      </div>
+    </Modal>
+  )
+}
 
 function MovieModal({
   movie,
@@ -801,6 +917,7 @@ function NewMovieModal({
       region: draft.region.trim() || preview.region || '',
       duration: preview.duration ?? 0,
       watched_at: normalizeDate(draft.watchedAt) || nowIso.slice(0, 10),
+      view_count: 0,
       synced: !!preview.cover,
       cover_failed: !preview.cover && !draft.cover,
       created_at: nowIso,
@@ -1079,6 +1196,7 @@ function BatchImportModal({
           region: data.region ?? '',
           duration: data.duration ?? 0,
           watched_at: normalizeDate(r.watchedAt) || nowIso.slice(0, 10),
+          view_count: 0,
           synced: !!(cover || backdrop),
           cover_failed: !cover,
           created_at: nowIso,

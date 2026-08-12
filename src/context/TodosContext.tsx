@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import type { Todo, TodoInput } from '../types'
 import {
+  db,
   localAll,
   localGet,
   localPut,
@@ -103,6 +104,21 @@ export function TodosProvider({ children }: { children: ReactNode }) {
     }
   }, [load])
 
+  // 跨模块联动：待办完成 → 对应电影的观影次数 +1。
+  // 仅当该电影存在于本地 Dexie 时累加；走既有 outbox 增量同步到云端。
+  const bumpMovieViewCount = useCallback(async (movieId: string) => {
+    const movie = await db.movies.get(movieId)
+    if (!movie) return
+    const now = new Date().toISOString()
+    const updated: typeof movie = {
+      ...movie,
+      view_count: (movie.view_count ?? 0) + 1,
+      updated_at: now,
+    }
+    await db.movies.put(updated)
+    await enqueueAndMaybeFlush('movies', 'update', movieId, updated)
+  }, [])
+
   const addTodo = useCallback(
     async (input: TodoInput) => {
       if (!user) throw new Error('未登录')
@@ -117,6 +133,8 @@ export function TodosProvider({ children }: { children: ReactNode }) {
         deadline_at: input.deadline_at || null,
         note: input.note || null,
         tag_id: input.tag_id || null,
+        movie_id: input.movie_id || null, // 绑定观影电影（预约观看联动）
+        counted_at: null, // 计数守卫初始为空
         done: false,
         done_at: null,
         created_at: now,
@@ -157,17 +175,25 @@ export function TodosProvider({ children }: { children: ReactNode }) {
       if (!current) return
       const next = !current.done
       const now = new Date().toISOString()
+      // 计数守卫：仅在"未完成→已完成"且绑定了电影且尚未计数时，打上 counted_at 并触发 +1。
+      // 取消勾选：不动 counted_at（不清零）→ 再次勾选时守卫已存在，跳过 +1（不累加）。
+      const shouldCount = next && !!current.movie_id && !current.counted_at
       const row: Todo = {
         ...current,
         done: next,
         done_at: next ? now : null,
+        counted_at: shouldCount ? now : current.counted_at ?? null,
         updated_at: now,
       }
       await localPut(TABLE, row)
       setTodos((prev) => prev.map((x) => (x.id === id ? row : x)))
       await enqueueAndMaybeFlush(TABLE, 'update', id, row)
+      // 跨模块联动：观影次数 +1（仅首次完成触发；重新预约会生成新待办故可累计）
+      if (shouldCount && current.movie_id) {
+        await bumpMovieViewCount(current.movie_id)
+      }
     },
-    [],
+    [bumpMovieViewCount],
   )
 
   const removeTodo = useCallback(async (id: string) => {

@@ -12,6 +12,8 @@ export interface Todo {
   done: boolean
   done_at?: string | null
   tag_id?: string | null // 字典·枚举值 id（来自 tag_values）
+  movie_id?: string | null // 绑定的观影电影 id（预约观看联动用）
+  counted_at?: string | null // 计数守卫：完成并已计入观影次数的时间戳；用于去重（取消再勾选不累加）
   created_at: string
   updated_at: string
 }
@@ -24,6 +26,7 @@ export type TodoInput = {
   deadline_at?: string | null
   note?: string | null
   tag_id?: string | null
+  movie_id?: string | null // 绑定的观影电影 id（预约观看联动用）
 }
 
 // ============================================================
@@ -276,6 +279,7 @@ export interface Movie {
   region: string // 地区
   duration: number // 时长（分钟）
   watched_at: string // 观影日期（YYYY-MM-DD）
+  view_count: number // 观影次数（默认 0；预约观看待办完成勾选时 +1，可累计）
   synced: boolean // 是否已同步第三方数据
   cover_failed: boolean // 封面获取是否失败（用于标记手动获取）
   created_at: string

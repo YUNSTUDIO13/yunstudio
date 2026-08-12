@@ -15,6 +15,7 @@ import { TagPicker, TagChip } from '../components/TagPicker'
 import { useTags } from '../context/TagsContext'
 import { useTodos } from '../context/TodosContext'
 import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
+import { isoToLocalInput, localInputToIso } from '../lib/datetime'
 import type { Priority, Todo } from '../types'
 
 type FilterStatus = 'all' | 'active' | 'done'
@@ -22,20 +23,6 @@ type SortKey = 'score' | 'deadline' | 'created'
 type ViewKey = 'list' | 'quadrant'
 const ALL_TAGS = '__ALL_TAGS__'
 
-// ISO（UTC）↔ datetime-local（本地）互转，保证表单显示与存储一致
-function isoToLocalInput(iso?: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours(),
-  )}:${pad(d.getMinutes())}`
-}
-function localInputToIso(v: string): string | null {
-  if (!v) return null
-  const t = new Date(v).getTime()
-  return isNaN(t) ? null : new Date(t).toISOString()
-}
 
 const EMPTY = {
   title: '',
