@@ -21,7 +21,7 @@ jobs:
           # 替换下面 '你的表名' 为你数据库中任意一张真实存在的表名
           # 使用 API 请求进行一次简单的查询操作
           response=$(curl -s -o /dev/null -w "%{http_code}" \
-            "$SUPABASE_URL/rest/v1/你的表名?select=count" \
+            "$SUPABASE_URL/rest/v1/todos?select=count" \
             -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY")
           
