@@ -388,7 +388,7 @@ export default function Bugs() {
             ) : (
               <ul className="space-y-2">
                 {qitems.map((b) => (
-                  <li key={b.id} className="rounded-xl border border-line bg-canvas/40 px-[1.5px] pb-[1.5px] pt-[8px] md:p-3">
+                  <li key={b.id} className="rounded-xl border border-line bg-canvas/40 px-1.5 pb-1.5 pt-2 md:p-3">
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
 <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
