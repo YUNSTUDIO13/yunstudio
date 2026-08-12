@@ -9,8 +9,8 @@
  *    activate 时清空「所有」旧缓存，保证更新必生效、旧壳不再焊死客户端
  *
  * 紧急字面改动（确保 sw.js bytes hash 变更，让已装的客户端 SW 触发 install + 清旧 cache）：
- *  2026-08-12 flat-light 3 项修复（输入框 1px / 分割线 0.05 / 进度条 var 化）
- *  部署 css hash: index-CL6X0WYI.css，旧 css 缓存的客户端请硬刷或卸载 PWA 重装。
+ *  2026-08-12 #3 「详情 Modal 三皮肤实色化」+ chip ink-strong slate-700 软化 + 灯箱/海报覆盖层纹理保留
+ *  部署 css hash 后续随 build 浮动（旧 css 缓存的客户端请硬刷或卸载 PWA 重装）。
  */
 const VERSION = '__SW_VERSION__';
 const APP_SHELL = [

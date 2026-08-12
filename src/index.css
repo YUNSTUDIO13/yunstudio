@@ -401,17 +401,17 @@ input[type='time'] {
   /* 大数字色：不用 #111827 那种发硬的黑，用 slate-800 更柔 */
   --c-display-primary: #1e293b;
   /* 文字灰度（深色 → 白底高对比） */
-  --c-text-primary: #1f2937;     /* 主标题/数值 —— slate-800 比 #111827 柔和 */
+  --c-text-primary: #334155;     /* 主标题/数值 —— slate-700 比 #111827 柔和，避免"纯黑" */
   --c-text-sub: #6b7280;         /* 副标题/描述 */
   --c-text-ghost: #9ca3af;       /* 极弱/placeholder */
   --c-border: rgba(0, 0, 0, 0.06);  /* 默认边 */
   --c-border-high: rgba(0, 0, 0, 0.12);
   /* ink 系统类（沿用 flat-dark 的语义） */
-  --ink-strong: #1f2937;         /* slate-800 —— 修复 bug1（三级 chip hover 时 #111827 看着像纯黑） */
-  --ink-base: #334155;           /* slate-700 —— 正文默认深字，柔和 */
-  --ink-soft: #475569;           /* slate-600 */
-  --ink-mute: #64748b;           /* slate-500 */
-  --ink-subtle: #94a3b8;         /* slate-400 */
+  --ink-strong: #334155;         /* slate-700 —— 修复 bug1（三级 chip hover 时 #111827/#1f2937 看着像纯黑） */
+  --ink-base: #475569;           /* slate-600 —— 正文默认深字，柔和 */
+  --ink-soft: #64748b;           /* slate-500 */
+  --ink-mute: #94a3b8;           /* slate-400 */
+  --ink-subtle: #cbd5e1;         /* slate-300 */
   /* 画布/卡/弹层（白底分层） */
   --canvas: #f9fafb;
   --surface: #f3f4f6;
@@ -762,4 +762,43 @@ html[data-skin='flat-light'], html[data-skin='flat-light'] body {
 [data-skin='flat-light'] .fixed.inset-0.overflow-y-auto {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+/* ============================================================
+ * 详情 Modal 全屏覆盖层 —— 三皮肤统一走画布实色（皇上指令 "三个模式手机版详情不能是半透明"）
+ * ----------------------------------------------------
+ * 用 [data-detail-modal] 属性作为锚点（Movies.tsx 给全屏 Modal 顶层覆盖层加上），
+ * 三种皮肤下都强制 background-color: var(--canvas) + 去 backdrop-filter。
+ *   - liquid-glass → var(--canvas) = #040408（深紫黑，与原 .bg-black/85 视觉近乎一致，跨皮肤"现代仪表盘"风）
+ *   - flat-dark    → var(--canvas) = #0E1015（柔和深蓝黑，ByeWind 深色仪表盘风）
+ *   - flat-light   → var(--canvas) = #F9FAFB（白底，与卡片同色系，"白底极简"风）
+ * 关键好处：内部 MovieDetailPanel 在画布色上展开，文案/字段走自然文字色而非"白字配深底"，
+ * 海报顶部 bg-gradient-to-t from-black 仍保留（图片深底+白字标题是设计意图），
+ * [class*=bg-black] 文本豁免规则负责覆盖海报/徽章等真"深色块"场景。
+ * ============================================================ */
+[data-skin='liquid-glass'] .fixed.inset-0[data-detail-modal],
+[data-skin='flat-dark'] .fixed.inset-0[data-detail-modal],
+[data-skin='flat-light'] .fixed.inset-0[data-detail-modal] {
+  background-color: var(--canvas) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* flat-light 下：详情 Modal 全屏画布是浅色，原本 .bg-white/10 + text-white 的浮按钮直接看不到，
+ * 反转覆写为"深底白字 + 1px 极淡边"，保持视觉上"悬浮"但能看清。
+ * 深底皮肤下保持原样半透白+白字即可（在黑画布上仍清晰）。*/
+[data-skin='flat-light'] [data-detail-modal] .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18);
+}
+[data-skin='flat-light'] [data-detail-modal] .bg-white\/10:hover {
+  background-color: rgba(15, 23, 42, 1) !important;
+}
+[data-skin='flat-light'] [data-detail-modal] .bg-white\/15,
+[data-skin='flat-light'] [data-detail-modal] .bg-white\/25,
+[data-skin='flat-light'] [data-detail-modal] .bg-white\/20 {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18);
 }

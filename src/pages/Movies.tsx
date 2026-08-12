@@ -739,6 +739,7 @@ function MovieModal({
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md"
+      data-detail-modal
       role="dialog"
       aria-modal="true"
       onClick={onClose}
