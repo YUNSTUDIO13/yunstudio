@@ -500,9 +500,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div
         className={
           isMobile
-            ? 'relative z-10 min-h-screen px-4 pb-28 pt-4'
+            ? 'relative z-10 min-h-screen px-4 pb-28'
             : 'relative z-10 min-h-screen pl-[120px] pr-6 py-6'
         }
+        style={isMobile ? { paddingTop: 'calc(1rem + env(safe-area-inset-top))' } : undefined}
       >
         {children}
       </div>
