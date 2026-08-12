@@ -9,11 +9,12 @@ export const C = {
   green: '#5eead4',
   amber: '#fbbf24',
   red: '#f87171',
-  textPrimary: 'rgba(255,255,255,0.88)',
-  textSub: 'rgba(255,255,255,0.38)',
-  textGhost: 'rgba(255,255,255,0.14)',
-  border: 'rgba(255,255,255,0.07)',
-  borderHigh: 'rgba(255,255,255,0.12)',
+  // 文字/边色全部 var 化，让 flat-dark / flat-light 皮肤可穿透覆盖
+  textPrimary: 'var(--c-text-primary, rgba(255,255,255,0.88))',
+  textSub: 'var(--c-text-sub, rgba(255,255,255,0.38))',
+  textGhost: 'var(--c-text-ghost, rgba(255,255,255,0.14))',
+  border: 'var(--c-border, rgba(255,255,255,0.07))',
+  borderHigh: 'var(--c-border-high, rgba(255,255,255,0.12))',
 }
 
 export const glass = {

@@ -202,7 +202,7 @@ function ThemePreview({ themeId, color }: { themeId: ThemeId; color: string }) {
 // 皮肤预览缩略（手写样式展示皮肤的"真容"，不依赖 .glass-card / data-skin）
 // ============================================================
 function SkinPreview({ skinId }: { skinId: SkinId }) {
-  // 两套皮肤色板：与 index.css 覆盖层的值严格一致，保证所见即所得
+  // 三套皮肤色板：与 index.css 覆盖层的值严格一致，保证所见即所得
   const palette = skinId === 'liquid-glass'
     ? {
         bg: '#0e0e16',
@@ -214,7 +214,8 @@ function SkinPreview({ skinId }: { skinId: SkinId }) {
         mute: 'rgba(255,255,255,0.55)',
         hint: 'rgba(255,255,255,0.10)',
       }
-    : {
+    : skinId === 'flat-dark'
+    ? {
         // 与 src/index.css [data-skin='flat-dark'] 段的 var(--xxx) 严格一致
         bg: '#0E1015',                                     // 画布：柔和深蓝黑
         cardBg: '#1A1C22',                                 // 卡：比画布亮 8%
@@ -230,6 +231,23 @@ function SkinPreview({ skinId }: { skinId: SkinId }) {
         sub: 'rgba(255,255,255,0.42)',
         hint: 'rgba(255,255,255,0.06)',                    // 次级胶囊底
         hintBorder: 'rgba(255,255,255,0.07)',
+      }
+    : {
+        // flat-light（ByeWind 白图）：画布极浅灰 / 卡纯白 / 淡边 / 深字 / 克制蓝 / 主按钮黑底
+        bg: '#F9FAFB',                                     // 画布：极浅灰
+        cardBg: '#FFFFFF',                                 // 卡：纯白
+        cardBorder: 'rgba(0,0,0,0.06)',                    // 极淡边
+        radius: 18,                                        // 卡圆角
+        accent: 'rgba(37,99,235,0.10)',                    // 选中态：极淡蓝
+        accentBorder: 'rgba(37,99,235,0.45)',              // 选中态边
+        primaryBtnBg: 'linear-gradient(180deg, #111827 0%, #1f2937 100%)',  // 主按钮深色实底
+        primaryBtnColor: '#ffffff',
+        text: '#111827',                                   // 主标题（深）
+        base: '#1f2937',
+        mute: '#6b7280',                                   // 副标题
+        sub: '#9ca3af',
+        hint: 'rgba(0,0,0,0.04)',                          // 次级胶囊底
+        hintBorder: 'rgba(0,0,0,0.08)',
       }
   return (
     <div
@@ -416,7 +434,7 @@ export default function UISettings() {
         <h2 className="px-1 text-sm font-semibold uppercase tracking-wider text-ink-soft">
           皮肤
         </h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {SKIN_IDS.map((id) => (
             <SkinCard
               key={id}
@@ -427,7 +445,7 @@ export default function UISettings() {
           ))}
         </div>
         <p className="mt-1 px-1 text-xs text-ink-soft">
-          皮肤仅影响全站视觉（背景、卡片、圆角），与上方的指针特效独立，可自由组合。
+          皮肤仅影响全站视觉（背景、卡片、圆角），与上方的指针特效独立，可自由组合。切换后手机状态栏颜色会自动跟随当前主题。
         </p>
       </section>
 

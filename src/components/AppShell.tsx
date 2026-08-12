@@ -126,6 +126,25 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }, [skin])
 
+  // 把当前皮肤的画布色同步到 meta[name=theme-color]，让安卓 Chrome / PWA 状态栏跟随主题
+  // （iOS PWA 状态栏由 apple-mobile-web-app-status-bar-style 决定，运行时不可改——这是 PWA 限制）
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const THEME_COLOR: Record<typeof skin, string> = {
+      'liquid-glass': '#040408',  // 深紫黑（液态玻璃画布）
+      'flat-dark': '#0E1015',     // 柔和深蓝黑
+      'flat-light': '#F9FAFB',    // 极浅灰（纯白简约画布）
+    }
+    const color = THEME_COLOR[skin]
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      document.head.appendChild(meta)
+    }
+    meta.content = color
+  }, [skin])
+
   const [openPrimaryId, setOpenPrimaryId] = useState<string | null>(null)
   // 系统设置（固定 dock 入口）的独立展开状态；与 openPrimaryId 互斥
   const [settingsOpen, setSettingsOpen] = useState(false)

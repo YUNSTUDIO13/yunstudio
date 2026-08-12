@@ -39,8 +39,8 @@ export interface ThemeConfig {
   color: string
 }
 
-/** 全站皮肤 id：liquid-glass（默认，老用户无感） / flat-dark（ByeWind 风格，去毛玻璃） */
-export type SkinId = 'liquid-glass' | 'flat-dark'
+/** 全站皮肤 id：liquid-glass（默认，老用户无感） / flat-dark（ByeWind 深色扁平，去毛玻璃） / flat-light（ByeWind 白色扁平，浅底卡片） */
+export type SkinId = 'liquid-glass' | 'flat-dark' | 'flat-light'
 
 export const SKIN_LABELS: Record<SkinId, { title: string; desc: string }> = {
   'liquid-glass': {
@@ -51,13 +51,17 @@ export const SKIN_LABELS: Record<SkinId, { title: string; desc: string }> = {
     title: '现代仪表板',
     desc: 'ByeWind 风格——柔和深蓝黑底 + 浅一档卡 + 极细边 + 18px 圆角，几乎无阴影，靠卡片与背景亮度差自然浮起，去除所有毛玻璃与极光',
   },
+  'flat-light': {
+    title: '纯白简约',
+    desc: 'ByeWind 白色风格——白底卡片 + 极淡边 + 深字 + 克制蓝强调，去除毛玻璃与极光，强光环境下长时间阅读更舒服',
+  },
 }
 
-export const SKIN_IDS: SkinId[] = ['liquid-glass', 'flat-dark']
+export const SKIN_IDS: SkinId[] = ['liquid-glass', 'flat-dark', 'flat-light']
 
 /** UI 设置总配置（按用户持久化到 user_configs / kind='ui_settings'） */
 export interface UISettingsConfig {
-  version: 2
+  version: 3
   /** 总开关：默认关闭；关闭时全局指针特效一律不渲染 */
   enabled: boolean
   /** 各主题配置；颜色独立 */
@@ -75,7 +79,7 @@ const DEFAULT_THEME_COLOR: Record<ThemeId, string> = {
 
 export function defaultUISettings(): UISettingsConfig {
   return {
-    version: 2,
+    version: 3,
     enabled: false,
     themes: {
       particles: { enabled: true, color: DEFAULT_THEME_COLOR.particles },
@@ -88,7 +92,7 @@ export function defaultUISettings(): UISettingsConfig {
 function isUISettings(x: unknown): x is UISettingsConfig {
   if (!x || typeof x !== 'object') return false
   const v = (x as { version?: unknown }).version
-  if (v !== 1 && v !== 2) return false
+  if (v !== 1 && v !== 2 && v !== 3) return false
   const cfg = x as UISettingsConfig
   if (typeof cfg.enabled !== 'boolean') return false
   if (!cfg.themes) return false
@@ -97,13 +101,13 @@ function isUISettings(x: unknown): x is UISettingsConfig {
 
 const VALID_SKINS: readonly string[] = SKIN_IDS
 
-/** 兜底合并：缺字段时回填默认值（向后兼容老版本 v1 配置） */
+/** 兜底合并：缺字段时回填默认值（向后兼容老版本 v1/v2 配置） */
 function hydrate(s: UISettingsConfig): UISettingsConfig {
   const def = defaultUISettings()
   return {
     ...def,
     ...s,
-    version: 2,
+    version: 3,
     skin: VALID_SKINS.includes((s as Partial<UISettingsConfig>).skin ?? '')
       ? ((s as UISettingsConfig).skin as SkinId)
       : def.skin,

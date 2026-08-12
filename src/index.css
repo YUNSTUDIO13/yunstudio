@@ -376,3 +376,253 @@ input[type='time'] {
 [data-skin='flat-dark'] .text-\[\#A276E5\] {
   color: #ffffff !important;
 }
+
+/* ============================================================
+ * 纯白扁平皮肤（flat-light）—— ByeWind 白图风格
+ * 目标：白底白卡 + 极淡边 + 深字 + 克制蓝强调，0 毛玻璃 0 极光
+ * 设计特征：画布 #F9FAFB / 卡 #FFFFFF / 边 0.5px rgba(0,0,0,0.06) / 圆角 18px
+ * 性能：0 动画 + 0 backdrop-filter
+ * ============================================================ */
+
+/* ---- 全局：白底 + 深字灰度（flat-dark 的镜像版，主色反转） ---- */
+[data-skin='flat-light'] {
+  /* 强调色：克制的蓝（仅用于按钮/选中态/链接，图表色另行覆盖） */
+  --c-accent: #2563eb;
+  --c-accent-soft: rgba(37, 99, 235, 0.10);
+  --c-accent-border: rgba(37, 99, 235, 0.30);
+  --c-accent-glow: rgba(37, 99, 235, 0.20);
+  /* 文字灰度（深色 → 白底高对比） */
+  --c-text-primary: #111827;        /* 主标题/数值 */
+  --c-text-sub: #6b7280;            /* 副标题/描述 */
+  --c-text-ghost: #9ca3af;          /* 极弱/placeholder */
+  --c-border: rgba(0, 0, 0, 0.06);  /* 默认边 */
+  --c-border-high: rgba(0, 0, 0, 0.12);
+  /* ink 系统类（沿用 flat-dark 的语义） */
+  --ink-strong: #111827;
+  --ink-base: #1f2937;
+  --ink-soft: #4b5563;
+  --ink-mute: #6b7280;
+  --ink-subtle: #9ca3af;
+  /* 画布/卡/弹层（白底分层） */
+  --canvas: #f9fafb;
+  --surface: #f3f4f6;
+  --card: #ffffff;
+  --modal: #ffffff;
+  --edge: rgba(0, 0, 0, 0.06);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* 玻璃 token（穿透 inline style） */
+  --glass-card-bg: #ffffff;
+  --glass-card-blur: none;
+  --glass-card-border: 0;
+  --glass-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --glass-panel-bg: #ffffff;
+  --glass-panel-blur: none;
+  --glass-panel-border: 0;
+  --glass-panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --glass-input-bg: #f3f4f6;
+  --glass-input-blur: none;
+  --glass-input-border: 0;
+  --glass-input-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --glass-pill-bg: rgba(0, 0, 0, 0.04);
+  --glass-pill-blur: none;
+  --glass-pill-border: 0;
+  --glass-pill-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  /* 进度条渐变（淡蓝，去紫） */
+  --grad-progress: linear-gradient(90deg, #2563eb 0%, #93c5fd 100%);
+
+  color-scheme: light;
+}
+
+[data-skin='flat-light'] body {
+  background-color: var(--canvas);
+  color: var(--ink-base);
+}
+
+/* ---- Tailwind 语义类：让 ink 反转成深字 ---- */
+[data-skin='flat-light'] .text-ink-strong { color: var(--ink-strong) !important; }
+[data-skin='flat-light'] .text-ink-base   { color: var(--ink-base) !important; }
+[data-skin='flat-light'] .text-ink-soft   { color: var(--ink-soft) !important; }
+[data-skin='flat-light'] .text-ink-mute   { color: var(--ink-mute) !important; }
+[data-skin='flat-light'] .text-ink-subtle { color: var(--ink-subtle) !important; }
+[data-skin='flat-light'] .border-line     { border-color: rgba(0, 0, 0, 0.08) !important; }
+
+/* ---- 玻璃组件：白底版本 ---- */
+[data-skin='flat-light'] .glass-card {
+  background: var(--card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 0;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 0.5px var(--edge),
+    var(--shadow);
+}
+[data-skin='flat-light'] .glass-panel {
+  background: var(--modal);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 0;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 0.5px var(--edge),
+    var(--shadow);
+}
+[data-skin='flat-light'] .glass-input {
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 0;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 0.5px var(--edge),
+    inset 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+[data-skin='flat-light'] .glass-input:focus,
+[data-skin='flat-light'] .glass-input:focus-within,
+[data-skin='flat-light'] .glass-input:focus-visible {
+  box-shadow:
+    0 0 0 0.5px rgba(37, 99, 235, 0.6),
+    0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+[data-skin='flat-light'] .glass-pill {
+  background: rgba(0, 0, 0, 0.04);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+}
+
+/* 关掉所有 Tailwind 的 backdrop-blur-* */
+[data-skin='flat-light'] [class*='backdrop-blur'] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ---- 主按钮（紫渐变 → 深色实底：在白底上跳出） ---- */
+[data-skin='flat-light'] button[class*='bg-gradient-to-br'],
+[data-skin='flat-light'] a[class*='bg-gradient-to-br'],
+[data-skin='flat-light'] span[class*='bg-gradient-to-br'] {
+  background-image: linear-gradient(180deg, #111827 0%, #1f2937 100%) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+[data-skin='flat-light'] button[class*='bg-gradient-to-br']:hover,
+[data-skin='flat-light'] a[class*='bg-gradient-to-br']:hover {
+  background-image: linear-gradient(180deg, #1f2937 0%, #374151 100%) !important;
+  opacity: 1 !important;
+}
+[data-skin='flat-light'] button[class*='bg-gradient-to-br']:disabled,
+[data-skin='flat-light'] a[class*='bg-gradient-to-br']:disabled {
+  background-image: linear-gradient(180deg, rgba(17,24,39,0.4) 0%, rgba(31,41,55,0.4) 100%) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* ---- 次按钮 / 小圆按钮（半透白底 → 浅黑底） ---- */
+[data-skin='flat-light'] .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+}
+[data-skin='flat-light'] .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.025) !important;
+}
+[data-skin='flat-light'] .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+[data-skin='flat-light'] .border-white\/15 {
+  border-color: rgba(0, 0, 0, 0.10) !important;
+}
+
+/* ---- accent 强调色（克制蓝） ---- */
+[data-skin='flat-light'] .text-accent,
+[data-skin='flat-light'] .text-brand { color: #2563eb !important; }
+[data-skin='flat-light'] .border-accent,
+[data-skin='flat-light'] .border-accent\/40,
+[data-skin='flat-light'] .border-accent\/60 {
+  border-color: rgba(37, 99, 235, 0.35) !important;
+}
+[data-skin='flat-light'] .bg-accent,
+[data-skin='flat-light'] .bg-accent\/5,
+[data-skin='flat-light'] .bg-accent\/10,
+[data-skin='flat-light'] .bg-accent\/15,
+[data-skin='flat-light'] .bg-accent\/20 {
+  background-color: rgba(37, 99, 235, 0.10) !important;
+  color: #2563eb !important;
+}
+[data-skin='flat-light'] .bg-accent\/15 {
+  background-color: rgba(37, 99, 235, 0.14) !important;
+}
+[data-skin='flat-light'] .bg-accent svg,
+[data-skin='flat-light'] .bg-accent\/5 svg,
+[data-skin='flat-light'] .bg-accent\/12 svg,
+[data-skin='flat-light'] .bg-accent\/15 svg { color: #2563eb !important; }
+
+/* 选中态环（极淡蓝光，替代紫光环） */
+[data-skin='flat-light'] .ring-accent,
+[data-skin='flat-light'] [class*='ring-accent'] {
+  --tw-ring-color: rgba(37, 99, 235, 0.25) !important;
+}
+
+/* ---- 进度条 / KPI 渐变：紫 → 淡蓝 ---- */
+[data-skin='flat-light'] [class*='from-indigo-'][class*='to-violet-'],
+[data-skin='flat-light'] [class*='from-[#7c85f5]'][class*='to-[#c084fc]'] {
+  --tw-gradient-from: #2563eb var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: #93c5fd var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+/* ---- 强调色文字：紫 → 深灰 ---- */
+[data-skin='flat-light'] .text-indigo-300,
+[data-skin='flat-light'] .text-violet-300,
+[data-skin='flat-light'] .text-brand-soft { color: #4b5563 !important; }
+
+/* ---- Scrollbar：浅灰 ---- */
+[data-skin='flat-light'] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+}
+[data-skin='flat-light'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+/* ---- 选中态：淡蓝底 + 深字 ---- */
+[data-skin='flat-light'] ::selection {
+  background: rgba(37, 99, 235, 0.18);
+  color: #111827;
+}
+
+/* ---- glow 装饰：极弱蓝光 ---- */
+[data-skin='flat-light'] .shadow-glow {
+  box-shadow: 0 0 24px rgba(37, 99, 235, 0.08) !important;
+}
+
+/* ---- 链接色：默认蓝（参考图用深色/蓝色） ---- */
+[data-skin='flat-light'] a.text-accent,
+[data-skin='flat-light'] .text-\[\#7592D6\],
+[data-skin='flat-light'] .text-\[\#A276E5\] {
+  color: #2563eb !important;
+}
+
+/* ---- 标题色反转：text-white 等在白底上要变深 ---- */
+[data-skin='flat-light'] .text-white\/90 { color: rgba(17, 24, 39, 0.92) !important; }
+[data-skin='flat-light'] .text-white\/80 { color: rgba(17, 24, 39, 0.84) !important; }
+[data-skin='flat-light'] .text-white\/70 { color: rgba(17, 24, 39, 0.72) !important; }
+[data-skin='flat-light'] .text-white\/60 { color: rgba(17, 24, 39, 0.60) !important; }
+[data-skin='flat-light'] .text-white\/50 { color: rgba(75, 85, 99, 0.7) !important; }
+[data-skin='flat-light'] .text-white\/40 { color: rgba(107, 114, 128, 0.85) !important; }
+[data-skin='flat-light'] .text-white\/30 { color: rgba(156, 163, 175, 0.85) !important; }
+[data-skin='flat-light'] .text-white\/20 { color: rgba(0, 0, 0, 0.35) !important; }
+[data-skin='flat-light'] .text-white     { color: #111827 !important; }
+[data-skin='flat-light'] .text-black     { color: #ffffff !important; }
+
+/* ---- 透明黑底（mobile nav 等）反转为透明白 ---- */
+[data-skin='flat-light'] .bg-black\/40 { background-color: rgba(0, 0, 0, 0.04) !important; }
+[data-skin='flat-light'] .bg-black\/85 { background-color: rgba(0, 0, 0, 0.55) !important; }
+[data-skin='flat-light'] .bg-black\/70 { background-color: rgba(0, 0, 0, 0.45) !important; }
+[data-skin='flat-light'] .bg-black\/60 { background-color: rgba(0, 0, 0, 0.40) !important; }
+[data-skin='flat-light'] .bg-black     { background-color: #111827 !important; }
+
+/* 颜色通用兜底：white 系文字/边 在白底上必须转成深色 */
+[data-skin='flat-light'] [class*='text-white'],
+[data-skin='flat-light'] [class*='border-white'] {
+  /* 选择器已具体到细分 opacity 规则上，这里不写粗暴通配避免误伤 */
+}
