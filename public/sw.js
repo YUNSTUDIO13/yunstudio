@@ -22,6 +22,11 @@
  *         ② index.css 把 .border-line 覆盖升到 'html .border-line' (specificity 0,1,1)
  *            压过 Tailwind (0,1,0)，双保险。本轮 sw.js bytes 必然变更，触发客户端 install +
  *            清旧 cache —— 即使 PWA 不重开也能拿到新壳。
+ *
+ * 2026-08-12 #6 「新建需求输入框残缺修复」—— flat-light 段 .glass-input 的 box-shadow
+ *   残留 `inset 0 1px 2px rgba(0,0,0,0.03)`，inset 让圆角左上/左下被"吃进"产生视觉残缺。
+ *   治法：与 flat-dark 段对齐成单层 `0 0 0 1px var(--edge)`，去掉 inset。liquid-glass
+ *   默认段保留 inset 是设计意图（玻璃顶部高光），仅 flat-light 清掉。
  */
 const VERSION = '__SW_VERSION__';
 const APP_SHELL = [
