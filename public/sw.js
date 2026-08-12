@@ -39,6 +39,14 @@
  *   ② src/index.css 把覆写规则拆分——`.bg-accent`（实色）和 `.bg-accent/X`（透明变体）
  *     各走各的色：flat-light 实色=#2563eb 蓝 / 浅底变体=rgba(37,99,235,0.10) 10%透明蓝；
  *     flat-dark 实色=#7c85f5 靛紫 / 浅底变体=rgba(255,255,255,0.08) 白.08。
+ *
+ * 2026-08-12 #8 「屏幕顶部那根虚线治本」—— 根因是 tailwind.config.js 把 canvas 硬编码 #040408，
+ *   Tailwind 编译出 .bg-canvas{background-color:#040408} 静态 utility；PWA 状态栏透明区下方透出
+ *   body 默认紫黑 vs AppShell div 的 flat-dark 蓝黑 / flat-light 白，色差产生"虚线"。
+ *   治法（双保险）：① tailwind.config.js 让 canvas='rgb(var(--c-canvas-rgb) / <alpha-value>)'，
+ *     三段补 --c-canvas-rgb（4,4,8 / 14,16,21 / 249,250,251），Tailwind 编译的 utility 本身引用变量；
+ *   ② src/index.css 把 html / html[data-skin] 背景升 specificity 0,1,0 + !important 压过
+ *     Tailwind 静态 utility (0,1,0)；三层（html / body / .bg-canvas div）背景色完全统一。
  */
 const VERSION = '__SW_VERSION__';
 const APP_SHELL = [

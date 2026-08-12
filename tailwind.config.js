@@ -5,14 +5,14 @@ export default {
     extend: {
       colors: {
         // 暗色玻璃语义（1:1 复刻高级简约UI）
-        canvas: '#040408',        // 主背景（近黑，与设计稿 #040408 一致）
+        canvas: 'rgb(var(--c-canvas-rgb) / <alpha-value>)', // 主背景 var 化（2026-08-12 #8 治本：避免 Tailwind 编译出 #040408 硬编码 utility，否则 PWA 状态栏透明区看到 body 默认紫黑 vs AppShell div 蓝黑产生色差「虚线」；现在 utility 本身引用变量，三皮肤自动跟随）
         surface: '#0e0e16',       // 卡片实色底（玻璃质感由 .glass-* 工具类提供）
         'ink-strong': '#ECECF4',  // 主文本（近白）
         'ink-soft': '#9A9CA8',    // 副文本
         'ink-mute': '#6B6E78',    // 弱化文本
         line: 'var(--c-line)',     // 细线/边框引用 --c-line（2026-08-12 #5 治本：不再让 Tailwind 编译出 rgb(38,38,46) 硬编码 utility，把"白底黑分割线"焊死在 css 里；现在 utility 本身就跟着皮肤走）
         brand: '#7c85f5',         // 主按钮（靛紫，渐变由 ui Button 处理）
-        'brand-soft': '#1A1A24',  // 次按钮底
+        'brand-soft': '#1A1A24',  // 次按钮底（2026-08-12 #8 暂不动——index.css 三段对 .bg-brand-soft 已有覆写覆盖此硬编码）
         accent: 'rgb(var(--c-accent-rgb) / <alpha-value>)', // 主题强调色 var 化（2026-08-12 #7 治本：避免 Tailwind 烧出 #7c85f5 硬编码 utility，flat-light 下 Sprints 进度条 fill 仍是靛紫，被覆写为 #2563eb1a 10% 透明蓝→视觉变"实心纯黑"）
         'accent-2': '#c084fc',    // 紫
         warning: '#fbbf24',

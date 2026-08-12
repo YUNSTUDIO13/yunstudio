@@ -15,6 +15,10 @@
    所有 3 个皮肤共用：先给 dark 默认值，然后各 [data-skin=xxx] 段覆盖。
    这样 inline style 用 var(--name) 时永远有值，不会"看不见 fallback 错位"。*/
 :root {
+  /* 主背景画布色 RGB 通道（2026-08-12 #8 治本）
+   * 让 Tailwind 编译出的 .bg-canvas / .bg-canvas/X utility 引用变量，三皮肤自动跟随。
+   * 同步给 html / body 用，避免 PWA 状态栏透明区色差「虚线」。 */
+  --c-canvas-rgb: 4, 4, 8;       /* liquid-glass 默认（深紫黑 #040408） */
   /* 主题强调色（dark/liquid-glass 默认靛紫；flat-light 段覆写为 #2563eb 蓝）
      ★ 2026-08-12 #7 治本：RGB 通道 + alpha-value 模式，让 Tailwind bg-accent/X 系列 utility
        编译时引用变量，三皮肤自动跟随。 */
@@ -72,6 +76,19 @@ html [data-skin] .border-line {
   border-color: var(--c-line) !important;
 }
 
+/* ---- 全局：html 背景跟着 var 走（2026-08-12 #8 治本双保险）
+   根因：tailwind.config.js 把 canvas 硬编码 #040408 → Tailwind 编译出 .bg-canvas{border-color:#040408}
+   字面 utility；PWA 状态栏下方透出 html/body 默认色（liquid-glass 紫黑）vs AppShell <div className="bg-canvas">
+   渲染的 flat-dark 蓝黑 / flat-light 白，**色差在状态栏下沿产生一根"虚线"**。
+   治法：① tailwind.config.js 让 canvas='rgb(var(--c-canvas-rgb) / <alpha-value>)'，Tailwind 编译的
+        utility 本身引用变量；② 此处把 html 背景升到 'html, html[data-skin]'(specificity 0,1,0)
+        + !important 压过 Tailwind .bg-canvas (0,1,0)，双保险；③ :root + flat-light + flat-dark 三段
+        都补 --c-canvas-rgb（#040408 / #0E1015 / #F9FAFB RGB 通道）。 */
+html,
+html[data-skin] {
+  background-color: rgb(var(--c-canvas-rgb)) !important;
+}
+
 html,
 body,
 #root {
@@ -82,7 +99,10 @@ body {
   margin: 0;
   font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background-color: #040408;
+  /* 2026-08-12 #8 治本：body 背景按主题 var 化
+   *  root 因 Tailwind 静态 utility 烧 #040408 让 flat-dark / flat-light 用户 PWA 状态栏透明区透出紫黑，与 AppShell 蓝黑/白底色差产生「屏幕顶部那根虚线」。
+   * 现在 body / html / .bg-canvas 三层都引用 var(--c-canvas-rgb)（三段都补具体 RGB），任何 css 版本都跟着皮肤走。 */
+  background-color: rgb(var(--c-canvas-rgb));
   color: rgba(255, 255, 255, 0.88);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -219,6 +239,8 @@ input[type='time'] {
   --c-accent-soft: rgba(124, 133, 245, 0.12);
   --c-accent-border: rgba(124, 133, 245, 0.35);
   --c-accent-glow: rgba(124, 133, 245, 0.20);
+  /* 主画布 RGB 通道（2026-08-12 #8 治本）：#0E1015 深蓝黑 */
+  --c-canvas-rgb: 14, 16, 21;
   --ink-strong: #ffffff;
   --ink-base: rgba(255, 255, 255, 0.92);
   --ink-soft: rgba(255, 255, 255, 0.65);     /* 辅助（贴近参考图二级灰度） */
@@ -475,6 +497,8 @@ input[type='time'] {
   --c-accent-soft: rgba(37, 99, 235, 0.10);
   --c-accent-border: rgba(37, 99, 235, 0.30);
   --c-accent-glow: rgba(37, 99, 235, 0.20);
+  /* 主画布 RGB 通道（2026-08-12 #8 治本）：#F9FAFB 极浅灰白 */
+  --c-canvas-rgb: 249, 250, 251;
   /* 语义色"高同色非荧光"加深版：白底上 #fbbf24 之类亮色看起来像荧光 */
   --c-green: #047857;        /* green-700（柔和墨绿） */
   --c-amber: #b45309;        /* amber-700（深琥珀，去荧光） */
@@ -541,7 +565,8 @@ input[type='time'] {
    阻断任何顶部残留阴影渲染。所有顶层 fixed/absolute 元素（Movies nav、移动 dock）的 box-shadow 全部归零，
    用 1px 边替代（极淡）。这样状态栏底色与页面画布严丝合缝接缝，再无灰线。 */
 html[data-skin='flat-light'], html[data-skin='flat-light'] body {
-  background-color: #F9FAFB !important;
+  /* 2026-08-12 #8 治本：跟着 var 走，不再硬编码 #F9FAFB */
+  background-color: rgb(var(--c-canvas-rgb)) !important;
 }
 [data-skin='flat-light'] body {
   background-image: none !important;
