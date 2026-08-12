@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 2026-08-12 flat-light 修复确认版本：4 项修复（输入框 1px / 分割线 5% / 进度条 var 化 / 封面白字豁免）+ 5 项延伸修复（chip hover / 荧光色 / Modal 半透 / 状态栏灰线 / 通知灰）。
+   当前 css hash 是 4 项修复后的产物，如果客户端 sw.js 还在老 cache，必须硬刷或重装 PWA。*/
+
 html,
 body,
 #root {
