@@ -6,9 +6,14 @@ export const C = {
   accentSoft: 'var(--c-accent-soft, rgba(124,133,245,0.15))',
   accentBorder: 'var(--c-accent-border, rgba(124,133,245,0.28))',
   accentGlow: 'var(--c-accent-glow, rgba(124,133,245,0.22))',
-  green: '#5eead4',
-  amber: '#fbbf24',
-  red: '#f87171',
+  // 语义色（success/warning/danger）—— 也 var 化，让 flat-light 段切换为"高同色非荧光色"加深版，
+  // 避免白底上 #fbbf24 之类亮黄/亮绿视觉像荧光色。
+  // liquid-glass 默认维持原版（亮色在深底上效果好）；flat-light 段在 index.css 重新定义。
+  green: 'var(--c-green, #5eead4)',
+  amber: 'var(--c-amber, #fbbf24)',
+  red: 'var(--c-red, #f87171)',
+  // 大数字（非荧光、柔和深字）：liquid-glass 用接近白，flat-light 用 slate-800 替代 #111827 的硬黑感。
+  displayPrimary: 'var(--c-display-primary, rgba(255,255,255,0.92))',
   // 文字/边色全部 var 化，让 flat-dark / flat-light 皮肤可穿透覆盖
   textPrimary: 'var(--c-text-primary, rgba(255,255,255,0.88))',
   textSub: 'var(--c-text-sub, rgba(255,255,255,0.38))',

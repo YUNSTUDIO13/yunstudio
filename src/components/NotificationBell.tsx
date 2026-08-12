@@ -175,6 +175,8 @@ export default function NotificationBell() {
           `}
           style={{
             ...glass.card,
+            // 平板/桌面端 popover：白底深字的 flat-light 覆盖在 [data-skin='flat-light'] [data-notif-panel] 段做。
+            // 这里保留 liquid-glass / flat-dark 的深色玻璃风格（用户明确要求"dock 类浮层保留"）。
             background: 'rgba(20,20,28,0.72)',
             backdropFilter: 'blur(40px) saturate(180%)',
             WebkitBackdropFilter: 'blur(40px) saturate(180%)',
@@ -237,16 +239,16 @@ export default function NotificationBell() {
                     className="flex w-full items-start gap-3 px-4 py-3 text-left transition active:scale-[0.98]"
                     style={{
                       borderBottom: `1px solid ${C.border}`,
-                      background: unread ? 'rgba(124,133,245,0.05)' : 'transparent',
+                      background: unread ? C.accentSoft : 'transparent',
                     }}
                     onMouseEnter={(e) => {
                       ;(e.currentTarget as HTMLElement).style.background = unread
-                        ? 'rgba(124,133,245,0.10)'
-                        : 'rgba(255,255,255,0.04)'
+                        ? C.accentSoft
+                        : 'var(--c-notif-hover, rgba(255,255,255,0.04))'
                     }}
                     onMouseLeave={(e) => {
                       ;(e.currentTarget as HTMLElement).style.background = unread
-                        ? 'rgba(124,133,245,0.05)'
+                        ? C.accentSoft
                         : 'transparent'
                     }}
                   >

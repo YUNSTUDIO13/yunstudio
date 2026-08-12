@@ -391,18 +391,24 @@ input[type='time'] {
   --c-accent-soft: rgba(37, 99, 235, 0.10);
   --c-accent-border: rgba(37, 99, 235, 0.30);
   --c-accent-glow: rgba(37, 99, 235, 0.20);
+  /* 语义色"高同色非荧光"加深版：白底上 #fbbf24 之类亮色看起来像荧光 */
+  --c-green: #047857;        /* green-700（柔和墨绿） */
+  --c-amber: #b45309;        /* amber-700（深琥珀，去荧光） */
+  --c-red: #b91c1c;          /* red-700（深红，去荧光） */
+  /* 大数字色：不用 #111827 那种发硬的黑，用 slate-800 更柔 */
+  --c-display-primary: #1e293b;
   /* 文字灰度（深色 → 白底高对比） */
-  --c-text-primary: #111827;        /* 主标题/数值 */
-  --c-text-sub: #6b7280;            /* 副标题/描述 */
-  --c-text-ghost: #9ca3af;          /* 极弱/placeholder */
+  --c-text-primary: #1f2937;     /* 主标题/数值 —— slate-800 比 #111827 柔和 */
+  --c-text-sub: #6b7280;         /* 副标题/描述 */
+  --c-text-ghost: #9ca3af;       /* 极弱/placeholder */
   --c-border: rgba(0, 0, 0, 0.06);  /* 默认边 */
   --c-border-high: rgba(0, 0, 0, 0.12);
   /* ink 系统类（沿用 flat-dark 的语义） */
-  --ink-strong: #111827;
-  --ink-base: #1f2937;
-  --ink-soft: #4b5563;
-  --ink-mute: #6b7280;
-  --ink-subtle: #9ca3af;
+  --ink-strong: #1f2937;         /* slate-800 —— 修复 bug1（三级 chip hover 时 #111827 看着像纯黑） */
+  --ink-base: #334155;           /* slate-700 —— 正文默认深字，柔和 */
+  --ink-soft: #475569;           /* slate-600 */
+  --ink-mute: #64748b;           /* slate-500 */
+  --ink-subtle: #94a3b8;         /* slate-400 */
   /* 画布/卡/弹层（白底分层） */
   --canvas: #f9fafb;
   --surface: #f3f4f6;
@@ -436,6 +442,29 @@ input[type='time'] {
 [data-skin='flat-light'] body {
   background-color: var(--canvas);
   color: var(--ink-base);
+}
+
+/* ---- bug4 修复：白底净化 ----
+   状态栏下方那一根"灰线"根因排查：Movies 顶 nav `bg-transparent border-b border-transparent` +
+   glass-panel 浮岛 boxShadow + Aurora 残余。在 flat-light 段统一做"白底净化"——强制 html/body 平铺 #F9FAFB，
+   阻断任何顶部残留阴影渲染。所有顶层 fixed/absolute 元素（Movies nav、移动 dock）的 box-shadow 全部归零，
+   用 1px 边替代（极淡）。这样状态栏底色与页面画布严丝合缝接缝，再无灰线。 */
+html[data-skin='flat-light'], html[data-skin='flat-light'] body {
+  background-color: #F9FAFB !important;
+}
+[data-skin='flat-light'] body {
+  background-image: none !important;
+}
+/* 任何 fixed/sticky 顶部元素：禁掉装饰性阴影（避免白底上看出"灰条"），保留必要的 1px 极淡边 */
+[data-skin='flat-light'] nav.fixed,
+[data-skin='flat-light'] header.fixed,
+[data-skin='flat-light'] [class*='fixed'][class*='top-'] {
+  box-shadow: none !important;
+}
+/* 顶部 1px 装饰边：统一降到 0 → 透明（避免与状态栏接缝出现一条线）*/
+[data-skin='flat-light'] [class*='fixed'][class*='top-'][class*='border-b'],
+[data-skin='flat-light'] .border-b.border-transparent {
+  border-bottom-color: transparent !important;
 }
 
 /* ---- Tailwind 语义类：让 ink 反转成深字 ---- */
@@ -614,24 +643,35 @@ input[type='time'] {
   color: #2563eb !important;
 }
 
-/* ---- 标题色反转：text-white 等在白底上要变深 ---- */
-[data-skin='flat-light'] .text-white\/90 { color: rgba(17, 24, 39, 0.92) !important; }
-[data-skin='flat-light'] .text-white\/80 { color: rgba(17, 24, 39, 0.84) !important; }
-[data-skin='flat-light'] .text-white\/70 { color: rgba(17, 24, 39, 0.72) !important; }
-[data-skin='flat-light'] .text-white\/60 { color: rgba(17, 24, 39, 0.60) !important; }
-[data-skin='flat-light'] .text-white\/50 { color: rgba(75, 85, 99, 0.7) !important; }
-[data-skin='flat-light'] .text-white\/40 { color: rgba(107, 114, 128, 0.85) !important; }
-[data-skin='flat-light'] .text-white\/30 { color: rgba(156, 163, 175, 0.85) !important; }
+/* ---- 标题色反转：text-white 等在白底上要变深 —— 用 #1f2937 不用 #111827（避免硬黑感）---- */
+[data-skin='flat-light'] .text-white\/90 { color: rgba(31, 41, 55, 0.92) !important; }
+[data-skin='flat-light'] .text-white\/80 { color: rgba(31, 41, 55, 0.84) !important; }
+[data-skin='flat-light'] .text-white\/70 { color: rgba(31, 41, 55, 0.72) !important; }
+[data-skin='flat-light'] .text-white\/60 { color: rgba(31, 41, 55, 0.60) !important; }
+[data-skin='flat-light'] .text-white\/50 { color: rgba(71, 85, 105, 0.7) !important; }
+[data-skin='flat-light'] .text-white\/40 { color: rgba(100, 116, 139, 0.85) !important; }
+[data-skin='flat-light'] .text-white\/30 { color: rgba(148, 163, 184, 0.85) !important; }
 [data-skin='flat-light'] .text-white\/20 { color: rgba(0, 0, 0, 0.35) !important; }
-[data-skin='flat-light'] .text-white     { color: #111827 !important; }
+[data-skin='flat-light'] .text-white     { color: var(--c-text-primary) !important; }
 [data-skin='flat-light'] .text-black     { color: #ffffff !important; }
 
-/* ---- 透明黑底（mobile nav 等）反转为透明白 ---- */
+/* ---- 透明黑底（mobile nav / Modal 覆盖层）：按用途分级 ----
+   - 默认 `.bg-black` / `.bg-black\/60+` 仍保持 0.55 透明（侧栏/MegaSheet 底）
+   - 但 Movies 详情 Modal（手机端封面+大标题+封面白字场景）需要更"实"的黑底
+     —— 因为 flat-light 下 55% 黑实际是"灰底"，上层白字就被遮住看不清
+   - 用两个分层：
+     · .bg-black/85 → 0.92（接近实色，白字清晰）—— 给 Movies Modal 等"半屏大 Modal"使用
+     · .bg-black/70/60/55/40 → 0.55/0.45/0.40/0.35/0.04（保留透感）—— 给浮层遮罩/侧栏使用 */
+[data-skin='flat-light'] .bg-black\/92 { background-color: rgba(0, 0, 0, 0.92) !important; }
+[data-skin='flat-light'] .bg-black\/90 { background-color: rgba(0, 0, 0, 0.90) !important; }
+[data-skin='flat-light'] .bg-black\/85 { background-color: rgba(0, 0, 0, 0.88) !important; }
+[data-skin='flat-light'] .bg-black\/80 { background-color: rgba(0, 0, 0, 0.85) !important; }
+[data-skin='flat-light'] .bg-black\/75 { background-color: rgba(0, 0, 0, 0.75) !important; }
+[data-skin='flat-light'] .bg-black\/70 { background-color: rgba(0, 0, 0, 0.65) !important; }
+[data-skin='flat-light'] .bg-black\/60 { background-color: rgba(0, 0, 0, 0.55) !important; }
+[data-skin='flat-light'] .bg-black\/50 { background-color: rgba(0, 0, 0, 0.50) !important; }
 [data-skin='flat-light'] .bg-black\/40 { background-color: rgba(0, 0, 0, 0.04) !important; }
-[data-skin='flat-light'] .bg-black\/85 { background-color: rgba(0, 0, 0, 0.55) !important; }
-[data-skin='flat-light'] .bg-black\/70 { background-color: rgba(0, 0, 0, 0.45) !important; }
-[data-skin='flat-light'] .bg-black\/60 { background-color: rgba(0, 0, 0, 0.40) !important; }
-[data-skin='flat-light'] .bg-black     { background-color: #111827 !important; }
+[data-skin='flat-light'] .bg-black     { background-color: #0f172a !important; }
 
 /* ---- Tailwind 静态编出的颜色类（CSS 变量穿不透 .bg-canvas/.bg-surface 工具类） ----
    必须显式覆盖，否则 AppShell 的 <div className="bg-canvas"> 仍把整页画布涂成 tailwind.config 的 #040408，
@@ -682,3 +722,41 @@ input[type='time'] {
 [data-skin='flat-light'] [class*='bg-black'] .text-white\/25 { color: rgba(255, 255, 255, 0.25) !important; }
 [data-skin='flat-light'] [class*='bg-black'] .text-white\/20 { color: rgba(255, 255, 255, 0.2) !important; }
 [data-skin='flat-light'] [class*='bg-black'] .text-white\/10 { color: rgba(255, 255, 255, 0.1) !important; }
+
+/* ---- bug5 修复：通知面板白底化 ----
+   NotificationBell popover 之前是写死的 rgba(20,20,28,0.72) 深色玻璃模糊，
+   在 flat-light 段下没覆盖，看上去仍是灰色玻璃态 → bug5。
+   修复：用 [data-notif-panel] 锚点 + flat-light 段全面覆写为白底实色 + 极淡边 + 浅阴影。
+   同时把 Notion 高亮（rgba(124,133,245,.05)）改成 flat-light 友好的浅蓝 0.06。 */
+[data-skin='flat-light'] [data-notif-panel] {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 12px 36px rgba(15, 23, 42, 0.10) !important;
+}
+[data-skin='flat-light'] [data-notif-panel] * {
+  /* 让所有 text-white 系类在白底 popover 内不再反转成深字（豁免第二条规则） */
+  color: #1f2937;
+}
+/* 标题栏 / 分隔线 → 浅灰 */
+[data-skin='flat-light'] [data-notif-panel] [style*="border-bottom"] {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+[data-skin='flat-light'] [data-notif-panel] [style*="border-top"] {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+/* 通知项 hover：浅蓝 */
+[data-skin='flat-light'] {
+  --c-notif-hover: rgba(37, 99, 235, 0.06);
+}
+
+/* ---- bug3 修复：手机观影详情 Modal 半透白字不清 ----
+   Movies Modal 用的 bg-black/85 backdrop-blur-md 在 flat-light 段已改为 0.88 接近实色黑（上面修改），
+   但 backdrop-blur-md 在白底上层 Glass 上是"灰底蓝"残留；同时 Modal 内右上角"关闭按钮"用 bg-white/10。
+   这一段统一 flat-light 下观影 Modal popover 内部的玻璃感残留。*/
+[data-skin='flat-light'] .fixed.inset-0.overflow-y-auto {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
