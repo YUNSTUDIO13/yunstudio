@@ -5,6 +5,13 @@ export default function AuroraBackground() {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}>
       <div style={{ position: 'absolute', inset: 0, background: '#040408' }} />
+      {/* 顶部极光带 —— 让沉浸式状态栏透出有质感的紫调极光而非死黑画布（状态栏高度区域即其下缘） */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: '42vh',
+        background: 'linear-gradient(to bottom, rgba(124,133,245,0.18) 0%, rgba(192,132,252,0.09) 38%, transparent 100%)',
+        filter: 'blur(34px)',
+        pointerEvents: 'none',
+      }} />
       {/* aurora layer 1 — large violet */}
       <div style={{
         position: 'absolute', width: 900, height: 700,
