@@ -9,8 +9,11 @@
  *    activate 时清空「所有」旧缓存，保证更新必生效、旧壳不再焊死客户端
  *
  * 紧急字面改动（确保 sw.js bytes hash 变更，让已装的客户端 SW 触发 install + 清旧 cache）：
- *  2026-08-12 #3 「详情 Modal 三皮肤实色化」+ chip ink-strong slate-700 软化 + 灯箱/海报覆盖层纹理保留
- *  部署 css hash 后续随 build 浮动（旧 css 缓存的客户端请硬刷或卸载 PWA 重装）。
+ *  2026-08-12 #4 「全面反思修复」—— .glass-* 1px 全局化 + .border-line 用 var 三段覆盖 +
+ *   进度条 var 全局兜底 (Overview inline 移除 fallback) + 状态栏 box-shadow:none 全局 +
+ *   MegaMenu 三级菜单 hover 用 accent 高亮。皇上根因排查后确认"不是 SW 缓存问题，
+ *   是修复只在 [data-skin=flat-light] 段生效"。本次把全部 5 个 bug 都做到 :root 默认值 +
+ *   三皮肤覆盖，**绝不再依赖单段**。客户端请卸载 PWA 重装或 Ctrl+Shift+R 硬刷。
  */
 const VERSION = '__SW_VERSION__';
 const APP_SHELL = [

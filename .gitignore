@@ -11,3 +11,20 @@ dist
 
 # agent-internal runtime data (memory / skills cache / project notes) — 含 PII，绝不入库
 .workbuddy/
+
+# 测试/部署核验用临时文件
+_check*.py
+_verify*.py
+deployed.css
+deployed.html
+dist-old*
+vite.config.js.timestamp-*
+after_push.log
+clean*.log
+cred.log
+diag.log
+gctest.log
+gh_run.log
+git_state.log
+gitcfg.log
+local_hash.log

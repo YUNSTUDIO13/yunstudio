@@ -1,9 +1,58 @@
+/* 2026-08-12 v2 全面反思修复 —— 之前的修复只在 [data-skin=flat-light] 段覆盖，
+   导致用户在 flat-dark 默认主题或 liquid-glass 主题下依然看到旧 bug。
+   本轮把所有"非特定皮肤"的 bug 都做到全局兜底：
+   - .glass-* 圆角边默认 1px（不再 0.5px），三段扁平段也强制 1px
+   - .border-line 用 CSS 变量，三段都覆盖（不再是 "只有 flat-light 改 5%"）
+   - 进度条变量 --c-progress-track / --c-progress-glow 在 :root 默认 dark 主题值
+   - 状态栏 box-shadow:none + border-bottom-color:transparent 全局
+   只要 css hash 变了，客户端下次进 PWA 就能看到（注释字面变化 sw.js bytes 也强变化）。*/
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 2026-08-12 flat-light 修复确认版本：4 项修复（输入框 1px / 分割线 5% / 进度条 var 化 / 封面白字豁免）+ 5 项延伸修复（chip hover / 荧光色 / Modal 半透 / 状态栏灰线 / 通知灰）。
-   当前 css hash 是 4 项修复后的产物，如果客户端 sw.js 还在老 cache，必须硬刷或重装 PWA。*/
+/* ---- 全局 CSS 变量默认值（dark theme fallback） ----
+   所有 3 个皮肤共用：先给 dark 默认值，然后各 [data-skin=xxx] 段覆盖。
+   这样 inline style 用 var(--name) 时永远有值，不会"看不见 fallback 错位"。*/
+:root {
+  /* 进度条：dark theme 默认（亮底在深色画布上） */
+  --c-progress-track: rgba(255, 255, 255, 0.10);
+  --c-progress-glow: 0 0 10px rgba(255, 255, 255, 0.25);
+  --grad-progress: linear-gradient(90deg, #ffffff, rgba(255, 255, 255, 0.4));
+  /* .border-line 默认：dark theme 默认（亮边在深色画布上） */
+  --c-line: rgba(255, 255, 255, 0.08);
+  /* 玻璃统一 token（dark theme 默认实色 + 0 模糊） */
+  --c-glass-card-bg: #1A1C22;
+  --c-glass-card-border: 1px solid rgba(255, 255, 255, 0.06);
+  --c-glass-card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.25);
+  --c-glass-panel-bg: #1F2128;
+  --c-glass-panel-border: 1px solid rgba(255, 255, 255, 0.08);
+  --c-glass-panel-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 8px 32px rgba(0, 0, 0, 0.4);
+  --c-glass-input-bg: rgba(255, 255, 255, 0.05);
+  --c-glass-input-border: 1px solid rgba(255, 255, 255, 0.06);
+  --c-glass-input-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --c-glass-pill-bg: rgba(255, 255, 255, 0.05);
+  --c-glass-pill-border: 1px solid rgba(255, 255, 255, 0.08);
+  --c-glass-pill-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* ---- 全局：状态栏/顶部 fixed/sticky 元素的灰线清除（三皮肤通用，不靠 data-skin） ----
+   皇上指令："所有主题状态栏下仍然有灰色分割线"——这是因为 PWA/桌面浏览器 status bar 与画布之间
+   任何装饰性阴影/border-b 都会在白底或深底上呈现一条线。强制任何 fixed/sticky 顶部元素 box-shadow:none。*/
+header.fixed,
+nav.fixed,
+[class*='fixed'][class*='top-0'],
+[class*='fixed'][class*='top-'],
+[class*='sticky'][class*='top-0'],
+[class*='sticky'][class*='top-'] {
+  box-shadow: none !important;
+  border-bottom-color: transparent !important;
+}
+
+/* ---- 全局：.border-line 用 var（穿透三皮肤） ---- */
+.border-line {
+  border-color: var(--c-line) !important;
+}
 
 html,
 body,
@@ -155,30 +204,33 @@ input[type='time'] {
   --surface: #15181E;                         /* 输入框/小容器底（介于画布和卡之间） */
   --card: #1A1C22;                            /* 通用卡（比画布亮 8%，自然浮起） */
   --modal: #1F2128;                           /* 弹层/Modal（比卡再亮一档，更跳出） */
-  --edge: rgba(255, 255, 255, 0.06);          /* 0.5px 边（用 box-shadow 实现 0.5px） */
+  --edge: rgba(255, 255, 255, 0.08);          /* 1px 边（圆角处稳定，不再"缺一角"） */
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.25);    /* 极弱投影，无 inset */
 
   /* === 玻璃 var 重定义：去毛玻璃化（半透白底 → 实色 + blur none + 去内 inset 高光） === */
-  /* card：原 rgba(.038) + blur(32)+saturate+inset 高光 → #1A1C22 + 不模糊 + 极弱边 */
+  /* card：原 rgba(.038) + blur(32)+saturate+inset 高光 → #1A1C22 + 不模糊 + 1px 实边 */
   --glass-card-bg: #1A1C22;
   --glass-card-blur: none;
   --glass-card-border: 0;
-  --glass-card-shadow: 0 0 0 0.5px rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.25);
+  --glass-card-shadow: 0 0 0 1px var(--edge), 0 1px 3px rgba(0,0,0,0.25);
 
-  /* input：原 rgba(.03) + blur(12) + inset 凹陷 → #15181E + 不模糊 + 0 inset */
+  /* input：原 rgba(.03) + blur(12) + inset 凹陷 → #15181E + 不模糊 + 1px 实边 */
   --glass-input-bg: #15181E;
   --glass-input-blur: none;
   --glass-input-border: 0;
-  --glass-input-shadow: 0 0 0 0.5px rgba(255,255,255,0.06);
+  --glass-input-shadow: 0 0 0 1px var(--edge);
 
-  /* pill：原 rgba(.06) + blur(16) + 1px 内高光 → 浅实色 + 不模糊 + 0 inset */
+  /* pill：原 rgba(.06) + blur(16) + 1px 内高光 → 浅实色 + 不模糊 + 1px 实边 */
   --glass-pill-bg: rgba(255,255,255,0.05);
   --glass-pill-blur: none;
   --glass-pill-border: 0;
-  --glass-pill-shadow: 0 0 0 0.5px rgba(255,255,255,0.07);
+  --glass-pill-shadow: 0 0 0 1px rgba(255,255,255,0.09);
 
-  /* 进度条/KPI 紫蓝渐变 → 白到中性灰（去紫） */
-  --grad-progress: linear-gradient(90deg, #fafafa, rgba(255,255,255,0.25));
+  /* 进度条 / KPI 渐变：白到中性灰（去紫） */
+  --grad-progress: linear-gradient(90deg, #ffffff, rgba(255,255,255,0.4));
+
+  /* border-line 全局 var：dark theme 用 8% 白边 */
+  --c-line: rgba(255, 255, 255, 0.08);
 
   color-scheme: dark;
 }
@@ -193,7 +245,7 @@ input[type='time'] {
 [data-skin='flat-dark'] .text-ink-soft   { color: var(--ink-soft) !important; }
 [data-skin='flat-dark'] .text-ink-mute   { color: var(--ink-mute) !important; }
 [data-skin='flat-dark'] .text-ink-subtle { color: var(--ink-subtle) !important; }
-[data-skin='flat-dark'] .border-line     { border-color: rgba(255, 255, 255, 0.07) !important; }
+/* .border-line 已被全局 :root/[data-skin=xxx] 的 --c-line 覆盖（前面那段），无需在这里再写 */
 
 /* ============================================================
  * 卡片三种层次（看图：画布 < 输入框 < 通用卡 < 弹层）
@@ -205,10 +257,10 @@ input[type='time'] {
   background: var(--card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 0;                                  /* 边用 box-shadow 实现 0.5px */
+  border: 0;                                  /* 边用 box-shadow 实现 1px */
   border-radius: 18px;
   box-shadow:
-    0 0 0 0.5px var(--edge),                  /* 极细外缘描边 */
+    0 0 0 1px var(--edge),                  /* 1px 实边（圆角处不再丢半像素） */
     0 1px 3px rgba(0, 0, 0, 0.25);            /* 极弱投影 */
 }
 
@@ -220,7 +272,7 @@ input[type='time'] {
   border: 0;
   border-radius: 18px;
   box-shadow:
-    0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    0 0 0 1px var(--edge),
     0 8px 32px rgba(0, 0, 0, 0.5);             /* Modal 用稍深的浮起阴影 */
 }
 
@@ -232,13 +284,13 @@ input[type='time'] {
   border: 0;
   border-radius: 12px;
   box-shadow:
-    0 0 0 0.5px var(--edge);                  /* 极细边 */
+    0 0 0 1px var(--edge);                  /* 1px 实边（圆角处不再丢半像素） */
 }
 [data-skin='flat-dark'] .glass-input:focus,
 [data-skin='flat-dark'] .glass-input:focus-within,
 [data-skin='flat-dark'] .glass-input:focus-visible {
   box-shadow:
-    0 0 0 0.5px rgba(255, 255, 255, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.45),
     0 0 0 3px rgba(255, 255, 255, 0.08) !important;
 }
 
@@ -249,7 +301,7 @@ input[type='time'] {
   -webkit-backdrop-filter: none;
   border: 0;
   border-radius: 12px;
-  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09);
 }
 
 /* 关掉所有 Tailwind 的 backdrop-blur-*（圆按钮/详情 Modal/mega sheet 覆盖层等） */
@@ -439,6 +491,13 @@ input[type='time'] {
   /* 进度条渐变（淡蓝，去紫） */
   --grad-progress: linear-gradient(90deg, #2563eb 0%, #93c5fd 100%);
 
+  /* border-line 全局 var：flat-light 用 4% 黑（极淡，几乎不显眼） */
+  --c-line: rgba(0, 0, 0, 0.06);
+
+  /* 进度条变量（穿透 Overview.tsx 的 inline style var() 调用） */
+  --c-progress-track: rgba(0, 0, 0, 0.06);
+  --c-progress-glow: none;
+
   color-scheme: light;
 }
 
@@ -476,16 +535,7 @@ html[data-skin='flat-light'], html[data-skin='flat-light'] body {
 [data-skin='flat-light'] .text-ink-soft   { color: var(--ink-soft) !important; }
 [data-skin='flat-light'] .text-ink-mute   { color: var(--ink-mute) !important; }
 [data-skin='flat-light'] .text-ink-subtle { color: var(--ink-subtle) !important; }
-[data-skin='flat-light'] .border-line     { border-color: rgba(0, 0, 0, 0.05) !important; }
-
-/* ---- 进度条 / KPI 局部 token（穿透 Overview 进度条 inline style） ----
-   旧实现是写死的 rgba(255,255,255,0.06)（白底上不可见）+ 紫色 box-shadow（白底不协调），
-   flat-light 必须重新定义。 */
-[data-skin='flat-light'] {
-  --c-progress-track: rgba(0, 0, 0, 0.06);
-  --c-progress-glow: none;
-  --grad-progress: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
-}
+/* .border-line 已被全局 :root/[data-skin=xxx] 的 --c-line 覆盖（前面那段），无需在这里再写 !important */
 
 /* ---- 玻璃组件：白底版本 ---- */
 [data-skin='flat-light'] .glass-card {

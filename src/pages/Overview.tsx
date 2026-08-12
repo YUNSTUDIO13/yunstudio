@@ -228,8 +228,8 @@ export default function Overview() {
             <CardHeader title="整体进度" style={{ marginBottom: 0 }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <Display size={isMobile ? 32 : 28} color={C.displayPrimary}>{reqPct}%</Display>
-              <div style={{ flex: 1, position: 'relative', height: 3, background: 'var(--c-progress-track, rgba(255,255,255,0.06))', borderRadius: 2, overflow: 'visible' }}>
-                <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: 'var(--grad-progress, linear-gradient(90deg,#7c85f5,#c084fc))', borderRadius: 2, boxShadow: 'var(--c-progress-glow, 0 0 10px ' + C.accentGlow + ')' }} />
+              <div style={{ flex: 1, position: 'relative', height: 3, background: 'var(--c-progress-track)', borderRadius: 2, overflow: 'visible' }}>
+                <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: 'var(--grad-progress)', borderRadius: 2, boxShadow: 'var(--c-progress-glow)' }} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 'auto' }}>
@@ -262,8 +262,8 @@ export default function Overview() {
                 <div className="min-w-0 break-words text-sm font-semibold leading-snug" style={{ color: C.textPrimary, marginTop: 4 }}>
                   {activeSprint.name}
                 </div>
-                <div className="relative" style={{ height: 2, background: 'var(--c-progress-track, rgba(255,255,255,0.06))', borderRadius: 2, marginTop: 14, marginBottom: 10, overflow: 'visible' }}>
-                  <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${Math.round(activeSprint.progress)}%`, background: 'var(--grad-progress, linear-gradient(90deg,#7c85f5,#c084fc))', borderRadius: 2, boxShadow: 'var(--c-progress-glow, 0 0 10px ' + C.accentGlow + ')' }} />
+                <div className="relative" style={{ height: 2, background: 'var(--c-progress-track)', borderRadius: 2, marginTop: 14, marginBottom: 10, overflow: 'visible' }}>
+                  <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${Math.round(activeSprint.progress)}%`, background: 'var(--grad-progress)', borderRadius: 2, boxShadow: 'var(--c-progress-glow)' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: C.textSub }}>
                   <span>{activeSprint.status}</span>

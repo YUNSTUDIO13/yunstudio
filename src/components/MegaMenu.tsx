@@ -66,7 +66,10 @@ export default function MegaMenu({ primary }: MegaMenuProps) {
                         className="
                           flex items-center gap-2 rounded-lg px-2 py-1.5
                           text-sm text-ink-strong
-                          transition hover:bg-brand-soft
+                          transition
+                          hover:bg-accent/15 hover:text-accent
+                          focus-visible:bg-accent/15 focus-visible:text-accent focus-visible:outline-none
+                          active:bg-accent/20
                         "
                       >
                         <span className="grid h-6 w-6 place-items-center rounded-md bg-brand-soft text-ink-strong">
