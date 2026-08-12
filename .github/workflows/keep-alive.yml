@@ -1,0 +1,35 @@
+name: Supabase Keep Alive
+
+on:
+  # 设置定时触发：每 4 天的 UTC 时间 0 点运行一次
+  schedule:
+    - cron: '0 0 */4 * *'
+  
+  # 允许你在 GitHub Actions 页面手动点击按钮测试运行
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send request to Supabase
+        env:
+          # 这里使用了你在 GitHub Secrets 中定义的名称
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          # 替换下面 '你的表名' 为你数据库中任意一张真实存在的表名
+          # 使用 API 请求进行一次简单的查询操作
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/你的表名?select=count" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          
+          echo "Response HTTP status: $response"
+          
+          if [ "$response" -eq 200 ]; then
+            echo "Successfully pinged Supabase, project is kept alive!"
+          else
+            echo "Failed to ping Supabase, status code: $response"
+            exit 1
+          fi
