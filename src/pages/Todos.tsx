@@ -413,7 +413,7 @@ export default function Todos() {
                 return (
                   <li
                     key={t.id}
-                    className={`flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:gap-3 ${t.done ? 'opacity-60' : ''}`}
+                    className={`flex flex-col gap-2 p-1.5 md:px-2 md:py-3 md:flex-row md:items-center md:gap-3 ${t.done ? 'opacity-60' : ''}`}
                   >
                     {/* 紧凑头：checkbox + PriorityTag + TagChip 合并为一个 chip 行，避免「勾选框 / P0 / 标签」被 gap 拆成三段独立块 */}
                     <div className="flex items-center gap-1.5 self-start md:self-auto">
@@ -506,7 +506,7 @@ export default function Todos() {
                       return (
                         <li
                           key={t.id}
-                          className={`rounded-xl border border-line bg-canvas/40 p-3 ${t.done ? 'opacity-60' : ''}`}
+                          className={`rounded-xl border border-line bg-canvas/40 p-1.5 md:p-3 ${t.done ? 'opacity-60' : ''}`}
                         >
                           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                             <div className="min-w-0 flex-1">

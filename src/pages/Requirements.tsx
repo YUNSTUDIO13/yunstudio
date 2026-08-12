@@ -335,7 +335,7 @@ export default function Requirements() {
                     }
                   : undefined
               }
-              className={`group flex flex-col gap-2 px-2 py-3 md:flex-row md:items-center md:gap-2 transition ${
+              className={`group flex flex-col gap-2 p-1.5 md:px-2 md:py-3 md:flex-row md:items-center md:gap-2 transition ${
                 draggable && dragId === r.id ? 'opacity-40' : ''
               } ${
                 draggable && dragId && overId === r.id && dragId !== r.id
@@ -417,7 +417,7 @@ export default function Requirements() {
                 {qitems.map((r) => (
                   <li
                     key={r.id}
-                    className="rounded-xl border border-line bg-canvas/40 p-3"
+                    className="rounded-xl border border-line bg-canvas/40 p-1.5 md:p-3"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                       <div className="min-w-0 flex-1">

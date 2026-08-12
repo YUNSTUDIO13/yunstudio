@@ -317,7 +317,7 @@ export default function Bugs() {
                     }
                   : undefined
               }
-              className={`group flex flex-col gap-2 px-2 py-3 transition md:flex-row md:items-center md:gap-2 ${
+              className={`group flex flex-col gap-2 p-1.5 md:px-2 md:py-3 transition md:flex-row md:items-center md:gap-2 ${
                 draggable && dragId === b.id ? 'opacity-40' : ''
               } ${
                 draggable && dragId && overId === b.id && dragId !== b.id
@@ -388,7 +388,7 @@ export default function Bugs() {
             ) : (
               <ul className="space-y-2">
                 {qitems.map((b) => (
-                  <li key={b.id} className="rounded-xl border border-line bg-canvas/40 p-3">
+                  <li key={b.id} className="rounded-xl border border-line bg-canvas/40 p-1.5 md:p-3">
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
 <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
