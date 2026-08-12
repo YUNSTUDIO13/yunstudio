@@ -10,6 +10,7 @@
   "orientation": "portrait",
   "start_url": ".",
   "scope": "./",
+  "id": "./",
   "icons": [
     {
       "src": "pwa-192.png",
