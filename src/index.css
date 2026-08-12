@@ -444,7 +444,16 @@ input[type='time'] {
 [data-skin='flat-light'] .text-ink-soft   { color: var(--ink-soft) !important; }
 [data-skin='flat-light'] .text-ink-mute   { color: var(--ink-mute) !important; }
 [data-skin='flat-light'] .text-ink-subtle { color: var(--ink-subtle) !important; }
-[data-skin='flat-light'] .border-line     { border-color: rgba(0, 0, 0, 0.08) !important; }
+[data-skin='flat-light'] .border-line     { border-color: rgba(0, 0, 0, 0.05) !important; }
+
+/* ---- 进度条 / KPI 局部 token（穿透 Overview 进度条 inline style） ----
+   旧实现是写死的 rgba(255,255,255,0.06)（白底上不可见）+ 紫色 box-shadow（白底不协调），
+   flat-light 必须重新定义。 */
+[data-skin='flat-light'] {
+  --c-progress-track: rgba(0, 0, 0, 0.06);
+  --c-progress-glow: none;
+  --grad-progress: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+}
 
 /* ---- 玻璃组件：白底版本 ---- */
 [data-skin='flat-light'] .glass-card {
@@ -453,8 +462,9 @@ input[type='time'] {
   -webkit-backdrop-filter: none;
   border: 0;
   border-radius: 18px;
+  /* 0.5px 阴影边在 Windows Chrome 圆角处会渲染丢半像素看起来"缺角"——改 1px 稳定 */
   box-shadow:
-    0 0 0 0.5px var(--edge),
+    0 0 0 1px var(--edge),
     var(--shadow);
 }
 [data-skin='flat-light'] .glass-panel {
@@ -464,7 +474,7 @@ input[type='time'] {
   border: 0;
   border-radius: 18px;
   box-shadow:
-    0 0 0 0.5px var(--edge),
+    0 0 0 1px var(--edge),
     var(--shadow);
 }
 [data-skin='flat-light'] .glass-input {
@@ -473,8 +483,9 @@ input[type='time'] {
   -webkit-backdrop-filter: none;
   border: 0;
   border-radius: 12px;
+  /* 同上：0.5px → 1px 解决输入框左边"缺一角"（圆角阴影子像素渲染异常） */
   box-shadow:
-    0 0 0 0.5px var(--edge),
+    0 0 0 1px var(--edge),
     inset 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 [data-skin='flat-light'] .glass-input:focus,
@@ -490,7 +501,8 @@ input[type='time'] {
   -webkit-backdrop-filter: none;
   border: 0;
   border-radius: 12px;
-  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  /* 同上：0.5px → 1px */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 /* 关掉所有 Tailwind 的 backdrop-blur-* */
@@ -651,3 +663,22 @@ input[type='time'] {
 [data-skin='flat-light'] [class*='border-white'] {
   /* 选择器已具体到细分 opacity 规则上，这里不写粗暴通配避免误伤 */
 }
+
+/* ---- 豁免：bg-black 系列容器内的 .text-white 在所有皮肤保持白色文字 ----
+   场景：Movies 详情 Modal（bg-black/85 backdrop-blur）、全屏浮层、电影海报封面深色叠加层、按钮徽章（bg-black/55 + text-white/85）。
+   这些地方的"白字配深底"是设计意图，不能被全局反转误伤成深色。
+   用 [class*='bg-black'] 作容器锚点，比给每个 Modal 加 data-attr 更零侵入。 */
+[data-skin='flat-light'] [class*='bg-black'] [class*='text-white'] {
+  color: #fff !important;
+}
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/90 { color: rgba(255, 255, 255, 0.9) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/85 { color: rgba(255, 255, 255, 0.85) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/80 { color: rgba(255, 255, 255, 0.8) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/70 { color: rgba(255, 255, 255, 0.7) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/60 { color: rgba(255, 255, 255, 0.6) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/50 { color: rgba(255, 255, 255, 0.5) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/40 { color: rgba(255, 255, 255, 0.4) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/30 { color: rgba(255, 255, 255, 0.3) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/25 { color: rgba(255, 255, 255, 0.25) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/20 { color: rgba(255, 255, 255, 0.2) !important; }
+[data-skin='flat-light'] [class*='bg-black'] .text-white\/10 { color: rgba(255, 255, 255, 0.1) !important; }
