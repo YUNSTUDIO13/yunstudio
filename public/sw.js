@@ -27,6 +27,18 @@
  *   残留 `inset 0 1px 2px rgba(0,0,0,0.03)`，inset 让圆角左上/左下被"吃进"产生视觉残缺。
  *   治法：与 flat-dark 段对齐成单层 `0 0 0 1px var(--edge)`，去掉 inset。liquid-glass
  *   默认段保留 inset 是设计意图（玻璃顶部高光），仅 flat-light 清掉。
+ *
+ * 2026-08-12 #7 「Sprints 进度条实心纯黑治本」—— Sprints.tsx 用 `bg-accent` Tailwind utility
+ *   渲染 fill，但 tailwind.config.js:16 把 `accent:'#7c85f5'` 硬编码，Tailwind 编译出
+ *   `.bg-accent{background-color:#7c85f5}` 静态 utility。flat-light 段覆写规则把 `.bg-accent`
+ *   和 `.bg-accent/5/10/15/20` 合并到一个规则里用 rgba(37,99,235,0.10) 10% 透明蓝，**实色
+ *   fill 被错改成接近透明的浅蓝**（视觉上跟外层 bg-line 浅灰 track 一起呈现一条"深色实心"）。
+ *   治法（双保险）：① tailwind.config.js 让 accent='rgb(var(--c-accent-rgb) / <alpha-value>)'，
+ *     :root + flat-dark 段补 --c-accent-rgb:124,133,245（靛紫）+ flat-light 段补
+ *     --c-accent-rgb:37,99,235（蓝），让 Tailwind 编译出的 utility 本身引用变量，三皮肤自动跟随；
+ *   ② src/index.css 把覆写规则拆分——`.bg-accent`（实色）和 `.bg-accent/X`（透明变体）
+ *     各走各的色：flat-light 实色=#2563eb 蓝 / 浅底变体=rgba(37,99,235,0.10) 10%透明蓝；
+ *     flat-dark 实色=#7c85f5 靛紫 / 浅底变体=rgba(255,255,255,0.08) 白.08。
  */
 const VERSION = '__SW_VERSION__';
 const APP_SHELL = [

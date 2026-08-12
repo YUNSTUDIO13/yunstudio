@@ -15,6 +15,14 @@
    所有 3 个皮肤共用：先给 dark 默认值，然后各 [data-skin=xxx] 段覆盖。
    这样 inline style 用 var(--name) 时永远有值，不会"看不见 fallback 错位"。*/
 :root {
+  /* 主题强调色（dark/liquid-glass 默认靛紫；flat-light 段覆写为 #2563eb 蓝）
+     ★ 2026-08-12 #7 治本：RGB 通道 + alpha-value 模式，让 Tailwind bg-accent/X 系列 utility
+       编译时引用变量，三皮肤自动跟随。 */
+  --c-accent-rgb: 124, 133, 245;
+  --c-accent: rgb(var(--c-accent-rgb));
+  --c-accent-soft: rgba(124, 133, 245, 0.12);
+  --c-accent-border: rgba(124, 133, 245, 0.35);
+  --c-accent-glow: rgba(124, 133, 245, 0.20);
   /* 进度条：dark theme 默认（亮底在深色画布上） */
   --c-progress-track: rgba(255, 255, 255, 0.10);
   --c-progress-glow: 0 0 10px rgba(255, 255, 255, 0.25);
@@ -205,6 +213,12 @@ input[type='time'] {
 
 /* ---- 全局：5 阶灰度 + 柔和深蓝黑画布（不像纯#000 那么硬） ---- */
 [data-skin='flat-dark'] {
+  /* 主题强调色保持靛紫（与 :root 默认一致；显式写出防漏） */
+  --c-accent-rgb: 124, 133, 245;
+  --c-accent: rgb(var(--c-accent-rgb));
+  --c-accent-soft: rgba(124, 133, 245, 0.12);
+  --c-accent-border: rgba(124, 133, 245, 0.35);
+  --c-accent-glow: rgba(124, 133, 245, 0.20);
   --ink-strong: #ffffff;
   --ink-base: rgba(255, 255, 255, 0.92);
   --ink-soft: rgba(255, 255, 255, 0.65);     /* 辅助（贴近参考图二级灰度） */
@@ -375,12 +389,15 @@ input[type='time'] {
   border-color: rgba(255, 255, 255, 0.25) !important;
 }
 
-[data-skin='flat-dark'] .bg-accent,
+[data-skin='flat-dark'] .bg-accent {
+  background-color: #7c85f5 !important;     /* 实色靛紫（进度条 fill 等实色场景） */
+  color: #ffffff !important;
+}
 [data-skin='flat-dark'] .bg-accent\/5,
 [data-skin='flat-dark'] .bg-accent\/10,
 [data-skin='flat-dark'] .bg-accent\/15,
 [data-skin='flat-dark'] .bg-accent\/20 {
-  background-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;  /* 浅底变体 */
   color: #ffffff !important;
 }
 
@@ -451,7 +468,9 @@ input[type='time'] {
 
 /* ---- 全局：白底 + 深字灰度（flat-dark 的镜像版，主色反转） ---- */
 [data-skin='flat-light'] {
-  /* 强调色：克制的蓝（仅用于按钮/选中态/链接，图表色另行覆盖） */
+  /* 强调色：克制的蓝（仅用于按钮/选中态/链接，图表色另行覆盖）
+     ★ 2026-08-12 #7 治本：补 --c-accent-rgb 让 Tailwind bg-accent/X utility 跟随皮肤 */
+  --c-accent-rgb: 37, 99, 235;
   --c-accent: #2563eb;
   --c-accent-soft: rgba(37, 99, 235, 0.10);
   --c-accent-border: rgba(37, 99, 235, 0.30);
@@ -643,12 +662,15 @@ html[data-skin='flat-light'], html[data-skin='flat-light'] body {
 [data-skin='flat-light'] .border-accent\/60 {
   border-color: rgba(37, 99, 235, 0.35) !important;
 }
-[data-skin='flat-light'] .bg-accent,
+[data-skin='flat-light'] .bg-accent {
+  background-color: #2563eb !important;     /* 实色蓝（进度条 fill 等实色场景） */
+  color: #ffffff !important;
+}
 [data-skin='flat-light'] .bg-accent\/5,
 [data-skin='flat-light'] .bg-accent\/10,
 [data-skin='flat-light'] .bg-accent\/15,
 [data-skin='flat-light'] .bg-accent\/20 {
-  background-color: rgba(37, 99, 235, 0.10) !important;
+  background-color: rgba(37, 99, 235, 0.10) !important;   /* 浅底变体 */
   color: #2563eb !important;
 }
 [data-skin='flat-light'] .bg-accent\/15 {
