@@ -621,6 +621,31 @@ input[type='time'] {
 [data-skin='flat-light'] .bg-black\/60 { background-color: rgba(0, 0, 0, 0.40) !important; }
 [data-skin='flat-light'] .bg-black     { background-color: #111827 !important; }
 
+/* ---- Tailwind 静态编出的颜色类（CSS 变量穿不透 .bg-canvas/.bg-surface 工具类） ----
+   必须显式覆盖，否则 AppShell 的 <div className="bg-canvas"> 仍把整页画布涂成 tailwind.config 的 #040408，
+   即便 <html data-skin="flat-light">，看上去仍是黑色底。
+   这一段对应"铁律 #6 的补强"——光盖 inline token 不够，Tailwind 静态 utility 也要扒掉再穿。 */
+[data-skin='flat-light'] .bg-canvas { background-color: var(--canvas) !important; }
+[data-skin='flat-light'] .bg-canvas\/30 { background-color: rgba(249,250,251,0.30) !important; }
+[data-skin='flat-light'] .bg-canvas\/40 { background-color: rgba(249,250,251,0.40) !important; }
+[data-skin='flat-light'] .bg-canvas\/50 { background-color: rgba(249,250,251,0.50) !important; }
+[data-skin='flat-light'] .bg-canvas\/60 { background-color: rgba(249,250,251,0.60) !important; }
+[data-skin='flat-light'] .bg-surface { background-color: var(--surface) !important; }
+[data-skin='flat-light'] .bg-surface\/40 { background-color: rgba(243,244,246,0.55) !important; }
+[data-skin='flat-light'] .bg-surface\/60 { background-color: rgba(243,244,246,0.75) !important; }
+[data-skin='flat-light'] .bg-brand-soft { background-color: rgba(229,231,235,0.55) !important; }
+
+/* flat-dark 同步：确保 Token 平移一致（虽然 flat-dark 用的也是深色，肉眼差异小，但保持系统一致性） */
+[data-skin='flat-dark'] .bg-canvas { background-color: var(--canvas) !important; }
+[data-skin='flat-dark'] .bg-canvas\/30 { background-color: rgba(14,16,21,0.30) !important; }
+[data-skin='flat-dark'] .bg-canvas\/40 { background-color: rgba(14,16,21,0.40) !important; }
+[data-skin='flat-dark'] .bg-canvas\/50 { background-color: rgba(14,16,21,0.50) !important; }
+[data-skin='flat-dark'] .bg-canvas\/60 { background-color: rgba(14,16,21,0.60) !important; }
+[data-skin='flat-dark'] .bg-surface { background-color: var(--surface) !important; }
+[data-skin='flat-dark'] .bg-surface\/40 { background-color: rgba(21,24,30,0.55) !important; }
+[data-skin='flat-dark'] .bg-surface\/60 { background-color: rgba(21,24,30,0.75) !important; }
+[data-skin='flat-dark'] .bg-brand-soft { background-color: rgba(26,26,36,0.55) !important; }
+
 /* 颜色通用兜底：white 系文字/边 在白底上必须转成深色 */
 [data-skin='flat-light'] [class*='text-white'],
 [data-skin='flat-light'] [class*='border-white'] {
