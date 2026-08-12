@@ -1,9 +1,49 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-skin="flat-dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0d0c1a" />
+    <meta name="theme-color" content="#0E1015" />
+    <script>
+      // 首屏去闪：在绘制前同步设置 data-skin 与状态栏颜色，避免先闪液态玻璃再切换
+      // 根因：React 的 AppShell useEffect 在首帧绘制后才执行，<html> 彼时还无 data-skin，
+      // 基础（液态玻璃）样式会先绘制约 0.5s 再被覆盖。此脚本在 <head> 阻塞执行，先于首次 paint。
+      (function () {
+        try {
+          var DEFAULT_SKIN = 'flat-dark';
+          var THEME_COLORS = { 'liquid-glass': '#040408', 'flat-dark': '#0E1015', 'flat-light': '#F9FAFB' };
+          var VALID = { 'liquid-glass': 1, 'flat-dark': 1, 'flat-light': 1 };
+          var skin = DEFAULT_SKIN;
+          var ls = window.localStorage;
+          // 1) 从 Supabase 会话键取当前登录用户 id（key 形如 sb-<ref>-auth-token）
+          var userId = 'anonymous';
+          for (var i = 0; i < ls.length; i++) {
+            var k = ls.key(i);
+            if (k && k.indexOf('sb-') === 0 && k.lastIndexOf('-auth-token') === k.length - 12) {
+              try {
+                var sess = JSON.parse(ls.getItem(k) || '{}');
+                var s = sess.currentSession || sess.session || (sess.user ? sess : null);
+                if (s && s.user && s.user.id) userId = s.user.id;
+              } catch (e) {}
+              break;
+            }
+          }
+          // 2) 读该用户持久化的 UI 配置里的皮肤（键 pw.ui.<userId>，与 UIContext 一致）
+          if (userId !== 'anonymous') {
+            try {
+              var raw = ls.getItem('pw.ui.' + userId);
+              if (raw) {
+                var cfg = JSON.parse(raw);
+                if (cfg && cfg.skin && VALID[cfg.skin]) skin = cfg.skin;
+              }
+            } catch (e) {}
+          }
+          document.documentElement.setAttribute('data-skin', skin);
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', THEME_COLORS[skin] || THEME_COLORS[DEFAULT_SKIN]);
+        } catch (e) {}
+      })();
+    </script>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
