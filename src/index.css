@@ -136,52 +136,184 @@ input[type='time'] {
 
 /* ============================================================
  * 纯黑扁平皮肤（flat-dark）覆盖层
- * 由 [data-skin="flat-dark"] 限定作用域；不影响 liquid-glass
- * 目标：去除所有 backdrop-filter / 半透白底 / 极光氛围，改为纯黑+实色边框
+ * 设计：5 阶灰度层级 + 边缘高光 + 白底主按钮去紫
+ * 性能：0 动画 / 0 backdrop-filter，仅 box-shadow 提供层次
  * ============================================================ */
+
+/* 全局：5 阶灰度 + 画布纯黑 */
+[data-skin='flat-dark'] {
+  --ink-strong: #ffffff;                       /* 主标题：纯白 */
+  --ink-base: rgba(255, 255, 255, 0.92);        /* 正文 */
+  --ink-soft: rgba(255, 255, 255, 0.72);        /* 辅助（↑ 提亮，原 0.55 太弱） */
+  --ink-mute: rgba(255, 255, 255, 0.5);         /* 弱化（↑ 提亮，原 0.4 太弱） */
+  --ink-subtle: rgba(255, 255, 255, 0.32);      /* placeholder / disabled */
+  color-scheme: dark;
+}
 [data-skin='flat-dark'] body {
   background-color: #000;
   color: rgba(255, 255, 255, 0.92);
 }
+
+/* Tailwind 语义类覆盖：把 ink-strong/soft/mute 提到新值 */
+[data-skin='flat-dark'] .text-ink-strong { color: #ffffff !important; }
+[data-skin='flat-dark'] .text-ink-base   { color: rgba(255, 255, 255, 0.92) !important; }
+[data-skin='flat-dark'] .text-ink-soft   { color: rgba(255, 255, 255, 0.72) !important; }
+[data-skin='flat-dark'] .text-ink-mute   { color: rgba(255, 255, 255, 0.5) !important; }
+[data-skin='flat-dark'] .text-ink-subtle { color: rgba(255, 255, 255, 0.32) !important; }
+[data-skin='flat-dark'] .border-line     { border-color: rgba(255, 255, 255, 0.08) !important; }
+
+/* 通用卡：#0d0d0d 比画布亮 13/255，比 Modal 暗，配 1px 半透白边 + 顶部金属高光 */
 [data-skin='flat-dark'] .glass-card {
-  background: #0a0a0a;
+  background: #0d0d0d;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 24px;
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),       /* 顶部金属高光 */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),             /* 底部暗边 */
+    0 0 0 0.5px rgba(255, 255, 255, 0.025);          /* 极细外缘描边 */
 }
+
+/* Modal/容器：#131313 比卡亮，自然浮起，更强的高光 */
 [data-skin='flat-dark'] .glass-panel {
-  background: #0a0a0a;
+  background: #131313;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid #1a1a1a;
-  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 24px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 0 0.5px rgba(255, 255, 255, 0.04),
+    0 24px 60px rgba(0, 0, 0, 0.4);
 }
+
+/* 输入框：#080808 凹陷感（比画布亮但比卡深） */
 [data-skin='flat-dark'] .glass-input {
-  background: #0a0a0a;
+  background: #080808;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid #1a1a1a;
-  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.015);
 }
+
+/* focus：纯白光环，替代紫边 */
+[data-skin='flat-dark'] .glass-input:focus,
+[data-skin='flat-dark'] .glass-input:focus-within,
+[data-skin='flat-dark'] .glass-input:focus-visible {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 0 0 3px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Pill/Chip：pill 用半透白浅底，比卡略亮 */
 [data-skin='flat-dark'] .glass-pill {
-  background: #0a0a0a;
+  background: rgba(255, 255, 255, 0.05);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid #1a1a1a;
-  border-radius: 16px;
-  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
+
 /* 关掉所有 Tailwind 的 backdrop-blur-*（圆按钮/详情模态/mega sheet 覆盖层等） */
 [data-skin='flat-dark'] [class*='backdrop-blur'] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-/* 滚动条颜色加深，避免在纯黑底上显得突兀 */
+
+/* =============================================================
+ * 主按钮去紫：用白底黑字替代 from-[#7c85f5]→to-[#c084fc] 渐变
+ * 通过属性选择器反命中所有"主按钮位置"，不动 React 组件
+ * ============================================================= */
+[data-skin='flat-dark'] button[class*='bg-gradient-to-br'],
+[data-skin='flat-dark'] a[class*='bg-gradient-to-br'],
+[data-skin='flat-dark'] span[class*='bg-gradient-to-br'] {
+  background-image: linear-gradient(180deg, #ffffff 0%, #d4d4d8 100%) !important;
+  color: #0a0a0a !important;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  text-shadow: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  font-weight: 600 !important;
+}
+[data-skin='flat-dark'] button[class*='bg-gradient-to-br']:hover,
+[data-skin='flat-dark'] a[class*='bg-gradient-to-br']:hover {
+  background-image: linear-gradient(180deg, #ffffff 0%, #e4e4e7 100%) !important;
+  opacity: 1 !important;
+}
+[data-skin='flat-dark'] button[class*='bg-gradient-to-br']:disabled,
+[data-skin='flat-dark'] a[class*='bg-gradient-to-br']:disabled {
+  background-image: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(212,212,216,0.4) 100%) !important;
+  color: rgba(10, 10, 10, 0.4) !important;
+  cursor: not-allowed;
+}
+
+/* =============================================================
+ * accent / brand 去紫：text/border/bg/ring 全部转白色调
+ * 保留语义色（success/warning/danger）不动 —— 它们是功能色
+ * ============================================================= */
+[data-skin='flat-dark'] .text-accent,
+[data-skin='flat-dark'] .text-brand { color: #ffffff !important; }
+
+[data-skin='flat-dark'] .border-accent,
+[data-skin='flat-dark'] .border-accent\/40,
+[data-skin='flat-dark'] .border-accent\/60 { border-color: rgba(255, 255, 255, 0.4) !important; }
+
+[data-skin='flat-dark'] .bg-accent,
+[data-skin='flat-dark'] .bg-accent\/5,
+[data-skin='flat-dark'] .bg-accent\/10,
+[data-skin='flat-dark'] .bg-accent\/15,
+[data-skin='flat-dark'] .bg-accent\/20 {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  color: #0a0a0a !important;
+}
+
+[data-skin='flat-dark'] .ring-accent,
+[data-skin='flat-dark'] [class*='ring-accent'] {
+  --tw-ring-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* 选中指示器：accent 背景图标反向（白底黑图标，保留识别但去掉紫色） */
+[data-skin='flat-dark'] .bg-accent svg,
+[data-skin='flat-dark'] .bg-accent\/5 svg,
+[data-skin='flat-dark'] .bg-accent\/15 svg { color: #0a0a0a !important; }
+
+/* 进度条 / KPI 渐变：从紫 → 白到中性灰（保留视觉的"进度"感，去紫） */
+[data-skin='flat-dark'] [class*='from-indigo-'][class*='to-violet-'],
+[data-skin='flat-dark'] [class*='from-[#7c85f5]'][class*='to-[#c084fc]'] {
+  --tw-gradient-from: #fafafa var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(255, 255, 255, 0.25) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+/* 强调色圆点 / 装饰渐变（不为按钮的）：让品牌色调保持可见但去紫饱和 */
+[data-skin='flat-dark'] .text-indigo-300,
+[data-skin='flat-dark'] .text-violet-300,
+[data-skin='flat-dark'] .text-brand-soft { color: rgba(255, 255, 255, 0.7) !important; }
+
+/* Scrollbar：加深 */
 [data-skin='flat-dark'] ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.18);
 }
 [data-skin='flat-dark'] ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.28);
+}
+
+/* 选中态文字：纯白（替代紫） */
+[data-skin='flat-dark'] ::selection {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+/* box-shadow glow 装饰：去紫光，换"白光" */
+[data-skin='flat-dark'] .shadow-glow {
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.08) !important;
 }
