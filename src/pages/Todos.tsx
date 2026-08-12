@@ -500,7 +500,7 @@ export default function Todos() {
                 {items.length === 0 ? (
                   <p className="py-6 text-center text-xs text-ink-mute">暂无待办</p>
                 ) : (
-                  <ul className="divide-y divide-line">
+                  <ul className="space-y-2">
                     {items.map((t) => {
                       const risk = riskLevel(t)
                       return (
