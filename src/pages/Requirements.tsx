@@ -335,7 +335,7 @@ export default function Requirements() {
                     }
                   : undefined
               }
-              className={`group flex flex-col gap-2 p-1.5 md:px-2 md:py-3 md:flex-row md:items-center md:gap-2 transition ${
+              className={`group flex flex-col gap-1.5 p-1 md:px-2 md:py-3 md:flex-row md:items-center md:gap-2 transition ${
                 draggable && dragId === r.id ? 'opacity-40' : ''
               } ${
                 draggable && dragId && overId === r.id && dragId !== r.id

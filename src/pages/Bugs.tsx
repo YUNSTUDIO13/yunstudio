@@ -317,7 +317,7 @@ export default function Bugs() {
                     }
                   : undefined
               }
-              className={`group flex flex-col gap-2 p-1.5 md:px-2 md:py-3 transition md:flex-row md:items-center md:gap-2 ${
+              className={`group flex flex-col gap-1.5 p-1 transition md:flex-row md:items-center md:gap-2 md:px-2 md:py-3 ${
                 draggable && dragId === b.id ? 'opacity-40' : ''
               } ${
                 draggable && dragId && overId === b.id && dragId !== b.id
@@ -353,7 +353,7 @@ export default function Bugs() {
                 <div className="text-sm font-medium leading-snug text-ink-strong break-words">
                   {b.title}
                 </div>
-                <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
+                <div className="text-xs leading-relaxed text-ink-mute break-words">
                   {b.reporter ?? '未指派'}
                 </div>
               </div>
@@ -404,7 +404,7 @@ export default function Bugs() {
                       <div className="mt-1.5 text-sm font-medium leading-snug text-ink-strong break-words">
                         {b.title}
                       </div>
-                      <div className="mt-0.5 text-xs leading-relaxed text-ink-mute break-words">
+                      <div className="text-xs leading-relaxed text-ink-mute break-words">
                         {b.reporter ?? '未指派'}
                       </div>
                     </div>

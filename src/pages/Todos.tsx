@@ -413,7 +413,7 @@ export default function Todos() {
                 return (
                   <li
                     key={t.id}
-                    className={`flex flex-col gap-2 p-1.5 md:px-2 md:py-3 md:flex-row md:items-center md:gap-3 ${t.done ? 'opacity-60' : ''}`}
+                    className={`flex flex-col gap-1.5 p-1 md:px-2 md:py-3 md:flex-row md:items-center md:gap-3 ${t.done ? 'opacity-60' : ''}`}
                   >
                     {/* 紧凑头：checkbox + PriorityTag + TagChip 合并为一个 chip 行，避免「勾选框 / P0 / 标签」被 gap 拆成三段独立块 */}
                     <div className="flex items-center gap-1.5 self-start md:self-auto">
@@ -449,7 +449,7 @@ export default function Todos() {
                         )}
                       </div>
                       {t.note && (
-                        <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">{t.note}</div>
+                        <div className="break-words text-xs leading-relaxed text-ink-mute">{t.note}</div>
                       )}
                     </div>
                     {/* 末行：风险 + Score + actions，移动端 justify-between，桌面端右对齐 */}
@@ -541,14 +541,12 @@ export default function Todos() {
                                 )}
                               </div>
                               {t.note && (
-                                <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-mute">
-                                  <div className="break-words">
-                                    <span className="text-ink-mute/80">备注：</span>
-                                    <span>{t.note}</span>
-                                  </div>
+                                <div className="mt-1 text-xs leading-relaxed text-ink-mute">
+                                  <span className="text-ink-mute/80">备注：</span>
+                                  <span className="break-words">{t.note}</span>
                                 </div>
                               )}
-                              <div className="mt-0.5 break-words text-xs leading-relaxed text-ink-mute">
+                              <div className="break-words text-xs leading-relaxed text-ink-mute">
                                 Score {computeScore(t)}
                                 {risk === 'overdue'
                                   ? ' · 逾期'
