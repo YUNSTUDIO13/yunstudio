@@ -7,11 +7,12 @@ import { useBugs } from '../context/BugsContext'
 import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
 import { renderIcon } from '../lib/icon-library'
 import type { IconKey } from '../lib/icon-library'
+import { MovieHeroCard, MovieTop3Card, MovieTop5StripCard, MovieCollectionCard } from './movie-cards'
 
 // ============================================================
 // 类型
 // ============================================================
-export type WidgetCategory = '待办' | '模块概览' | '规划' | '协作'
+export type WidgetCategory = '待办' | '模块概览' | '观影' | '规划' | '协作'
 
 export interface WidgetMeta {
   id: string
@@ -27,6 +28,12 @@ export interface WidgetMeta {
   span: number
   /** 默认二维尺寸：'1x1' | '2x1' | '1x2' | '2x2'（宽×高，单位=网格单元格） */
   defaultSize?: WidgetSize
+  /**
+   * 该卡片允许的尺寸集合（卡片管理里的尺寸选择器只列这些）。
+   * 缺省时使用全局 SIZE_OPTIONS。像胶片榜单这类"按固定像素稿等比缩放"的卡，
+   * 只允许其设计稿对应的唯一尺寸，避免被调成别的比例后版式失真。
+   */
+  sizeOptions?: WidgetSize[]
 }
 
 export interface WidgetDef extends WidgetMeta {
@@ -403,6 +410,12 @@ export const WIDGETS: Record<string, WidgetDef> = {
   w_goal: { id: 'w_goal', title: '目标 OKR', desc: '个人 / 团队目标跟踪', category: '规划', iconKey: 'target', developed: false, span: 4, defaultSize: '1x1', Render: () => <></> },
   w_team: { id: 'w_team', title: '团队负载', desc: '成员任务负载分布', category: '协作', iconKey: 'users', developed: false, span: 4, defaultSize: '1x1', Render: () => <></> },
   w_message: { id: 'w_message', title: '消息中心', desc: '待办 / @ 提醒聚合', category: '协作', iconKey: 'msg', developed: false, span: 4, defaultSize: '1x1', Render: () => <></> },
+
+  // —— 观影 · 胶片票据风格榜单（4 张，视觉 1:1 复刻桌面设计稿，按 personal_rating 取 Top N） ——
+  w_movie_hero: { id: 'w_movie_hero', title: 'C位单片', desc: '个人评分最高 · Top 1', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 2, defaultSize: '2x2', sizeOptions: ['2x2'], Render: MovieHeroCard },
+  w_movie_top3: { id: 'w_movie_top3', title: '年度三甲', desc: '个人评分最高 · Top 3', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 2, defaultSize: '2x4', sizeOptions: ['2x4'], Render: MovieTop3Card },
+  w_movie_top5: { id: 'w_movie_top5', title: 'TOP5 横版胶卷', desc: '个人评分最高 · Top 5', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 4, defaultSize: '4x2', sizeOptions: ['4x2'], Render: MovieTop5StripCard },
+  w_movie_collection: { id: 'w_movie_collection', title: '年度全榜典藏版', desc: '个人评分最高 · Top 5', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 4, defaultSize: '4x4', sizeOptions: ['4x4'], Render: MovieCollectionCard },
 }
 
 export const WIDGET_LIST: WidgetDef[] = Object.values(WIDGETS)
@@ -417,6 +430,7 @@ export const DEFAULT_DASHBOARD: string[] = [
 export const OVERVIEW_CARD_IDS: string[] = [
   'w_todo_ring', 'w_todo_stream', 'w_todo_progress',
   'w_req_summary', 'w_sprint_summary', 'w_bug_summary',
+  'w_movie_hero', 'w_movie_top3', 'w_movie_top5', 'w_movie_collection',
 ]
 
 /**
@@ -430,15 +444,19 @@ export const OVERVIEW_CARD_IDS: string[] = [
  *   手机端 <768px 不加 md: 前缀，保留原 auto-rows-[168px] 横向卡片不变）。
  * 渲染层映射到 grid 的 col-span / row-span + md: aspect-*（静态 class，避免 JIT 丢类）。
  */
-export type WidgetSize = '1x1' | '2x1' | '1x2' | '2x2'
+export type WidgetSize = '1x1' | '2x1' | '1x2' | '2x2' | '2x4' | '4x2' | '4x4'
 
-export const SIZE_OPTIONS: WidgetSize[] = ['1x1', '2x1', '1x2', '2x2']
+export const SIZE_OPTIONS: WidgetSize[] = ['1x1', '2x1', '1x2', '2x2', '2x4', '4x2', '4x4']
 
 export const SIZE_CLASS: Record<WidgetSize, string> = {
   '1x1': 'col-span-1 row-span-1 aspect-square',
   '2x1': 'col-span-2 row-span-1 aspect-[2/1]',
   '1x2': 'col-span-1 row-span-2 aspect-[1/2]',
   '2x2': 'col-span-2 row-span-2 aspect-square',
+  // 胶片榜单卡：固定像素稿等比缩放（见 movie-cards.tsx FilmFrame），尺寸严格匹配设计稿宽高比，避免版式失真
+  '2x4': 'col-span-2 row-span-4 aspect-[1/2]',
+  '4x2': 'col-span-2 md:col-span-4 row-span-2 aspect-[31/15]',
+  '4x4': 'col-span-2 md:col-span-4 row-span-4 aspect-square',
 }
 
 /** 默认尺寸（从各 widget 的 defaultSize 派生；addWidget / reset 兜底用） */

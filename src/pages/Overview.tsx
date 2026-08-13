@@ -11,6 +11,7 @@ import { useDashboard } from '../context/DashboardContext'
 import DashboardConfig from '../components/DashboardConfig'
 import NotificationBell from '../components/NotificationBell'
 import { SIZE_CLASS } from '../widgets/registry'
+import { MovieHeroCard, MovieTop3Card, MovieTop5StripCard, MovieCollectionCard } from '../widgets/movie-cards'
 import { C, glass } from '../design/tokens'
 import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
 import {
@@ -289,6 +290,30 @@ export default function Overview() {
               <MetricPill label={`严重 ${bugSevere}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
           </Card>
+                </div>
+              )
+            case 'w_movie_hero':
+              return (
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
+                  <MovieHeroCard />
+                </div>
+              )
+            case 'w_movie_top3':
+              return (
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
+                  <MovieTop3Card />
+                </div>
+              )
+            case 'w_movie_top5':
+              return (
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
+                  <MovieTop5StripCard />
+                </div>
+              )
+            case 'w_movie_collection':
+              return (
+                <div key={id} className={`${SIZE_CLASS[size]}`}>
+                  <MovieCollectionCard />
                 </div>
               )
             default:

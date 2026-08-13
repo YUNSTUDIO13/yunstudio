@@ -4,7 +4,7 @@ import { renderIcon } from '../lib/icon-library'
 import { useDashboard } from '../context/DashboardContext'
 import { WIDGET_LIST, OVERVIEW_CARD_IDS, SIZE_OPTIONS, type WidgetCategory, type WidgetDef } from '../widgets/registry'
 
-const CATEGORY_ORDER: WidgetCategory[] = ['待办', '模块概览', '规划', '协作']
+const CATEGORY_ORDER: WidgetCategory[] = ['待办', '模块概览', '观影', '规划', '协作']
 
 export default function DashboardConfig({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { config, actions } = useDashboard()
@@ -102,7 +102,7 @@ export default function DashboardConfig({ open, onClose }: { open: boolean; onCl
                   <span className="flex-1 truncate text-sm text-ink-strong">{w.title}</span>
                   {/* 尺寸选择器：1×1 / 2×1 / 1×2 / 2×2，点击即改并持久化 */}
                   <div className="flex items-center gap-1">
-                    {SIZE_OPTIONS.map((s) => (
+                    {(w.sizeOptions ?? SIZE_OPTIONS).map((s) => (
                       <button
                         key={s}
                         type="button"
