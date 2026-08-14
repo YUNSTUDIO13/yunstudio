@@ -16,6 +16,7 @@ import { fetchMovieByTitle, syncMovie, uploadMovieCover, uploadTmdbImage, normal
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { localInputToIso } from '../lib/datetime'
 import { TagPicker } from '../components/TagPicker'
+import { CachedImage } from '../components/CachedImage'
 import type { Movie } from '../types'
 
 const SRC_THIRD = '第三方'
@@ -143,7 +144,7 @@ function PosterCard({ movie, onClick, fluid }: { movie: Movie; onClick: () => vo
       }`}
     >
       {movie.cover && !err ? (
-        <img
+        <CachedImage
           src={movie.cover}
           alt={movie.title}
           loading="lazy"
@@ -195,7 +196,7 @@ function StillThumb({
     <div className="group relative w-full overflow-hidden rounded-lg ring-1 ring-white/10">
       <button type="button" onClick={onOpen} className="block w-full">
         {!err ? (
-          <img
+          <CachedImage
             src={url}
             alt={label}
             loading="lazy"
@@ -496,9 +497,10 @@ function MovieDetailPanel({
             >
               ✕
             </button>
-            <img
+            <CachedImage
               src={lightbox}
               alt="剧照大图"
+              loading="eager"
               onClick={(e) => e.stopPropagation()}
               className="max-h-[82vh] max-w-full rounded-lg object-contain"
             />

@@ -18,6 +18,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { db } from '../lib/localDb'
+import { CachedImage } from '../components/CachedImage'
 import { useAuth } from '../context/AuthContext'
 import type { Movie } from '../types'
 
@@ -364,7 +365,7 @@ function Poster({
     )
   }
   return (
-    <img
+    <CachedImage
       src={src}
       alt={alt}
       onError={() => setFailed(true)}
