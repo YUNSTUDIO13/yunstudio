@@ -1880,7 +1880,7 @@ export default function MoviesPage() {
   }, [showFunc])
 
   // 观影记录排序：按个人评分 / 年份倒序 / 年份正序
-  const [sortBy, setSortBy] = useState<'rating' | 'year_desc' | 'year_asc'>('year_desc')
+  const [sortBy, setSortBy] = useState<'rating' | 'year_desc' | 'year_asc'>('rating')
   const [showSort, setShowSort] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
 
