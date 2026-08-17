@@ -12,7 +12,7 @@ import { seedFromServer, enqueueAndMaybeFlush, setSyncStatusHandler } from '../l
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useTodos } from '../context/TodosContext'
-import { fetchBookByTitle, syncBook, uploadBookCover, uploadBookImage, type BookCandidate } from '../lib/books'
+import { fetchBookByTitle, fetchBookDetail, syncBook, uploadBookCover, uploadBookImage, type BookCandidate } from '../lib/books'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { localInputToIso } from '../lib/datetime'
 import { TagPicker } from '../components/TagPicker'
@@ -828,7 +828,7 @@ function NewBookModal({
 
   const triggerFetch = (title: string, year: string) => {
     if (timer.current) clearTimeout(timer.current)
-    // 必须「名称 + 年代」双字段都非空才触发（同名歧义需要年份辅助 TMDB search 锁定目标）
+    // 必须「名称 + 年代」双字段都非空才触发（同名歧义需要年份辅助豆瓣 search 锁定目标）
     if (!title.trim() || !year.trim()) {
       setCandidates([])
       setSelectedCandidateIdx(null)
@@ -838,10 +838,10 @@ function NewBookModal({
       setFetching(true)
       try {
         const data = await fetchBookByTitle(title, year)
-        // 公网封面直链（Google Books）直接采用，无需重传 Storage（uploadBookImage 已做直通）
+        // 公网封面直链（豆瓣 doubanio.com）直接采用，无需重传 Storage（uploadBookImage 已做直通）
         const cover = data.cover
         setPreview({ ...data, cover })
-        // 类型/作者：仅在用户尚未手动填写时，用 Google Books 建议值预填（用户填了则保留覆盖）
+        // 类型/作者：仅在用户尚未手动填写时，用豆瓣建议值预填（用户填了则保留覆盖）
         setDraft((d) => ({
           ...d,
           genre: d.genre ? d.genre : (data.genre ?? []).join(' / '),
@@ -855,23 +855,48 @@ function NewBookModal({
     }, 800)
   }
 
-  /** 切换候选后，同步封面与评分 */
+  /** 切换候选后，同步封面与评分；若豆瓣 id 存在则再拉详情补大封面 / 类型 / 简介 */
   const handleSelectCandidate = async (idx: number) => {
     const candidate = candidates[idx]
     if (!candidate) return
     setSelectedCandidateIdx(idx)
     setFetching(true)
     try {
-      const cover = candidate.cover || ''
+      // 候选自带封面/年份/作者；有豆瓣 id 时再拉详情，拿到大封面 + 评分 + 类型 + 简介
+      let detail: {
+        cover?: string
+        third_party_rating?: number | null
+        author?: string
+        genre?: string[]
+        overview?: string
+      } = {}
+      if (candidate.id) {
+        const d = await fetchBookDetail(candidate.id)
+        detail = {
+          cover: d.cover || candidate.cover || '',
+          third_party_rating: d.third_party_rating ?? candidate.third_party_rating,
+          author: d.author || candidate.author || '',
+          genre: d.genre ?? [],
+          overview: d.overview ?? '',
+        }
+      }
+      const cover = detail.cover || candidate.cover || ''
       setPreview((prev) => ({
         ...prev,
         cover,
-        third_party_rating: candidate.third_party_rating,
+        third_party_rating: detail.third_party_rating ?? candidate.third_party_rating,
         year: candidate.year,
-        author: candidate.author || prev.author || '',
+        author: detail.author || candidate.author || prev.author || '',
+        genre: detail.genre ?? prev.genre ?? [],
+        overview: detail.overview ?? prev.overview ?? '',
         cover_failed: !cover && !prev.cover,
       }))
-      setDraft((d) => ({ ...d, year: candidate.year ? String(candidate.year) : d.year }))
+      setDraft((d) => ({
+        ...d,
+        year: candidate.year ? String(candidate.year) : d.year,
+        genre: d.genre ? d.genre : (detail.genre ?? []).join(' / '),
+        author: d.author ? d.author : (detail.author || ''),
+      }))
     } finally {
       setFetching(false)
     }
@@ -927,7 +952,7 @@ function NewBookModal({
     >
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-[1fr_160px]">
         <div className="space-y-4">
-          <Field label="书籍名称" hint="输入后自动尝试获取封面与第三方信息">
+          <Field label="书籍名称" hint="输入后自动从豆瓣获取封面与信息">
             <Input
               value={draft.title}
               autoFocus
@@ -935,7 +960,7 @@ function NewBookModal({
                 setDraft({ ...draft, title: e.target.value })
                 triggerFetch(e.target.value, draft.year)
               }}
-              placeholder="如：奥本海默"
+              placeholder="如：三体"
             />
           </Field>
           <Field label="年代">
@@ -1012,18 +1037,18 @@ function NewBookModal({
               </label>
             </div>
           </Field>
-          <Field label="类型" hint="多个用「/」分隔，如 剧情 / 科幻">
+          <Field label="类型" hint="多个用「/」分隔，如 小说 / 科幻；豆瓣无标签时留空手填">
             <Input
               value={draft.genre}
               onChange={(e) => setDraft({ ...draft, genre: e.target.value })}
-              placeholder="TMDB 自动带出，可修改"
+              placeholder="豆瓣自动带出，可修改"
             />
           </Field>
-          <Field label="作者" hint="多个作者用「、」分隔；Google Books 自动带出，可修改">
+          <Field label="作者" hint="多个作者用「、」分隔；豆瓣自动带出，可修改">
             <Input
               value={draft.author ?? ''}
               onChange={(e) => setDraft({ ...draft, author: e.target.value })}
-              placeholder="Google Books 自动带出"
+              placeholder="豆瓣自动带出，可修改"
             />
           </Field>
           <Field label="个人评分 (0–10)" hint="留空则使用第三方评分">
@@ -2037,14 +2062,14 @@ export default function BooksPage() {
       try {
         await persist(m)
       } catch (e) {
-        console.error('[movies] 新建落库失败:', e)
+        console.error('[books] 新建落库失败:', e)
       }
     })()
   }
 
   const handleSync = async (m: Book): Promise<Book> => {
     const data = await syncBook(m)
-    // 若本地缺封面，从 Google Books 拉取并压缩上传到 Storage（失败则留空）
+    // 若本地缺封面，从豆瓣拉取并压缩上传到 Storage（失败则留空）
     let cover = m.cover
     if (!cover && data.cover) cover = await uploadBookImage(data.cover, userId).catch(() => '')
     const updated: Book = {

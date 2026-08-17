@@ -21,7 +21,7 @@ export interface BookData {
   genre: string[]
   year: number
   cover_failed: boolean
-  /** 简介（豆瓣详情接口当前未返回 summary，留空待手动补） */
+  /** 简介（豆瓣详情接口 intro 字段；多数书有，部分为空待手动补） */
   overview: string
   /** 作者（多作者「、」拼接） */
   author: string
@@ -94,6 +94,34 @@ export async function fetchBookByTitle(title: string, year: string): Promise<Boo
 /** 对已有书籍重新拉取第三方数据（用于「同步数据」/「手动获取封面」） */
 export async function syncBook(book: Book): Promise<BookData> {
   return fetchBookByTitle(book.title, String(book.year))
+}
+
+/**
+ * 按豆瓣 id 拉取单本书详情（用户切换候选时调用）：
+ * 补回大封面 / 评分 / 作者 / 类型(tags) / 简介(intro)。未部署/异常时返回空对象，由调用方回退候选自带字段。
+ */
+export async function fetchBookDetail(doubanId: string): Promise<Partial<BookData>> {
+  if (!doubanId) return {}
+  try {
+    const { data, error } = await supabase.functions.invoke('book-search', {
+      body: { douban_id: doubanId },
+    })
+    if (!error && data && data.found) {
+      return {
+        cover: typeof data.cover === 'string' ? data.cover : '',
+        third_party_rating:
+          typeof data.third_party_rating === 'number' ? data.third_party_rating : null,
+        genre: Array.isArray(data.genre) ? (data.genre as string[]) : [],
+        overview: typeof data.overview === 'string' ? data.overview : '',
+        author: typeof data.author === 'string' ? data.author : '',
+        cover_failed: !data.cover,
+      }
+    }
+    if (error) console.warn('[books] book-search detail error:', error.message)
+  } catch (e) {
+    console.warn('[books] book-search detail failed:', e)
+  }
+  return {}
 }
 
 // ─── 图片压缩 + 上传 Storage（手动上传的本地封面用） ──────────────────────

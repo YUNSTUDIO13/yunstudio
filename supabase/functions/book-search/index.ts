@@ -1,12 +1,15 @@
 // 阅读模块 · 豆瓣图书代理（Supabase Edge Function）
 //
-// 为什么需要它：豆瓣是中文图书数据最全的来源（书名 / 作者 / 封面 / 评分 / 简介），
+// 为什么需要它：豆瓣是中文图书数据最全的来源（书名 / 作者 / 封面 / 评分 / 简介 / 标签），
 // 但 book.douban.com 不返回 Access-Control-Allow-Origin，浏览器直连被 CORS 拦；
 // 故由本函数服务端代理，前端经 supabase.functions.invoke('book-search') 调用，CORS 天然解决。
 //
 // 豆瓣无官方免费 API，但以下两个非官方接口可用、且无需 key：
 //   ① book.douban.com/j/subject_suggest?q=书名   → 自动补全候选（标题 / 作者 / 年 / 封面 / subject id）
-//   ② m.douban.com/rexxar/api/v2/book/{id}        → 详情（评分 0-10 / 大封面 / 作者），需带 Referer: m.douban.com
+//   ② m.douban.com/rexxar/api/v2/book/{id}        → 详情（评分 0-10 / 大封面 / 作者 / 简介(intro) / 标签(tags)），需带 Referer: m.douban.com
+//
+// 封面说明：suggest 给的是 /s/public/ 小图（必然存在），本函数尝试升级为 /l/public/ 大图，
+// 若大图 HEAD 探测不存在则回退小图，避免破图。
 //
 // 部署（两种方式，任选其一）：
 //   A. CLI（本地终端，需先 supabase login）：
@@ -39,10 +42,33 @@ type SuggestItem = {
   id?: string
 }
 
-/** 豆瓣详情：评分(0-10) / 大封面 / 作者（多作者「、」拼接） */
+/** 封面：优先大图 /l/public/，HEAD 探测不存在则回退 suggest 给的 /s/public/ 小图（必然有效） */
+async function bestCover(pic: string): Promise<string> {
+  if (!pic) return ''
+  const large = pic.replace('/s/public/', '/l/public/')
+  if (large === pic) return pic
+  try {
+    const r = await fetch(large, {
+      method: 'HEAD',
+      headers: { 'User-Agent': UA, 'Referer': 'https://book.douban.com/' },
+    })
+    if (r.ok) return large
+  } catch {
+    /* 探测失败则回退小图 */
+  }
+  return pic
+}
+
+/** 豆瓣详情：评分(0-10) / 大封面 / 作者（多作者「、」拼接）/ 简介(intro) / 标签(tags→类型) */
 async function fetchDoubanDetail(
   id: string,
-): Promise<null | { cover: string; third_party_rating: number | null; author: string }> {
+): Promise<null | {
+  cover: string
+  third_party_rating: number | null
+  author: string
+  overview: string
+  genre: string[]
+}> {
   try {
     const res = await fetch(`${DOUBAN_REXXAR}/${id}`, {
       headers: {
@@ -60,10 +86,22 @@ async function fetchDoubanDetail(
     let author = ''
     if (Array.isArray(authorRaw)) author = (authorRaw as string[]).join('、')
     else if (typeof authorRaw === 'string') author = authorRaw
+    // 简介：优先 intro（rexxar 主字段），兜底 summary
+    const overviewRaw = (j.intro as string) || (j.summary as string) || ''
+    // 类型：tags 数组（{name,count} 或字符串），多数书为空 → 留空由用户手填
+    const tagsRaw = j.tags
+    let genre: string[] = []
+    if (Array.isArray(tagsRaw)) {
+      genre = (tagsRaw as unknown[])
+        .map((t) => (typeof t === 'string' ? t : (t as { name?: string })?.name))
+        .filter((x): x is string => typeof x === 'string' && !!x)
+    }
     return {
       cover: typeof coverRaw === 'string' ? coverRaw : '',
       third_party_rating: typeof rating === 'number' ? Number(rating.toFixed(1)) : null,
       author,
+      overview: typeof overviewRaw === 'string' ? overviewRaw.trim() : '',
+      genre,
     }
   } catch {
     return null
@@ -116,10 +154,10 @@ serve(async (req: Request) => {
           candidates: [],
           cover: det.cover,
           third_party_rating: det.third_party_rating,
-          genre: [],
+          genre: det.genre,
           year: 0,
           cover_failed: !det.cover,
-          overview: '',
+          overview: det.overview,
           author: det.author,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -148,34 +186,34 @@ serve(async (req: Request) => {
     })
   }
 
-  const candidates = items.slice(0, 8).map((it) => ({
-    id: String(it.id ?? ''),
-    title: it.title ?? '',
-    year: it.year ? Number(it.year) : 0,
-    // 候选封面优先用 /l/ 大图（suggest 默认给 /s/ 小图）
-    cover: (it.pic ?? '').replace('/s/public/', '/l/public/'),
-    third_party_rating: null,
-    author: it.author_name ?? '',
-  }))
+  // 候选封面：尝试升级大图，失败回退小图（防破图）
+  const candidates = await Promise.all(
+    items.slice(0, 8).map(async (it) => ({
+      id: String(it.id ?? ''),
+      title: it.title ?? '',
+      year: it.year ? Number(it.year) : 0,
+      cover: await bestCover(it.pic ?? ''),
+      third_party_rating: null,
+      author: it.author_name ?? '',
+    })),
+  )
 
   const top = candidates[0]
 
-  // ② 对首个候选拉详情，补评分(0-10) / 大封面 / 作者
+  // ② 对首个候选拉详情，补评分(0-10) / 大封面 / 作者 / 简介 / 类型
   const det = await fetchDoubanDetail(top.id)
-  const cover = det?.cover || top.cover
-  const author = det?.author || top.author
 
   return new Response(
     JSON.stringify({
       found: true,
       candidates,
-      cover,
+      cover: det?.cover || top.cover,
       third_party_rating: det?.third_party_rating ?? null,
-      genre: [],
+      genre: det?.genre ?? [],
       year: top.year,
-      cover_failed: !cover,
-      overview: '',
-      author,
+      cover_failed: !(det?.cover || top.cover),
+      overview: det?.overview ?? '',
+      author: det?.author || top.author,
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   )
