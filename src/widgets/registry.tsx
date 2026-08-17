@@ -418,8 +418,8 @@ export const WIDGETS: Record<string, WidgetDef> = {
   w_movie_top5: { id: 'w_movie_top5', title: 'TOP5 横版胶卷', desc: '个人评分最高 · Top 5', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 4, defaultSize: '4x2', sizeOptions: ['4x2'], Render: MovieTop5StripCard },
   w_movie_collection: { id: 'w_movie_collection', title: '年度全榜典藏版', desc: '个人评分最高 · Top 5', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 4, defaultSize: '4x4', sizeOptions: ['4x4'], Render: MovieCollectionCard },
 
-  // —— 基础设施 · Supabase Free plan 当月用量看板（2x4，仅在「模块概览」分类下可见） ——
-  w_supabase_usage: { id: 'w_supabase_usage', title: 'Supabase 用量', desc: 'Free plan 当月用量看板（Egress / DB / MAU / Storage）', category: '模块概览', iconKey: 'cube', developed: true, span: 2, defaultSize: '2x4', sizeOptions: ['2x4'], Render: SupabaseUsageCard },
+  // —— 基础设施 · Supabase Free plan 当月用量看板（2x1，仅在「模块概览」分类下可见） ——
+  w_supabase_usage: { id: 'w_supabase_usage', title: 'Supabase 用量', desc: 'Free plan 当月用量看板（Egress / DB / MAU / Storage）', category: '模块概览', iconKey: 'cube', developed: true, span: 4, defaultSize: '2x1', sizeOptions: ['2x1'], Render: SupabaseUsageCard },
 }
 
 export const WIDGET_LIST: WidgetDef[] = Object.values(WIDGETS)

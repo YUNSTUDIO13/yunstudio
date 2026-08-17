@@ -8,7 +8,8 @@
 --
 -- 用量看板要看的指标：
 --   1) DATABASE SIZE    = pg_database_size(current_database())
---   2) FILE STORAGE     = sum((metadata->>'size')::bigint)  across all buckets
+--   2) FILE STORAGE     = sum((metadata->>'size')::bigint)  排除系统 bucket
+--                          （Supabase 官方计费规则：自动生成的 thumbnails bucket 不计入）
 -- 而 Egress / Monthly Active Users 没有 SQL 接口，必须走 Supabase Management API
 -- （在 Edge Function 中处理，需 MGMT_TOKEN secret；注意名字不能以 SUPABASE_ 开头，
 --  Dashboard 校验会拒绝 "Name must not start with the SUPABASE_ prefix"）。
@@ -37,6 +38,8 @@ comment on function public.get_db_size_bytes() is
 -- ② FILE STORAGE SIZE --------------------------------------------------------
 -- supabase 官方文档「Manage Storage size usage」的标准写法：metadata->>'size' 累计求和
 -- （supabase 上传时由 server 自动在 metadata 里塞入 size key；极少数老对象可能没塞，正则防御）。
+-- ★ 排除系统 bucket「thumbnails」：Dashboard 计费口径不计该 bucket，由 supabase server
+--   自动存储上传原图的衍生缩略图，应剔除避免虚高。
 create or replace function public.get_storage_size_bytes()
 returns bigint
 language sql
@@ -50,11 +53,12 @@ as $$
       else 0
     end
   ), 0)::bigint
-  from storage.objects;
+  from storage.objects
+  where objects.bucket_id <> 'thumbnails';
 $$;
 
 revoke all on function public.get_storage_size_bytes() from public;
 grant execute on function public.get_storage_size_bytes() to anon, authenticated, service_role;
 
 comment on function public.get_storage_size_bytes() is
-  '返回当前项目 storage.objects 总字节数（所有 buckets 聚合；据 supabase 官方文档 metadata->>size 字段，SECURITY DEFINER 暴露给 anon/authenticated/service_role）。';
+  '返回当前项目 storage.objects 总字节数（排除 thumbnails 系统 bucket；据 supabase 官方文档 metadata->>size 字段，SECURITY DEFINER 暴露给 anon/authenticated/service_role）。';

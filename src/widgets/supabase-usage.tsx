@@ -1,13 +1,13 @@
 /**
- * 首页 Supabase 用量看板 · 2x4 卡片
+ * 首页 Supabase 用量看板 · 2x1 卡片
  * ============================================================================
  * 数据：supabase.functions.invoke('supabase-usage') → 服务端聚合
  *   · DATABASE SIZE   ← SECURITY DEFINER RPC get_db_size_bytes
  *   · FILE STORAGE    ← SECURITY DEFINER RPC get_storage_size_bytes
  *   · EGRESS / MAU    ← Supabase Management API（需 MGMT_TOKEN，可选）
  *
- * 视觉：标题 + plan pill + 4 行（空心圆 + 标签 + 已用/总量 + 短进度条）；
- *       缺数据则该项显示「—」，进度条为 0%。
+ * 视觉：紧凑 4 行（字段左对齐 + 数值右对齐），无进度条；
+ *       缺数据则该项显示「—」。
  */
 import { useEffect, useState } from 'react'
 import { Card, CardHeader } from '../design/primitives'
@@ -53,12 +53,7 @@ function fmtCount(n: number | null): string {
   return n.toLocaleString()
 }
 
-function pct(used: number | null, limit: number): number {
-  if (used == null || limit <= 0) return 0
-  return Math.min(100, Math.max(0, (used / limit) * 100))
-}
-
-// ── 单行：空心圆 + 标签 + 已用/总量 + 进度条 ─────────────────────────────────
+// ── 单行：字段左对齐 + 数值右对齐，无装饰 ────────────────────────────────────
 type Unit = 'bytes' | 'mb' | 'count'
 
 function UsageRow({
@@ -72,7 +67,6 @@ function UsageRow({
   total: number
   unit: Unit
 }) {
-  const p = pct(used, total)
   const usedDisp =
     unit === 'bytes' ? fmtBytes(used) : unit === 'mb' ? fmtMB(used) : fmtCount(used)
   const totalDisp =
@@ -86,29 +80,21 @@ function UsageRow({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '9px 0',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '4px 0',
         borderTop: '1px solid rgba(255,255,255,0.06)',
       }}
     >
       <span
         style={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          border: '1.5px solid rgba(255,255,255,0.4)',
-          flexShrink: 0,
-        }}
-      />
-      <span
-        style={{
-          flex: 1,
           fontSize: 10.5,
           fontWeight: 500,
           color: 'rgba(255,255,255,0.6)',
           letterSpacing: '.06em',
           textTransform: 'uppercase',
           whiteSpace: 'nowrap',
+          textAlign: 'left',
         }}
       >
         {label}
@@ -119,31 +105,12 @@ function UsageRow({
           color: 'rgba(255,255,255,0.88)',
           fontVariantNumeric: 'tabular-nums',
           whiteSpace: 'nowrap',
+          textAlign: 'right',
         }}
       >
         {usedDisp}
-        <span style={{ color: 'rgba(255,255,255,0.32)', marginLeft: 4 }}>/ {totalDisp}</span>
+        <span style={{ color: 'rgba(255,255,255,0.32)', marginLeft: 6 }}>/ {totalDisp}</span>
       </span>
-      <div
-        style={{
-          width: 72,
-          height: 2,
-          background: 'var(--c-progress-track)',
-          borderRadius: 1,
-          overflow: 'hidden',
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            height: '100%',
-            width: `${p}%`,
-            background: 'var(--grad-progress)',
-            borderRadius: 1,
-            transition: 'width .5s ease',
-          }}
-        />
-      </div>
     </div>
   )
 }
@@ -184,16 +151,16 @@ export default function SupabaseUsageCard() {
     <Card
       style={{
         height: '100%',
-        padding: '18px 20px',
+        padding: '12px 16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
+        gap: 4,
         overflow: 'hidden',
       }}
     >
       <CardHeader
         title="Supabase 用量"
-        style={{ marginBottom: 4 }}
+        style={{ marginBottom: 0 }}
         action={
           data?.plan ? (
             <span
@@ -204,12 +171,12 @@ export default function SupabaseUsageCard() {
                 background: 'rgba(94,234,212,.10)',
                 border: '1px solid rgba(94,234,212,.28)',
                 borderRadius: 5,
-                padding: '2px 7px',
+                padding: '1px 6px',
                 letterSpacing: '.06em',
                 textTransform: 'uppercase',
               }}
             >
-              {data.plan} plan
+              {data.plan}
             </span>
           ) : undefined
         }
@@ -245,20 +212,6 @@ export default function SupabaseUsageCard() {
             total={limits.storage_mb * 1024 * 1024}
             unit="bytes"
           />
-          {!data.mgmt_enabled && (
-            <div
-              style={{
-                marginTop: 'auto',
-                fontSize: 10,
-                color: 'rgba(255,255,255,0.32)',
-                letterSpacing: '.04em',
-                textAlign: 'right',
-                paddingTop: 4,
-              }}
-            >
-              Egress / MAU 需配置 PAT（<code>MGMT_TOKEN</code>）
-            </div>
-          )}
         </div>
       )}
     </Card>
