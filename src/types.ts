@@ -308,7 +308,7 @@ export type MovieInput = {
 // 阅读（Books）—— 个人书库（镜像观影 Movies，字段差异见下）
 // 字段差异（相对 Movies）：
 //   · 书籍名称(title) / 年代(year) / 封面(cover) / 类型(genre[]) / 个人评分(personal_rating)
-//     / 第三方评分(third_party_rating) / 个人评价(review) / 简介(overview) 均与观影一致
+//     / 个人评价(review) / 简介(overview) 均与观影一致
 //   · 演员表(cast[]) → 作者(author)：单行文本，多作者用「、」分隔（无第三方书库自动拉取）
 //   · 观影日期(watched_at) → 阅读日期(read_at)
 //   · 观影次数(view_count) → 阅读次数(read_count)
@@ -321,7 +321,6 @@ export interface Book {
   year: number
   cover: string // 封面图 URL（Google Books 公网 / Storage 公链）；为空时显示占位
   personal_rating: number | null // 个人评分（0–10）
-  third_party_rating: number | null // 第三方评分（Google Books averageRating）0–10
   review: string // 个人短评
   overview: string // 简介
   author: string // 作者（单行文本，多作者「、」分隔）
@@ -339,7 +338,6 @@ export type BookInput = {
   year: number
   cover?: string
   personal_rating?: number | null
-  third_party_rating?: number | null
   review?: string
   overview?: string
   author?: string

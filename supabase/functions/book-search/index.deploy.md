@@ -29,11 +29,11 @@ supabase functions deploy book-search
 ## 验证
 
 部署后在浏览器（已登录）打开阅读模块 → 新建/搜索书名（如「三体」）：
-- 正常：返回中文候选（书名/作者/封面/评分），说明函数已生效。
+- 正常：返回中文候选（书名/作者/封面），说明函数已生效。
 - 若仍走 mock（封面是风景图、无作者）：打开控制台看 `[books] book-search invoke ...` 的告警，通常是函数未部署或 `functions` 服务未启用（Dashboard 的 Edge Functions 需项目已开通）。
 
 ## 备注
 
-- 函数返回字段：`found / candidates[{id,title,year,cover,third_party_rating,author}] / cover / third_party_rating(0-10) / genre([]) / year / author / overview('') / cover_failed`。
-- 豆瓣详情接口（rexxar）未返回 summary / tags，故 `overview` 与 `genre` 当前为空，由用户手动补；核心的书名/作者/封面/评分已齐。
+- 函数返回字段：`found / candidates[{id,title,year,cover,author}] / cover / genre([]) / year / author / overview('') / cover_failed`。
+- 豆瓣详情接口（rexxar）未返回 summary / tags，故 `overview` 与 `genre` 当前为空，由用户手动补；核心的书名/作者/封面已齐。
 - 豆瓣封面走 `imgN.doubanio.com` 公网直链，前端 `<img>` 直拉（已确认可被第三方页面引用）。若个别网络下被防盗链，再评估改为上传 Storage 中转。

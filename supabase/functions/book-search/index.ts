@@ -6,7 +6,7 @@
 //
 // 豆瓣无官方免费 API，但以下两个非官方接口可用、且无需 key：
 //   ① book.douban.com/j/subject_suggest?q=书名   → 自动补全候选（标题 / 作者 / 年 / 封面 / subject id）
-//   ② m.douban.com/rexxar/api/v2/book/{id}        → 详情（评分 0-10 / 大封面 / 作者 / 简介(intro) / 标签(tags)），需带 Referer: m.douban.com
+//   ② m.douban.com/rexxar/api/v2/book/{id}        → 详情（大封面 / 作者 / 简介(intro) / 标签(tags)），需带 Referer: m.douban.com
 //
 // 封面说明：suggest 给的是 /s/public/ 小图（必然存在），本函数尝试升级为 /l/public/ 大图，
 // 若大图 HEAD 探测不存在则回退小图，避免破图。
@@ -59,12 +59,11 @@ async function bestCover(pic: string): Promise<string> {
   return pic
 }
 
-/** 豆瓣详情：评分(0-10) / 大封面 / 作者（多作者「、」拼接）/ 简介(intro) / 标签(tags→类型) */
+/** 豆瓣详情：大封面 / 作者（多作者「、」拼接）/ 简介(intro) / 标签(tags→类型) */
 async function fetchDoubanDetail(
   id: string,
 ): Promise<null | {
   cover: string
-  third_party_rating: number | null
   author: string
   overview: string
   genre: string[]
@@ -79,7 +78,6 @@ async function fetchDoubanDetail(
     })
     if (!res.ok) return null
     const j = (await res.json()) as Record<string, unknown>
-    const rating = (j.rating as { value?: number } | undefined)?.value
     const coverRaw =
       (j.cover_url as string) || (j.large as string) || (j.pic as string) || ''
     const authorRaw = j.author
@@ -98,7 +96,6 @@ async function fetchDoubanDetail(
     }
     return {
       cover: typeof coverRaw === 'string' ? coverRaw : '',
-      third_party_rating: typeof rating === 'number' ? Number(rating.toFixed(1)) : null,
       author,
       overview: typeof overviewRaw === 'string' ? overviewRaw.trim() : '',
       genre,
@@ -153,7 +150,6 @@ serve(async (req: Request) => {
           found: true,
           candidates: [],
           cover: det.cover,
-          third_party_rating: det.third_party_rating,
           genre: det.genre,
           year: 0,
           cover_failed: !det.cover,
@@ -193,14 +189,13 @@ serve(async (req: Request) => {
       title: it.title ?? '',
       year: it.year ? Number(it.year) : 0,
       cover: await bestCover(it.pic ?? ''),
-      third_party_rating: null,
       author: it.author_name ?? '',
     })),
   )
 
   const top = candidates[0]
 
-  // ② 对首个候选拉详情，补评分(0-10) / 大封面 / 作者 / 简介 / 类型
+  // ② 对首个候选拉详情，补大封面 / 作者 / 简介 / 类型
   const det = await fetchDoubanDetail(top.id)
 
   return new Response(
@@ -208,7 +203,6 @@ serve(async (req: Request) => {
       found: true,
       candidates,
       cover: det?.cover || top.cover,
-      third_party_rating: det?.third_party_rating ?? null,
       genre: det?.genre ?? [],
       year: top.year,
       cover_failed: !(det?.cover || top.cover),

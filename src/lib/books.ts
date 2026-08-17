@@ -11,13 +11,11 @@ export interface BookCandidate {
   title: string
   year: number
   cover: string
-  third_party_rating: number | null
   author: string
 }
 
 export interface BookData {
   cover: string
-  third_party_rating: number | null
   genre: string[]
   year: number
   cover_failed: boolean
@@ -40,7 +38,6 @@ function mockBookData(year: string): BookData {
   const cover = MOCK_COVERS[Math.floor(Math.random() * MOCK_COVERS.length)]
   return {
     cover,
-    third_party_rating: Number((6 + Math.random() * 3).toFixed(1)),
     genre: [MOCK_GENRES[Math.floor(Math.random() * MOCK_GENRES.length)]],
     year: Number(year) || 2000 + Math.floor(Math.random() * 26),
     cover_failed: false,
@@ -68,14 +65,11 @@ export async function fetchBookByTitle(title: string, year: string): Promise<Boo
             title: c.title ?? '',
             year: c.year ?? 0,
             cover: c.cover ?? '',
-            third_party_rating: c.third_party_rating ?? null,
             author: c.author ?? '',
           }))
         : []
       return {
         cover: typeof data.cover === 'string' ? data.cover : '',
-        third_party_rating:
-          typeof data.third_party_rating === 'number' ? data.third_party_rating : null,
         genre: Array.isArray(data.genre) ? (data.genre as string[]) : [],
         year: typeof data.year === 'number' ? data.year : Number(year) || 0,
         cover_failed: !data.cover,
@@ -109,8 +103,6 @@ export async function fetchBookDetail(doubanId: string): Promise<Partial<BookDat
     if (!error && data && data.found) {
       return {
         cover: typeof data.cover === 'string' ? data.cover : '',
-        third_party_rating:
-          typeof data.third_party_rating === 'number' ? data.third_party_rating : null,
         genre: Array.isArray(data.genre) ? (data.genre as string[]) : [],
         overview: typeof data.overview === 'string' ? data.overview : '',
         author: typeof data.author === 'string' ? data.author : '',

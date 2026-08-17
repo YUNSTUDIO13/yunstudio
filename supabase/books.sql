@@ -10,7 +10,6 @@ create table if not exists public.books (
   year                int,
   cover               text not null default '',
   personal_rating     numeric(3,1),              -- 个人评分 0–10
-  third_party_rating  numeric(3,1),              -- 第三方评分（Google Books）0–10
   review              text not null default '',
   overview            text not null default '',  -- 简介
   author              text not null default '',  -- 作者（多作者以「、」分隔）
@@ -22,6 +21,9 @@ create table if not exists public.books (
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );
+
+-- 若此前已执行过含 third_party_rating 的旧版建表，删除该列（幂等：新表无此列也不报错）
+alter table public.books drop column if exists third_party_rating;
 
 create index if not exists books_user_id_idx on public.books(user_id);
 create index if not exists books_updated_at_idx on public.books(updated_at desc);

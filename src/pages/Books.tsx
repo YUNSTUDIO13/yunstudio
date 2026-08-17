@@ -19,8 +19,6 @@ import { TagPicker } from '../components/TagPicker'
 import { CachedImage } from '../components/CachedImage'
 import type { Book } from '../types'
 
-const SRC_THIRD = '第三方'
-
 // ─── 评分档位（筛选用，多选） ─────────────────────────────────
 const RATING_TIERS = [
   { key: '9+', label: '9 分以上', test: (r: number) => r >= 9 },
@@ -134,7 +132,7 @@ function Stars({ value, max = 10, size = 14 }: { value: number; max?: number; si
 // ─── 竖版海报（160×240 严格对齐参考 app；fluid=手机 2 列网格自适应） ─────────
 function PosterCard({ book, onClick, fluid }: { book: Book; onClick: () => void; fluid?: boolean }) {
   const [err, setErr] = useState(false)
-  const rating = book.personal_rating ?? book.third_party_rating
+  const rating = book.personal_rating
   return (
     <button
       type="button"
@@ -361,15 +359,6 @@ function BookDetailPanel({
               <span className="text-sm text-ink-mute">未评分</span>
             )}
           </div>
-          {draft.third_party_rating !== null && draft.third_party_rating !== undefined && (
-            <div>
-              <div className="mb-2 text-[11px] uppercase tracking-wider text-ink-mute">{SRC_THIRD}评分</div>
-              <div className="flex items-center gap-2">
-                <Stars value={draft.third_party_rating} />
-                <span className="text-xl font-semibold text-white/80">{draft.third_party_rating.toFixed(1)}</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* 简介 + 演员表（个人短评上方） */}
@@ -865,7 +854,6 @@ function NewBookModal({
       // 候选自带封面/年份/作者；有豆瓣 id 时再拉详情，拿到大封面 + 评分 + 类型 + 简介
       let detail: {
         cover?: string
-        third_party_rating?: number | null
         author?: string
         genre?: string[]
         overview?: string
@@ -874,7 +862,6 @@ function NewBookModal({
         const d = await fetchBookDetail(candidate.id)
         detail = {
           cover: d.cover || candidate.cover || '',
-          third_party_rating: d.third_party_rating ?? candidate.third_party_rating,
           author: d.author || candidate.author || '',
           genre: d.genre ?? [],
           overview: d.overview ?? '',
@@ -884,7 +871,6 @@ function NewBookModal({
       setPreview((prev) => ({
         ...prev,
         cover,
-        third_party_rating: detail.third_party_rating ?? candidate.third_party_rating,
         year: candidate.year,
         author: detail.author || candidate.author || prev.author || '',
         genre: detail.genre ?? prev.genre ?? [],
@@ -919,7 +905,6 @@ function NewBookModal({
       year: parseInt(draft.year, 10) || 0,
       cover: draft.cover || preview.cover || '',
       personal_rating: draft.personalRating ? parseFloat(draft.personalRating) : null,
-      third_party_rating: preview.third_party_rating ?? null,
       review: draft.review.trim(),
       overview: preview.overview ?? '',
       author: draft.author.trim() || preview.author || '',
@@ -1002,7 +987,6 @@ function NewBookModal({
                     <div className="mt-1.5 truncate text-xs text-white">{c.title}</div>
                     <div className="flex items-center gap-1.5 text-[10px] text-white/60">
                       <span>{c.year || '—'}</span>
-                      {c.third_party_rating !== null && <span className="text-yellow-400">★ {c.third_party_rating.toFixed(1)}</span>}
                     </div>
                   </button>
                 ))}
@@ -1078,10 +1062,9 @@ function NewBookModal({
               rows={3}
             />
           </Field>
-          {preview.third_party_rating !== null && preview.third_party_rating !== undefined && (
+          {(preview.genre?.length || preview.author) && (
             <p className="text-xs text-ink-mute">
-              第三方评分：<span className="text-ink-soft">{preview.third_party_rating.toFixed(1)}</span>
-              {preview.genre?.length ? ` · ${preview.genre.join(' / ')}` : ''}
+              {preview.genre?.length ? `${preview.genre.join(' / ')}` : ''}
               {preview.author ? ` · ${preview.author}` : ''}
             </p>
           )}
@@ -1194,7 +1177,6 @@ function BatchImportModal({
           year: data.year || parseInt(r.year, 10) || 0,
           cover,
           personal_rating: parseRating(r.rating),
-          third_party_rating: data.third_party_rating ?? null,
           review: '',
           overview: data.overview ?? '',
           author: r.author || data.author || '',
@@ -1990,7 +1972,7 @@ export default function BooksPage() {
       if (filter.years.length && !filter.years.includes(String(m.year || ''))) return false
       // 评分档位
       if (filter.ratings.length) {
-        const r = m.personal_rating ?? m.third_party_rating
+        const r = m.personal_rating
         if (r == null) return false
         const ok = RATING_TIERS.some((t) => filter.ratings.includes(t.key) && t.test(r))
         if (!ok) return false
@@ -2075,7 +2057,6 @@ export default function BooksPage() {
     const updated: Book = {
       ...m,
       cover,
-      third_party_rating: data.third_party_rating ?? m.third_party_rating,
       genre: m.genre.length ? m.genre : data.genre ?? [],
       year: data.year || m.year,
       author: m.author || data.author || '',
