@@ -906,6 +906,9 @@ function NewBookModal({
   const handleSave = () => {
     if (!draft.title.trim() || !draft.year.trim()) return
     if (isDuplicate) return // 已存在同名同年书籍，直接跳过不新建
+    const coverUrl = draft.cover || preview.cover || ''
+    // 封面为空时禁止保存：要么查询还在路上（fetching），要么豆瓣确实未返回封面
+    if (!coverUrl) return
     const nowIso = new Date().toISOString()
     const book: Book = {
       id: crypto.randomUUID(),
@@ -938,7 +941,7 @@ function NewBookModal({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button onClick={handleSave} disabled={!draft.title.trim() || !draft.year.trim() || isDuplicate}>
+          <Button onClick={handleSave} disabled={!draft.title.trim() || !draft.year.trim() || isDuplicate || !coverUrl}>
             {isDuplicate ? '已存在，无需添加' : '添加记录'}
           </Button>
         </>
@@ -971,6 +974,11 @@ function NewBookModal({
           {isDuplicate && (
             <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
               库中已存在「{draft.title.trim()}（{draft.year.trim()}）」，已阻止重复创建。如需修改请到列表中打开该书籍编辑。
+            </p>
+          )}
+          {!coverUrl && (
+            <p className={`rounded-lg border px-3 py-2 text-xs ${fetching ? 'border-sky-400/30 bg-sky-500/10 text-sky-300' : 'border-red-400/30 bg-red-500/10 text-red-300'}`}>
+              {fetching ? '封面查询中，请稍候…' : '未能获取封面，请检查书名 / 年代是否正确，或稍后重试'}
             </p>
           )}
           {candidates.length > 0 && (
