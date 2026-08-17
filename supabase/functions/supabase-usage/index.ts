@@ -15,7 +15,11 @@
 //
 //   方式 B（Dashboard）：
 //     Edge Functions → New function → 选 Deno → 粘本文件 → Deploy
-//     Secrets 面板 → Add SUPABASE_MGMT_TOKEN（可选）
+//     ⚠️ Secrets 不在「函数级 Settings」里，而是项目级独立页面：
+//        左导 Edge Functions → 顶部 Secrets（项目级）→ Add new secret
+//        Key=SUPABASE_MGMT_TOKEN  Value=sbp_xxx_xxxxxxxx
+//        或直接打开：https://supabase.com/dashboard/project/<ref>/functions/secrets
+//     设置后无需重新部署函数，下次调用自动实时读取。
 //
 // ⚠️ 函数本身不开 CORS 给浏览器直接 fetch 调；前端走 supabase.functions.invoke，
 //    平台自动附加 anon key 走网关校验。
