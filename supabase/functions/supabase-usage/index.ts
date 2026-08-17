@@ -1,21 +1,21 @@
 // supabase/functions/supabase-usage/index.ts
 // 首页 Supabase 用量看板 · 服务端聚合
 // ============================================================================
-// 数据源（按优先级）：
-//   ★ 主源：Supabase Management API  GET /v1/projects/{ref}/usage
-//          —— 这是 Supabase Dashboard「Usage」页自己的权威数据源，口径完全一致。
-//            返回 database_size_bytes / storage_size_bytes / bandwidth_bytes / mau
-//            等字段，本函数对其做防御式多字段名解析，命中即取。
-//   ★ 回退：仅当 MGMT_TOKEN 缺失或 API 调用失败时，才用 SECURITY DEFINER RPC
-//          get_db_size_bytes / get_storage_size_bytes（pg_database_size + storage.objects 求和）。
-//          —— 注意：RPC 口径 ≠ Dashboard 口径（差十几 MB 属正常），仅作兜底。
+// 数据源：
+//   ★ 主源（保底，永远可用）：SECURITY DEFINER RPC
+//        get_db_size_bytes()     = pg_database_size（PG 逻辑库即时字节数）
+//        get_storage_size_bytes()= storage.objects 文件字节求和（已排除 thumbnails 系统桶）
+//   ★ 增强源：Supabase Management API（需 MGMT_TOKEN）。
+//        ⚠️ 经实测，公开 Management API **没有** /v1/projects/{ref}/usage 聚合端点
+//        （返回 404）。本函数改为「探测模式」：把一组候选端点全部打一遍，
+//        把每个端点的真实返回打到日志（前缀 mgmt_probe），便于据此校准字段名。
+//        若某端点真含 database/storage/egress/mau 字段，再解析使用。
 //
-// ⚠️ Secret Name 不能用 SUPABASE_ 前缀（Dashboard 校验拦截：
-//   "Name must not start with the SUPABASE_ prefix"）。本函数读 MGMT_TOKEN。
+// ⚠️ Secret Name 不能用 SUPABASE_ 前缀（Dashboard 校验拦截）。本函数读 MGMT_TOKEN。
 //
 // 部署：
 //   方式 A（CLI）：supabase functions deploy supabase-usage
-//                  supabase secrets set MGMT_TOKEN=sbp_xxx_xxxxxxxx   ← 必需（否则 4 项不全）
+//                  supabase secrets set MGMT_TOKEN=sbp_xxx_xxxxxxxx   ← 可选（仅增强源）
 //   方式 B（Dashboard）：Edge Functions → New function → 选 Deno → 粘本文件 → Deploy
 //         Secrets 在「项目级」独立页：左导 Edge Functions → 顶部 Secrets → Add new secret
 //         或直接开 https://supabase.com/dashboard/project/<ref>/functions/secrets
@@ -77,40 +77,64 @@ async function rpcNumber(supabase: ReturnType<typeof createClient>, name: string
   return null
 }
 
-// 嵌套取值
-function getPath(obj: unknown, path: string[]): unknown {
-  let v: unknown = obj
-  for (const k of path) {
-    if (v == null || typeof v !== 'object') return undefined
-    v = (v as Record<string, unknown>)[k]
-  }
-  return v
+interface ProbeResult {
+  endpoint: string
+  status: number
+  ok: boolean
+  preview: string
 }
 
-// 从 Management API 响应里抽取一个指标的 usage + limit，兼容多种字段命名
-function extractMetric(j: Record<string, unknown>, usagePaths: string[][], limitPaths: string[][]): {
-  usage: number | null
-  limit: number | null
-} {
-  let usage: number | null = null
-  for (const p of usagePaths) {
-    const v = getPath(j, p)
-    const n = typeof v === 'string' ? Number(v) : v
-    if (typeof n === 'number' && Number.isFinite(n) && n >= 0) {
-      usage = n
-      break
+// 探测一组 Management API 候选端点，把每个的真实返回打日志并返回。
+// 目的：查清哪个公开端点真正含有 database/storage/egress/mau 用量字段。
+async function probeEndpoints(): Promise<ProbeResult[]> {
+  const results: ProbeResult[] = []
+  if (!MGMT_TOKEN || !PROJECT_REF) return results
+
+  const host = 'https://api.supabase.com'
+  const ref = PROJECT_REF
+  // 官方文档确认存在 / 或可能有用量数据的候选端点
+  const candidates = [
+    `/v1/projects/${ref}`,
+    `/v1/projects/${ref}/subscription`,
+    `/v1/projects/${ref}/billing`,
+    `/v1/projects/${ref}/endpoints/usage.api-counts`,
+    `/v1/projects/${ref}/endpoints/usage.api-requests-count`,
+  ]
+
+  for (const ep of candidates) {
+    try {
+      const r = await fetch(host + ep, { headers: { Authorization: `Bearer ${MGMT_TOKEN}` } })
+      const text = await r.text()
+      results.push({ endpoint: ep, status: r.status, ok: r.ok, preview: text.slice(0, 1800) })
+    } catch (e) {
+      results.push({ endpoint: ep, status: -1, ok: false, preview: String(e) })
     }
   }
-  let limit: number | null = null
-  for (const p of limitPaths) {
-    const v = getPath(j, p)
-    const n = typeof v === 'string' ? Number(v) : v
-    if (typeof n === 'number' && Number.isFinite(n) && n > 0) {
-      limit = n
-      break
+
+  // 从 project 详情里拿 organization id，再探 org 级端点
+  const proj = results.find((x) => x.endpoint === `/v1/projects/${ref}`)
+  if (proj && proj.ok) {
+    try {
+      const pj = JSON.parse(proj.preview) as Record<string, unknown>
+      const org = (pj.organization_id ?? pj.organization_slug) as string | undefined
+      if (org) {
+        for (const sub of [`/v1/organizations/${org}`, `/v1/organizations/${org}/billing`]) {
+          try {
+            const r = await fetch(host + sub, { headers: { Authorization: `Bearer ${MGMT_TOKEN}` } })
+            const text = await r.text()
+            results.push({ endpoint: sub, status: r.status, ok: r.ok, preview: text.slice(0, 1800) })
+          } catch (e) {
+            results.push({ endpoint: sub, status: -1, ok: false, preview: String(e) })
+          }
+        }
+      }
+    } catch {
+      /* ignore parse error */
     }
   }
-  return { usage, limit }
+
+  console.log('mgmt_probe:', JSON.stringify(results))
+  return results
 }
 
 // 数值规整：若原值 > 1e6 视为已是字节，否则视为 MB→转字节
@@ -119,84 +143,6 @@ function toBytes(v: number): number {
 }
 function toMB(v: number): number {
   return v > 1_000_000 ? Math.round(v / 1024 / 1024) : Math.round(v)
-}
-
-interface MgmtUsage {
-  db_size_bytes: number | null
-  storage_size_bytes: number | null
-  egress_mb: number | null
-  mau: number | null
-  limits: typeof FREE_PLAN_LIMITS
-  raw: unknown
-  ok: boolean
-}
-
-// Management API：4 项指标全部从这里取（与 Dashboard 同源）
-async function fetchMgmtUsage(): Promise<MgmtUsage> {
-  const fallback: MgmtUsage = {
-    db_size_bytes: null,
-    storage_size_bytes: null,
-    egress_mb: null,
-    mau: null,
-    limits: FREE_PLAN_LIMITS,
-    raw: null,
-    ok: false,
-  }
-  if (!MGMT_TOKEN || !PROJECT_REF) return fallback
-  try {
-    const r = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/usage`, {
-      headers: { Authorization: `Bearer ${MGMT_TOKEN}` },
-    })
-    if (!r.ok) {
-      const t = await r.text().catch(() => '')
-      console.error(`mgmt /usage ${r.status}: ${t.slice(0, 300)}`)
-      return fallback
-    }
-    const j = (await r.json()) as Record<string, unknown>
-    // 打日志便于核验字段名（Supabase 各版本返回结构略有差异）
-    console.log('mgmt usage raw:', JSON.stringify(j).slice(0, 3000))
-
-    const db = extractMetric(
-      j,
-      [['database_size', 'usage'], ['database_size_bytes'], ['db_size', 'usage'], ['db_size_bytes'], ['databaseSizeBytes']],
-      [['database_size', 'limit'], ['database_size_bytes_limit'], ['db_size_limit']],
-    )
-    const storage = extractMetric(
-      j,
-      [['storage', 'usage'], ['storage_size_bytes'], ['storage_size', 'usage'], ['storageSizeBytes']],
-      [['storage', 'limit'], ['storage_size_bytes_limit'], ['storage_limit']],
-    )
-    const egress = extractMetric(
-      j,
-      [['egress', 'usage'], ['egress_bytes'], ['bandwidth_bytes'], ['egress', 'used_mb'], ['bandwidth', 'usage']],
-      [['egress', 'limit'], ['egress_bytes_limit'], ['bandwidth_limit']],
-    )
-    const mau = extractMetric(
-      j,
-      [['maus', 'usage'], ['mau'], ['monthly_active_users'], ['auth', 'mau'], ['mau_count']],
-      [['maus', 'limit'], ['mau_limit'], ['monthly_active_users_limit']],
-    )
-
-    const limits = {
-      egress_mb: egress.limit != null ? toMB(egress.limit) : FREE_PLAN_LIMITS.egress_mb,
-      db_size_mb: db.limit != null ? toMB(db.limit) : FREE_PLAN_LIMITS.db_size_mb,
-      mau: mau.limit != null ? Math.round(mau.limit) : FREE_PLAN_LIMITS.mau,
-      storage_mb: storage.limit != null ? toMB(storage.limit) : FREE_PLAN_LIMITS.storage_mb,
-    }
-
-    return {
-      db_size_bytes: db.usage != null ? toBytes(db.usage) : null,
-      storage_size_bytes: storage.usage != null ? toBytes(storage.usage) : null,
-      egress_mb: egress.usage != null ? toMB(egress.usage) : null,
-      mau: mau.usage != null ? Math.round(mau.usage) : null,
-      limits,
-      raw: j,
-      ok: true,
-    }
-  } catch (e) {
-    console.error('mgmt fetch failed', e instanceof Error ? e.message : e)
-    return fallback
-  }
 }
 
 // ── 入口 ──────────────────────────────────────────────────────────────────────
@@ -212,29 +158,25 @@ serve(async (req) => {
     })
   }
 
-  const mgmt = await fetchMgmtUsage()
+  // db / storage 永远用 RPC 保底（真实字节数，与 Dashboard 计费口径有差异但真实）
+  const supabase = mkAdmin()
+  const [db_bytes, storage_bytes] = await Promise.all([
+    rpcNumber(supabase, 'get_db_size_bytes'),
+    rpcNumber(supabase, 'get_storage_size_bytes'),
+  ])
 
-  // db / storage 若 Management API 没拿到（无 token 或字段未命中），回退 RPC
-  let db_bytes = mgmt.db_size_bytes
-  let storage_bytes = mgmt.storage_size_bytes
-  if (db_bytes == null || storage_bytes == null) {
-    const supabase = mkAdmin()
-    const [rpcDb, rpcStorage] = await Promise.all([
-      rpcNumber(supabase, 'get_db_size_bytes'),
-      rpcNumber(supabase, 'get_storage_size_bytes'),
-    ])
-    if (db_bytes == null) db_bytes = rpcDb
-    if (storage_bytes == null) storage_bytes = rpcStorage
-  }
+  // 探测 Management API（诊断用，结果进日志 + 返回体 mgmt_probe 字段）
+  const mgmt_probe = await probeEndpoints()
 
   const body = {
     plan: 'free',
-    limits: mgmt.limits,
+    limits: FREE_PLAN_LIMITS,
     db_size_bytes: db_bytes,
     storage_size_bytes: storage_bytes,
-    egress_mb: mgmt.egress_mb,
-    mau: mgmt.mau,
+    egress_mb: null,
+    mau: null,
     mgmt_enabled: !!MGMT_TOKEN,
+    mgmt_probe,
     project_ref: PROJECT_REF,
     fetched_at: new Date().toISOString(),
   }
