@@ -814,16 +814,25 @@ function NewBookModal({
   const [candidates, setCandidates] = useState<BookCandidate[]>([])
   const [selectedCandidateIdx, setSelectedCandidateIdx] = useState<number | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 已自动查询过的「书名|4位年代」组合，避免年代/书名改动后重复打豆瓣代理
+  const fetchedKeyRef = useRef<string | null>(null)
 
   const triggerFetch = (title: string, year: string) => {
     if (timer.current) clearTimeout(timer.current)
-    // 必须「名称 + 年代」双字段都非空才触发（同名歧义需要年份辅助豆瓣 search 锁定目标）
-    if (!title.trim() || !year.trim()) {
+    const t = title.trim()
+    // 年代按「纯数字字符数 ≥ 4」判定为完成（如 2023），未完成的年代不触发查询
+    const yd = year.replace(/\D/g, '')
+    // 必须「名称 + 完整 4 位年代」都齐了才触发（同名歧义需要年份辅助豆瓣 search 锁定目标）
+    if (!t || yd.length < 4) {
       setCandidates([])
       setSelectedCandidateIdx(null)
       return
     }
+    const key = `${t}|${yd}`
+    // 同一组合已查过则跳过，杜绝改动书名/年代后的逐字重复请求
+    if (fetchedKeyRef.current === key) return
     timer.current = setTimeout(async () => {
+      fetchedKeyRef.current = key
       setFetching(true)
       try {
         const data = await fetchBookByTitle(title, year)
