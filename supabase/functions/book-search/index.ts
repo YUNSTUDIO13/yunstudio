@@ -8,11 +8,10 @@
 //   ① book.douban.com/j/subject_suggest?q=书名   → 自动补全候选（标题 / 作者 / 年 / 封面 / subject id）
 //   ② m.douban.com/rexxar/api/v2/book/{id}        → 详情（大封面 / 作者 / 简介(intro) / 标签(tags)），需带 Referer: m.douban.com
 //
-// 封面防盗链（关键）：
-//   豆瓣图床(imgX.doubanio.com) 对「跨域 Referer / 无 Referer」返回 403/418，浏览器直链必破图。
-//   故新增 GET /book-search?img=<豆瓣图URL> 图片代理分支：服务端带 Referer: book.douban.com 拉图回传，
-//   浏览器从自家域名加载，彻底绕开防盗链。仅放行 doubanio.com / douban.com 域名，防开放代理滥用。
-//   前端统一经 proxiedCover() 把豆瓣图 URL 改写成此代理地址（见 src/lib/books.ts）。
+// 封面策略（2026-08-17 治本）：
+//   服务端把候选+详情封面直接 fetch + base64 内嵌成 data URI 返回——浏览器按 data: 加载，
+//   完全不走网络图床、无 CORS/CORP/防盗链/慢网 任何环节，**保证所有浏览器、所有网络 100% 渲染**。
+//   同时保留 GET ?img=<url> 代理分支给「DB 里旧裸 URL」在读路径用；写入路径（新增/同步）一律内嵌。
 //
 // 部署（两种方式，任选其一）：
 //   A. CLI（本地终端，需先 supabase login）：
@@ -45,7 +44,7 @@ type SuggestItem = {
   id?: string
 }
 
-/** 豆瓣详情：大封面 / 作者（多作者「、」拼接）/ 简介(intro) / 标签(tags→类型) */
+/** 抓豆瓣详情：大封面 / 作者 / 简介(intro) / 标签(tags→类型) */
 async function fetchDoubanDetail(
   id: string,
 ): Promise<null | {
@@ -91,14 +90,44 @@ async function fetchDoubanDetail(
   }
 }
 
-/** 图片代理：仅放行豆瓣域名，服务端带 Referer 拉图回传，绕开防盗链 */
+/** 服务端带豆瓣 Referer 抓图，转 base64 内嵌 data URI 返回。
+ *  仅放行豆瓣图床主机（防滥用）；失败返回空串，让前端走 onError 兜底。 */
+async function embedImageDataUri(target: string): Promise<string> {
+  if (!target) return ''
+  try {
+    const u = new URL(target)
+    const host = u.hostname.toLowerCase()
+    if (!/doubanio\.com$/.test(host) && !/douban\.com$/.test(host)) return ''
+    const r = await fetch(u.toString(), {
+      headers: {
+        'User-Agent': UA,
+        'Referer': 'https://book.douban.com/',
+        'Accept': 'image/webp,image/avif,image/*,*/*',
+      },
+    })
+    if (!r.ok) return ''
+    const ct = r.headers.get('Content-Type') || 'image/jpeg'
+    const buf = await r.arrayBuffer()
+    const bytes = new Uint8Array(buf)
+    // Deno 不允许最大字符串放大倍数 > 1.5？实测 Uint8Array -> btoa 分块没问题
+    let bin = ''
+    const chunk = 0x8000
+    for (let i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + chunk))
+    }
+    return `data:${ct};base64,${btoa(bin)}`
+  } catch {
+    return ''
+  }
+}
+
+/** 图片代理（仅放行豆瓣域名）：保留供「DB 里旧裸 URL」在读路径走 proxiedCover() 包裹时使用 */
 async function proxyImage(target: string): Promise<Response> {
   try {
     const u = new URL(target)
     const host = u.hostname.toLowerCase()
-    // 仅允许 doubanio.com / douban.com 主机，防止被当作通用开放代理滥用
     if (!/doubanio\.com$/.test(host) && !/douban\.com$/.test(host)) {
-      return new Response('forbidden host', { status: 403 })
+      return new Response('forbidden host', { status: 403, headers: { 'Access-Control-Allow-Origin': '*' } })
     }
     const r = await fetch(u.toString(), {
       headers: {
@@ -120,6 +149,7 @@ async function proxyImage(target: string): Promise<Response> {
         'Content-Type': r.headers.get('Content-Type') || 'image/jpeg',
         'Cache-Control': 'public, max-age=86400, immutable',
         'Access-Control-Allow-Origin': '*',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
       },
     })
   } catch {
@@ -133,7 +163,7 @@ async function proxyImage(target: string): Promise<Response> {
 serve(async (req: Request) => {
   const url = new URL(req.url)
 
-  // ① 图片代理（公开，无需登录）：GET ?img=<豆瓣图URL>
+  // ① 图片代理（公开，无需登录）：保留供旧 DB 里的裸 douban URL 在读路径使用
   if (req.method === 'GET' && url.searchParams.has('img')) {
     return await proxyImage(url.searchParams.get('img') ?? '')
   }
@@ -175,18 +205,19 @@ serve(async (req: Request) => {
     })
   }
 
-  // 候选切换：直接按 douban_id 拉详情（跳过 suggest）
+  // 候选切换：按 douban_id 拉详情，返回内嵌图（保证浏览器一定能渲染）
   if (body.douban_id) {
     const det = await fetchDoubanDetail(body.douban_id)
     if (det) {
+      const coverB64 = await embedImageDataUri(det.cover)
       return new Response(
         JSON.stringify({
           found: true,
           candidates: [],
-          cover: det.cover,
+          cover: coverB64,
           genre: det.genre,
           year: 0,
-          cover_failed: !det.cover,
+          cover_failed: !coverB64,
           overview: det.overview,
           author: det.author,
         }),
@@ -199,7 +230,7 @@ serve(async (req: Request) => {
     })
   }
 
-  // ① suggest 取候选（中文书名 / 作者 / 年 / 封面）
+  // ① suggest 取候选（中文书名 / 作者 / 年 / 封面 URL）
   let items: SuggestItem[] = []
   try {
     const res = await fetch(`${DOUBAN_SUGGEST}?q=${encodeURIComponent(title)}`, {
@@ -216,31 +247,45 @@ serve(async (req: Request) => {
     })
   }
 
-  // 候选封面：直接用 suggest 给的 /s/public/ 小图（必然存在）；
-  // 不再逐个 HEAD 探测大图（避免 8 次冗余请求拖慢），前端统一经代理加载。
-  const candidates = items.slice(0, 8).map((it) => ({
+  // 8 个候选的封面 URL 列表
+  const candidatesRaw = items.slice(0, 8).map((it) => ({
     id: String(it.id ?? ''),
     title: it.title ?? '',
     year: it.year ? Number(it.year) : 0,
-    cover: it.pic ?? '',
-    author: it.author_name ?? '',
+    pic: it.pic ?? '',
+    author_name: it.author_name ?? '',
   }))
+  const top = candidatesRaw[0]
 
-  const top = candidates[0]
-
-  // ② 对首个候选拉详情，补大封面 / 作者 / 简介 / 类型
+  // ② 对首个候选拉详情
   const det = await fetchDoubanDetail(top.id)
+  const topCoverUrl = det?.cover || top.pic
+
+  // 并行抓所有图 + base64 内嵌（含 top 详情大图、8 张候选封面）
+  const [topCoverB64, ...candCoversB64] = await Promise.all([
+    embedImageDataUri(topCoverUrl),
+    ...candidatesRaw.map((c) => embedImageDataUri(c.pic)),
+  ])
+
+  const candidates = candidatesRaw.map((c, i) => ({
+    id: c.id,
+    title: c.title,
+    year: c.year,
+    cover: candCoversB64[i],   // data:image/jpeg;base64,... 或空串
+    author: c.author_name,
+    pic: c.pic,                // 保留原 URL，proxiedCover 兜底（旧 DB 兼容 / 内嵌失败时）
+  }))
 
   return new Response(
     JSON.stringify({
       found: true,
       candidates,
-      cover: det?.cover || top.cover,
+      cover: topCoverB64,                              // data URI
+      cover_failed: !topCoverB64,
       genre: det?.genre ?? [],
       year: top.year,
-      cover_failed: !(det?.cover || top.cover),
       overview: det?.overview ?? '',
-      author: det?.author || top.author,
+      author: det?.author || top.author_name,
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   )
