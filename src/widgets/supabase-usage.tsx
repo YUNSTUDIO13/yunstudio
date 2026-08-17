@@ -4,7 +4,7 @@
  * 数据：supabase.functions.invoke('supabase-usage') → 服务端聚合
  *   · DATABASE SIZE   ← SECURITY DEFINER RPC get_db_size_bytes
  *   · FILE STORAGE    ← SECURITY DEFINER RPC get_storage_size_bytes
- *   · EGRESS / MAU    ← Supabase Management API（需 SUPABASE_MGMT_TOKEN，可选）
+ *   · EGRESS / MAU    ← Supabase Management API（需 MGMT_TOKEN，可选）
  *
  * 视觉：标题 + plan pill + 4 行（空心圆 + 标签 + 已用/总量 + 短进度条）；
  *       缺数据则该项显示「—」，进度条为 0%。
@@ -256,7 +256,7 @@ export default function SupabaseUsageCard() {
                 paddingTop: 4,
               }}
             >
-              Egress / MAU 需配置 PAT（<code>SUPABASE_MGMT_TOKEN</code>）
+              Egress / MAU 需配置 PAT（<code>MGMT_TOKEN</code>）
             </div>
           )}
         </div>

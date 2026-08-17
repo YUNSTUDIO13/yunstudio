@@ -5,19 +5,22 @@
 //   1) DATABASE SIZE    ← supabase.rpc('get_db_size_bytes')    SECURITY DEFINER
 //   2) FILE STORAGE     ← supabase.rpc('get_storage_size_bytes') SECURITY DEFINER
 //   3) EGRESS / MAU     ← https://api.supabase.com/v1/projects/{ref}/usage
-//                          （需 SUPABASE_MGMT_TOKEN 个人访问令牌 PAT，非必须；
+//                          （需 MGMT_TOKEN 个人访问令牌 PAT，非必须；
 //                          不配则这两项返回 null，前端显示「—」）
+//
+// ⚠️ Secret Name 不能用 SUPABASE_ 前缀（Dashboard 校验拦截，会报错
+//   "Name must not start with the SUPABASE_ prefix"），保留前缀给系统变量。
 //
 // 部署：
 //   方式 A（CLI 推荐）：
 //     supabase functions deploy supabase-usage
-//     supabase secrets set SUPABASE_MGMT_TOKEN=sbp_xxx_xxxxxxxx   ← 可选
+//     supabase secrets set MGMT_TOKEN=sbp_xxx_xxxxxxxx   ← 可选
 //
 //   方式 B（Dashboard）：
 //     Edge Functions → New function → 选 Deno → 粘本文件 → Deploy
 //     ⚠️ Secrets 不在「函数级 Settings」里，而是项目级独立页面：
 //        左导 Edge Functions → 顶部 Secrets（项目级）→ Add new secret
-//        Key=SUPABASE_MGMT_TOKEN  Value=sbp_xxx_xxxxxxxx
+//        Key=MGMT_TOKEN  Value=sbp_xxx_xxxxxxxx
 //        或直接打开：https://supabase.com/dashboard/project/<ref>/functions/secrets
 //     设置后无需重新部署函数，下次调用自动实时读取。
 //
@@ -29,7 +32,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-const MGMT_TOKEN = Deno.env.get('SUPABASE_MGMT_TOKEN') ?? ''
+const MGMT_TOKEN = Deno.env.get('MGMT_TOKEN') ?? ''
 
 // 兼容方式：从 SUPABASE_URL 反推 ref（如 zvpsxbzxupkptyxfruny.supabase.co）
 function deriveRef(url: string): string {

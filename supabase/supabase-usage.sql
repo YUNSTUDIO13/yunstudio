@@ -10,7 +10,8 @@
 --   1) DATABASE SIZE    = pg_database_size(current_database())
 --   2) FILE STORAGE     = sum((metadata->>'size')::bigint)  across all buckets
 -- 而 Egress / Monthly Active Users 没有 SQL 接口，必须走 Supabase Management API
--- （在 Edge Function 中处理，需 SUPABASE_MGMT_TOKEN）。
+-- （在 Edge Function 中处理，需 MGMT_TOKEN secret；注意名字不能以 SUPABASE_ 开头，
+--  Dashboard 校验会拒绝 "Name must not start with the SUPABASE_ prefix"）。
 --
 -- ★ 字段来源（已据 supabase 官方文档 https://supabase.com/docs/guides/platform/manage-your-usage/storage-size 核实）：
 --   storage.objects 标准字段：id, bucket_id, name, owner, metadata jsonb,
