@@ -1879,6 +1879,21 @@ export default function MoviesPage() {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [showFunc])
 
+  // 观影记录排序：按个人评分 / 年份倒序 / 年份正序
+  const [sortBy, setSortBy] = useState<'rating' | 'year_desc' | 'year_asc'>('year_desc')
+  const [showSort, setShowSort] = useState(false)
+  const sortRef = useRef<HTMLDivElement>(null)
+
+  // 排序弹层：点击外部关闭
+  useEffect(() => {
+    if (!showSort) return
+    function onDoc(e: MouseEvent) {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setShowSort(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [showSort])
+
   // 注册同步状态回调：上传失败显式报错横幅，成功则清除
   useEffect(() => {
     setSyncStatusHandler((s) => {
@@ -2021,7 +2036,7 @@ export default function MoviesPage() {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return movies.filter((m) => {
+    const list = movies.filter((m) => {
       // 搜索（名称 + 类型）
       if (q && !(m.title.toLowerCase().includes(q) || (m.genre ?? []).some((g) => g.toLowerCase().includes(q)))) {
         return false
@@ -2041,7 +2056,34 @@ export default function MoviesPage() {
       }
       return true
     })
-  }, [movies, search, filter])
+    const sorted = [...list]
+    if (sortBy === 'rating') {
+      // 按个人评分高→低（缺失排末尾），同分按观影时间、创建时间
+      sorted.sort(
+        (a, b) =>
+          (b.personal_rating ?? -1) - (a.personal_rating ?? -1) ||
+          String(b.watched_at ?? '').localeCompare(String(a.watched_at ?? '')) ||
+          b.created_at.localeCompare(a.created_at),
+      )
+    } else if (sortBy === 'year_asc') {
+      // 年份正序（旧→新）
+      sorted.sort(
+        (a, b) =>
+          (Number(a.year) || 0) - (Number(b.year) || 0) ||
+          String(b.watched_at ?? '').localeCompare(String(a.watched_at ?? '')) ||
+          b.created_at.localeCompare(a.created_at),
+      )
+    } else {
+      // 默认：年份倒序（新→旧）
+      sorted.sort(
+        (a, b) =>
+          (Number(b.year) || 0) - (Number(a.year) || 0) ||
+          String(b.watched_at ?? '').localeCompare(String(a.watched_at ?? '')) ||
+          b.created_at.localeCompare(a.created_at),
+      )
+    }
+    return sorted
+  }, [movies, search, filter, sortBy])
 
   // 去重键集合（名称 + 年代）：新建 / 批量导入 共用，命中则跳过不重复创建
   const existingKeys = useMemo(
@@ -2161,6 +2203,70 @@ export default function MoviesPage() {
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
           </button>
+          {/* 排序（圆形按钮 + 弹层），位于搜索右侧 */}
+          <div className="relative" ref={sortRef}>
+            <button
+              onClick={() => setShowSort((s) => !s)}
+              aria-label="排序"
+              aria-haspopup="menu"
+              aria-expanded={showSort}
+              className={`grid h-9 w-9 place-items-center rounded-full backdrop-blur-md transition ${
+                sortBy !== 'year_desc' || showSort
+                  ? 'bg-accent/20 text-accent'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 4v16" />
+                <path d="M3 8l4-4 4 4" />
+                <path d="M17 20V4" />
+                <path d="M21 16l-4 4-4-4" />
+              </svg>
+            </button>
+            {showSort && (
+              <div className="animate-popover absolute right-0 top-11 z-40 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#15151c]/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                <button
+                  onClick={() => { setSortBy('rating'); setShowSort(false) }}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                    sortBy === 'rating' ? 'bg-accent/15 text-accent' : 'text-white/85 hover:bg-white/10'
+                  }`}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={sortBy === 'rating' ? 'text-accent' : 'text-white/70'}>
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                  按个人评分（高→低）
+                </button>
+                <button
+                  onClick={() => { setSortBy('year_desc'); setShowSort(false) }}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                    sortBy === 'year_desc' ? 'bg-accent/15 text-accent' : 'text-white/85 hover:bg-white/10'
+                  }`}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={sortBy === 'year_desc' ? 'text-accent' : 'text-white/70'}>
+                    <polyline points="8 4 4 8 8 12" />
+                    <line x1="4" y1="8" x2="20" y2="8" />
+                    <polyline points="16 20 20 16 16 12" />
+                    <line x1="20" y1="16" x2="4" y2="16" />
+                  </svg>
+                  年份倒序（新→旧）
+                </button>
+                <button
+                  onClick={() => { setSortBy('year_asc'); setShowSort(false) }}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                    sortBy === 'year_asc' ? 'bg-accent/15 text-accent' : 'text-white/85 hover:bg-white/10'
+                  }`}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={sortBy === 'year_asc' ? 'text-accent' : 'text-white/70'}>
+                    <polyline points="16 4 20 8 16 12" />
+                    <line x1="20" y1="8" x2="4" y2="8" />
+                    <polyline points="8 20 4 16 8 12" />
+                    <line x1="4" y1="16" x2="20" y2="16" />
+                  </svg>
+                  年份正序（旧→新）
+                </button>
+              </div>
+            )}
+          </div>
           {/* 筛选 */}
           <button
             onClick={() => setShowFilter(true)}
