@@ -24,8 +24,10 @@
 //        或直接打开：https://supabase.com/dashboard/project/<ref>/functions/secrets
 //     设置后无需重新部署函数，下次调用自动实时读取。
 //
-// ⚠️ 函数本身不开 CORS 给浏览器直接 fetch 调；前端走 supabase.functions.invoke，
-//    平台自动附加 anon key 走网关校验。
+// ⚠️ CORS：每个 Response（OPTIONS / 200 / 500）都必须显式带 ACAO 头，
+//    Supabase Edge Function 网关不会自动注入；缺失会导致浏览器把响应屏蔽成
+//    opaque response → supabase.functions.invoke 报 FunctionsFetchError。
+//    前端走 supabase.functions.invoke，平台自动附加 anon key 走网关校验。
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -116,22 +118,24 @@ async function fetchMgmtUsage(): Promise<MgmtUsage> {
 }
 
 // ── 入口 ──────────────────────────────────────────────────────────────────────
+// CORS 头（Supabase Edge Function 不会自动注入 ACAO，每个 Response 都得显式带，
+// 不然浏览器把响应屏蔽成 opaque response → supabase-js 报 FunctionsFetchError。
+// 参考 https://supabase.com/docs/guides/functions/cors ）
+const corsHeaders = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'access-control-allow-origin': '*',
-        'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
-        'access-control-allow-methods': 'GET, POST, OPTIONS',
-      },
-    })
+    return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   if (!SUPABASE_URL || !SERVICE_ROLE) {
     return new Response(JSON.stringify({ error: 'function env missing (SUPABASE_URL/SERVICE_ROLE_KEY)' }), {
       status: 500,
-      headers: { 'content-type': 'application/json' },
+      headers: { ...corsHeaders, 'content-type': 'application/json' },
     })
   }
 
@@ -157,6 +161,7 @@ serve(async (req) => {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
+      ...corsHeaders,
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
     },
