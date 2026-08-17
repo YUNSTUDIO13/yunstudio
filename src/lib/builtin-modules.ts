@@ -12,6 +12,7 @@ export const BUILTIN_MODULE_IDS = [
   'apps', // 应用（个人应用导航 / 书签）
   'ui-settings', // UI 设置（指针主题 · 全局视觉）
   'movies', // 观影（个人影视库 / 观影志）
+  'books', // 阅读（个人书库 / 阅读志）
 ] as const
 export type BuiltinModuleId = (typeof BUILTIN_MODULE_IDS)[number]
 
@@ -102,6 +103,13 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
     title: '观影',
     desc: '个人影视库 · 封面/评分/短评 · 自动同步第三方',
     route: '/modules/movies',
+    defaultEnabled: true,
+  },
+  'books': {
+    id: 'books',
+    title: '阅读',
+    desc: '个人书库 · 封面/评分/短评 · Google Books 自动补元数据',
+    route: '/modules/books',
     defaultEnabled: true,
   },
 }

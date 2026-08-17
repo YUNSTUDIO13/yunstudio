@@ -80,6 +80,13 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       groups: [{ id: 'g_movies_1', title: '观影志', modules: ['movies'] }],
     },
     {
+      id: 'p_books',
+      title: '阅读',
+      iconKey: 'book',
+      order: 9,
+      groups: [{ id: 'g_books_1', title: '阅读志', modules: ['books'] }],
+    },
+    {
       id: 'p_system_settings',
       title: '系统设置',
       iconKey: 'gear',

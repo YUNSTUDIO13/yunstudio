@@ -13,6 +13,7 @@ import type {
   TagValue,
   App,
   Movie,
+  Book,
 } from '../types'
 
 export type EntityTable =
@@ -25,6 +26,7 @@ export type EntityTable =
   | 'tag_values'
   | 'apps'
   | 'movies'
+  | 'books'
 
 export type SyncOpType = 'insert' | 'update' | 'delete'
 
@@ -52,6 +54,7 @@ interface LocalDB extends Dexie {
   cleared_notif_keys: Table<{ key: string; cleared_at: string }, string>
   apps: Table<App, string>
   movies: Table<Movie, string>
+  books: Table<Book, string>
   outbox: Table<OutboxOp, string>
 }
 
@@ -132,6 +135,22 @@ db.version(7).stores({
   outbox: 'id, table, rowId, createdAt',
 })
 
+// v8：新增 books 表（个人书库 / 阅读志），其余表结构保持不变
+db.version(8).stores({
+  todos: 'id, user_id, updated_at, tag_id',
+  requirements: 'id, user_id, updated_at, tag_id',
+  bugs: 'id, user_id, updated_at, tag_id',
+  sprints: 'id, user_id, updated_at, tag_id',
+  notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
+  tag_categories: 'id, user_id, updated_at, name',
+  tag_values: 'id, category_id, updated_at',
+  apps: 'id, user_id, updated_at',
+  movies: 'id, user_id, updated_at',
+  books: 'id, user_id, updated_at',
+  cleared_notif_keys: 'key, cleared_at',
+  outbox: 'id, table, rowId, createdAt',
+})
+
 /** 类型化表引用，避免 any 满天飞 */
 function tableRef<T>(table: EntityTable): Table<T> {
   switch (table) {
@@ -153,6 +172,8 @@ function tableRef<T>(table: EntityTable): Table<T> {
       return db.apps as unknown as Table<T>
     case 'movies':
       return db.movies as unknown as Table<T>
+    case 'books':
+      return db.books as unknown as Table<T>
   }
 }
 

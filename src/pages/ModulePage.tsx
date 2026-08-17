@@ -10,6 +10,7 @@ import TagDict from './TagDict'
 import Apps from './Apps'
 import UISettings from './UISettings'
 import Movies from './Movies'
+import Books from './Books'
 
 /**
  * 统一模块页：根据 /modules/:id 反查并渲染对应内置组件
@@ -41,6 +42,8 @@ export default function ModulePage() {
       return <UISettings />
     case 'movies':
       return <Movies />
+    case 'books':
+      return <Books />
     default:
       return <Navigate to="/modules/overview" replace />
   }
