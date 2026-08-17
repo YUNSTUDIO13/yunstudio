@@ -10,7 +10,7 @@ import { useMediaQuery } from '../lib/useMediaQuery'
 import MegaMenu from './MegaMenu'
 import MobileMegaSheet from './MobileMegaSheet'
 import Avatar from './Avatar'
-import type { BuiltinModuleId } from '../lib/builtin-modules'
+import { BUILTIN_MODULE_IDS, type BuiltinModuleId } from '../lib/builtin-modules'
 import type { NavPrimary } from '../lib/nav-types'
 import AuroraBackground from '../design/AuroraBackground'
 import CursorFX from './CursorFX'
@@ -27,11 +27,9 @@ function moduleIdFromPath(pathname: string): BuiltinModuleId | null {
   const m = pathname.match(/^\/modules\/([\w-]+)/)
   if (!m) return null
   const id = m[1]
-  if (
-    ['overview', 'todos', 'requirements', 'sprints', 'bugs', 'nav-config', 'tag-dict', 'apps', 'ui-settings', 'movies'].includes(
-      id,
-    )
-  ) {
+  // 复用内置模块权威清单做白名单校验：新增模块（如 books）自动获得 dock 高亮，
+  // 避免手写清单漂移导致「点击后无选中态」的回归。
+  if ((BUILTIN_MODULE_IDS as readonly string[]).includes(id)) {
     return id as BuiltinModuleId
   }
   return null
