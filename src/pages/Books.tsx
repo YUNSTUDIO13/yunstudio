@@ -12,7 +12,7 @@ import { seedFromServer, enqueueAndMaybeFlush, setSyncStatusHandler } from '../l
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useTodos } from '../context/TodosContext'
-import { fetchBookByTitle, fetchBookDetail, syncBook, uploadBookCover, uploadBookImage, type BookCandidate } from '../lib/books'
+import { fetchBookByTitle, fetchBookDetail, syncBook, uploadBookCover, uploadBookImage, proxiedCover, type BookCandidate } from '../lib/books'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { localInputToIso } from '../lib/datetime'
 import { TagPicker } from '../components/TagPicker'
@@ -143,7 +143,7 @@ function PosterCard({ book, onClick, fluid }: { book: Book; onClick: () => void;
     >
       {book.cover && !err ? (
         <CachedImage
-          src={book.cover}
+          src={proxiedCover(book.cover)}
           alt={book.title}
           loading="lazy"
           onError={() => setErr(true)}
@@ -267,7 +267,7 @@ function BookDetailPanel({
         {/* 顶部封面 + 渐变 + 标题（紧贴顶部，无 margin-top） */}
         <div className="relative h-72 w-full overflow-hidden md:h-80">
           {draft.cover ? (
-            <img src={draft.cover} alt={draft.title} className="h-full w-full object-cover" />
+            <img src={proxiedCover(draft.cover)} alt={draft.title} className="h-full w-full object-cover" />
           ) : (
             <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#1a1a2e] to-[#2a2a3e]">
               <span className="font-serif text-7xl text-white/10">{draft.title.slice(0, 1)}</span>
@@ -420,10 +420,10 @@ function BookDetailPanel({
           {draft.cover ? (
             <div className="grid grid-cols-2 gap-3">
               <StillThumb
-                url={draft.cover}
+                url={proxiedCover(draft.cover)}
                 label="封面"
-                onOpen={() => setLightbox(draft.cover)}
-                onDownload={() => void downloadImage(draft.cover, `${draft.title || 'book'}-封面.jpg`)}
+                onOpen={() => setLightbox(proxiedCover(draft.cover))}
+                onDownload={() => void downloadImage(proxiedCover(draft.cover), `${draft.title || 'book'}-封面.jpg`)}
               />
             </div>
           ) : (
@@ -979,7 +979,7 @@ function NewBookModal({
                   >
                     <div className="relative h-[150px] w-full overflow-hidden rounded-md bg-black/40">
                       {c.cover ? (
-                        <img src={c.cover} alt={c.title} loading="lazy" className="h-full w-full object-cover" />
+                        <img src={proxiedCover(c.cover)} alt={c.title} loading="lazy" className="h-full w-full object-cover" />
                       ) : (
                         <div className="grid h-full w-full place-items-center text-xs text-ink-mute">{c.title.slice(0, 1)}</div>
                       )}
@@ -1072,7 +1072,7 @@ function NewBookModal({
         <div className="flex flex-col items-center gap-2">
           <div className="h-[240px] w-[160px] overflow-hidden rounded-xl border border-white/10 bg-black/30">
             {coverUrl ? (
-              <img src={coverUrl} alt="封面预览" className="h-full w-full object-cover" />
+              <img src={proxiedCover(coverUrl)} alt="封面预览" className="h-full w-full object-cover" />
             ) : fetching ? (
               <div className="h-full w-full animate-pulse bg-white/5" />
             ) : (

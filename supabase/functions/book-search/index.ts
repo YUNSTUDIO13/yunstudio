@@ -8,14 +8,17 @@
 //   ① book.douban.com/j/subject_suggest?q=书名   → 自动补全候选（标题 / 作者 / 年 / 封面 / subject id）
 //   ② m.douban.com/rexxar/api/v2/book/{id}        → 详情（大封面 / 作者 / 简介(intro) / 标签(tags)），需带 Referer: m.douban.com
 //
-// 封面说明：suggest 给的是 /s/public/ 小图（必然存在），本函数尝试升级为 /l/public/ 大图，
-// 若大图 HEAD 探测不存在则回退小图，避免破图。
+// 封面防盗链（关键）：
+//   豆瓣图床(imgX.doubanio.com) 对「跨域 Referer / 无 Referer」返回 403/418，浏览器直链必破图。
+//   故新增 GET /book-search?img=<豆瓣图URL> 图片代理分支：服务端带 Referer: book.douban.com 拉图回传，
+//   浏览器从自家域名加载，彻底绕开防盗链。仅放行 doubanio.com / douban.com 域名，防开放代理滥用。
+//   前端统一经 proxiedCover() 把豆瓣图 URL 改写成此代理地址（见 src/lib/books.ts）。
 //
 // 部署（两种方式，任选其一）：
 //   A. CLI（本地终端，需先 supabase login）：
 //        supabase link --project-ref zvpsxbzxupkptyxfruny
 //        supabase functions deploy book-search
-//   B. Supabase Dashboard → Edge Functions → New Function，名称填 book-search，粘贴本文件代码保存即部署。
+//   B. Supabase Dashboard → Edge Functions → 选中 book-search → Via Editor 粘贴本文件保存即部署。
 //   无需设置任何 Secret（豆瓣接口无需 key）。
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -26,7 +29,7 @@ const DOUBAN_REXXAR = 'https://m.douban.com/rexxar/api/v2/book'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
 const UA =
@@ -40,23 +43,6 @@ type SuggestItem = {
   year?: string
   type?: string
   id?: string
-}
-
-/** 封面：优先大图 /l/public/，HEAD 探测不存在则回退 suggest 给的 /s/public/ 小图（必然有效） */
-async function bestCover(pic: string): Promise<string> {
-  if (!pic) return ''
-  const large = pic.replace('/s/public/', '/l/public/')
-  if (large === pic) return pic
-  try {
-    const r = await fetch(large, {
-      method: 'HEAD',
-      headers: { 'User-Agent': UA, 'Referer': 'https://book.douban.com/' },
-    })
-    if (r.ok) return large
-  } catch {
-    /* 探测失败则回退小图 */
-  }
-  return pic
 }
 
 /** 豆瓣详情：大封面 / 作者（多作者「、」拼接）/ 简介(intro) / 标签(tags→类型) */
@@ -105,10 +91,58 @@ async function fetchDoubanDetail(
   }
 }
 
-serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+/** 图片代理：仅放行豆瓣域名，服务端带 Referer 拉图回传，绕开防盗链 */
+async function proxyImage(target: string): Promise<Response> {
+  try {
+    const u = new URL(target)
+    const host = u.hostname.toLowerCase()
+    // 仅允许 doubanio.com / douban.com 主机，防止被当作通用开放代理滥用
+    if (!/doubanio\.com$/.test(host) && !/douban\.com$/.test(host)) {
+      return new Response('forbidden host', { status: 403 })
+    }
+    const r = await fetch(u.toString(), {
+      headers: {
+        'User-Agent': UA,
+        'Referer': 'https://book.douban.com/',
+        'Accept': 'image/webp,image/avif,image/*,*/*',
+      },
+    })
+    if (!r.ok) {
+      return new Response('upstream error', {
+        status: 502,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      })
+    }
+    const buf = await r.arrayBuffer()
+    return new Response(buf, {
+      status: 200,
+      headers: {
+        'Content-Type': r.headers.get('Content-Type') || 'image/jpeg',
+        'Cache-Control': 'public, max-age=86400, immutable',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+  } catch {
+    return new Response('proxy error', {
+      status: 502,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    })
+  }
+}
 
-  // 鉴权：要求登录态，匿名无法调用（防盗刷）
+serve(async (req: Request) => {
+  const url = new URL(req.url)
+
+  // ① 图片代理（公开，无需登录）：GET ?img=<豆瓣图URL>
+  if (req.method === 'GET' && url.searchParams.has('img')) {
+    return await proxyImage(url.searchParams.get('img') ?? '')
+  }
+
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  // ② 搜索 / 详情（需登录态，防盗刷）
   const authHeader = req.headers.get('Authorization') ?? ''
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -134,7 +168,7 @@ serve(async (req: Request) => {
   }
 
   const title = (body.title ?? '').toString().trim()
-  if (!title) {
+  if (!title && !body.douban_id) {
     return new Response(JSON.stringify({ error: 'title required' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -182,16 +216,15 @@ serve(async (req: Request) => {
     })
   }
 
-  // 候选封面：尝试升级大图，失败回退小图（防破图）
-  const candidates = await Promise.all(
-    items.slice(0, 8).map(async (it) => ({
-      id: String(it.id ?? ''),
-      title: it.title ?? '',
-      year: it.year ? Number(it.year) : 0,
-      cover: await bestCover(it.pic ?? ''),
-      author: it.author_name ?? '',
-    })),
-  )
+  // 候选封面：直接用 suggest 给的 /s/public/ 小图（必然存在）；
+  // 不再逐个 HEAD 探测大图（避免 8 次冗余请求拖慢），前端统一经代理加载。
+  const candidates = items.slice(0, 8).map((it) => ({
+    id: String(it.id ?? ''),
+    title: it.title ?? '',
+    year: it.year ? Number(it.year) : 0,
+    cover: it.pic ?? '',
+    author: it.author_name ?? '',
+  }))
 
   const top = candidates[0]
 

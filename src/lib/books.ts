@@ -6,6 +6,25 @@
 import { supabase } from './supabase'
 import type { Book } from '../types'
 
+// 豆瓣图床有防盗链（跨域 Referer / 无 Referer 返回 403/418），浏览器直链必破图。
+// 故把豆瓣图 URL 改写为「经 book-search 函数 GET 代理」的地址，由服务端带 Referer 拉图回传。
+// 已是自家代理 / Storage / DataURI 的则原样返回（幂等，可重复包裹）。
+const FN_BASE = `${(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '')}/functions/v1/book-search`
+export function proxiedCover(url?: string | null): string {
+  if (!url) return ''
+  if (
+    url.includes('/functions/v1/') ||
+    url.includes('supabase.co/storage') ||
+    url.startsWith('data:')
+  ) {
+    return url
+  }
+  if (/https?:\/\/[^\/]*doubanio\.com\//.test(url) || /https?:\/\/[^\/]*douban\.com\//.test(url)) {
+    return `${FN_BASE}?img=${encodeURIComponent(url)}`
+  }
+  return url
+}
+
 export interface BookCandidate {
   id: string
   title: string
