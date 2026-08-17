@@ -1791,7 +1791,7 @@ export default function BooksPage() {
   const [showBatchUpdate, setShowBatchUpdate] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER)
-  const [sortBy, setSortBy] = useState<'read_at' | 'rating'>('read_at')
+  const [sortBy, setSortBy] = useState<'read_at' | 'rating'>('rating')
   const [del, setDel] = useState<Book | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const isMobile = useMediaQuery('(max-width: 767px)')
