@@ -869,16 +869,25 @@ function NewMovieModal({
   const [candidates, setCandidates] = useState<TMDBCandidate[]>([])
   const [selectedCandidateIdx, setSelectedCandidateIdx] = useState<number | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 已自动查询过的「片名|4位年代」组合，避免年代/片名改动后重复打 TMDB 代理
+  const fetchedKeyRef = useRef<string | null>(null)
 
   const triggerFetch = (title: string, year: string) => {
     if (timer.current) clearTimeout(timer.current)
-    // 必须「名称 + 年代」双字段都非空才触发（同名歧义需要年份辅助 TMDB search 锁定目标）
-    if (!title.trim() || !year.trim()) {
+    const t = title.trim()
+    // 年代按「纯数字字符数 ≥ 4」判定为完成（如 2023），未完成的年代不触发查询
+    const yd = year.replace(/\D/g, '')
+    // 必须「名称 + 完整 4 位年代」都齐了才触发（同名歧义需要年份辅助 TMDB search 锁定目标）
+    if (!t || yd.length < 4) {
       setCandidates([])
       setSelectedCandidateIdx(null)
       return
     }
+    const key = `${t}|${yd}`
+    // 同一组合已查过则跳过，杜绝改动片名/年代后的逐字重复请求
+    if (fetchedKeyRef.current === key) return
     timer.current = setTimeout(async () => {
+      fetchedKeyRef.current = key
       setFetching(true)
       try {
         const data = await fetchMovieByTitle(title, year)
@@ -944,6 +953,9 @@ function NewMovieModal({
   const handleSave = () => {
     if (!draft.title.trim() || !draft.year.trim()) return
     if (isDuplicate) return // 已存在同名同年影片，直接跳过不新建
+    const coverUrl = draft.cover || preview.cover || ''
+    // 封面为空时禁止保存：要么查询还在路上（fetching），要么 TMDB 确实未返回封面
+    if (!coverUrl) return
     const nowIso = new Date().toISOString()
     const movie: Movie = {
       id: crypto.randomUUID(),
@@ -980,7 +992,7 @@ function NewMovieModal({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button onClick={handleSave} disabled={!draft.title.trim() || !draft.year.trim() || isDuplicate}>
+          <Button onClick={handleSave} disabled={!draft.title.trim() || !draft.year.trim() || isDuplicate || !coverUrl}>
             {isDuplicate ? '已存在，无需添加' : '添加记录'}
           </Button>
         </>
@@ -1013,6 +1025,11 @@ function NewMovieModal({
           {isDuplicate && (
             <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
               库中已存在「{draft.title.trim()}（{draft.year.trim()}）」，已阻止重复创建。如需修改请到列表中打开该影片编辑。
+            </p>
+          )}
+          {!coverUrl && (
+            <p className={`rounded-lg border px-3 py-2 text-xs ${fetching ? 'border-sky-400/30 bg-sky-500/10 text-sky-300' : 'border-red-400/30 bg-red-500/10 text-red-300'}`}>
+              {fetching ? '封面查询中，请稍候…' : '未能获取封面，请检查片名 / 年代是否正确，或稍后重试'}
             </p>
           )}
           {candidates.length > 0 && (
