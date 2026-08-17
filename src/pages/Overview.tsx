@@ -12,7 +12,6 @@ import DashboardConfig from '../components/DashboardConfig'
 import NotificationBell from '../components/NotificationBell'
 import { SIZE_CLASS } from '../widgets/registry'
 import { MovieHeroCard, MovieTop3Card, MovieTop5StripCard, MovieCollectionCard } from '../widgets/movie-cards'
-import SupabaseUsageCard from '../widgets/supabase-usage'
 import { C, glass } from '../design/tokens'
 import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
 import {
@@ -315,12 +314,6 @@ export default function Overview() {
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
                   <MovieCollectionCard />
-                </div>
-              )
-            case 'w_supabase_usage':
-              return (
-                <div key={id} className={`${SIZE_CLASS[size]}`}>
-                  <SupabaseUsageCard />
                 </div>
               )
             default:

@@ -8,7 +8,6 @@ import { computeScore, hoursToDeadline, riskLevel } from '../lib/score'
 import { renderIcon } from '../lib/icon-library'
 import type { IconKey } from '../lib/icon-library'
 import { MovieHeroCard, MovieTop3Card, MovieTop5StripCard, MovieCollectionCard } from './movie-cards'
-import SupabaseUsageCard from './supabase-usage'
 
 // ============================================================
 // 类型
@@ -417,9 +416,6 @@ export const WIDGETS: Record<string, WidgetDef> = {
   w_movie_top3: { id: 'w_movie_top3', title: '年度三甲', desc: '个人评分最高 · Top 3', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 2, defaultSize: '2x4', sizeOptions: ['2x4'], Render: MovieTop3Card },
   w_movie_top5: { id: 'w_movie_top5', title: 'TOP5 横版胶卷', desc: '个人评分最高 · Top 5', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 4, defaultSize: '4x2', sizeOptions: ['4x2'], Render: MovieTop5StripCard },
   w_movie_collection: { id: 'w_movie_collection', title: '年度全榜典藏版', desc: '个人评分最高 · Top 5', category: '观影', iconKey: 'film', developed: true, route: '/modules/movies', span: 4, defaultSize: '4x4', sizeOptions: ['4x4'], Render: MovieCollectionCard },
-
-  // —— 基础设施 · Supabase Free plan 当月用量看板（2x1，仅在「模块概览」分类下可见） ——
-  w_supabase_usage: { id: 'w_supabase_usage', title: 'Supabase 用量', desc: 'Free plan 当月用量看板（Egress / DB / MAU / Storage）', category: '模块概览', iconKey: 'cube', developed: true, span: 4, defaultSize: '2x1', sizeOptions: ['2x1'], Render: SupabaseUsageCard },
 }
 
 export const WIDGET_LIST: WidgetDef[] = Object.values(WIDGETS)
@@ -435,7 +431,6 @@ export const OVERVIEW_CARD_IDS: string[] = [
   'w_todo_ring', 'w_todo_stream', 'w_todo_progress',
   'w_req_summary', 'w_sprint_summary', 'w_bug_summary',
   'w_movie_hero', 'w_movie_top3', 'w_movie_top5', 'w_movie_collection',
-  'w_supabase_usage',
 ]
 
 /**
