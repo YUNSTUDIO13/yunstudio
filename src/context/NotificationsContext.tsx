@@ -24,7 +24,8 @@ import {
   localGet,
   localPut,
   getClearedNotifKeys,
-  addClearedNotifKeys,
+  getResolvedNotifKeys,
+  addResolvedNotifKeys,
   type EntityTable,
 } from '../lib/localDb'
 import { seedFromServer, enqueueAndMaybeFlush } from '../lib/sync'
@@ -115,12 +116,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   /**
    * 加载：本地优先，联网再注水。
-   * ⚠️ 根治「刷新丢失」：seedFromServer 下行用 mergeServerIntoLocal 的 bulkPut 整行覆盖本地
-   *    Dexie。通知的「已读(read_at)」「已清除(cleared_notif_keys)」是用户本地行为，若上行
-   *    （markRead/clearAll 的 outbox flush）因弱网/时序未把状态推上云端，下行就会用云端旧值
-   *    （read_at=null / 行仍在）把本地打回原形 —— 表现为「刷新必现」。
-   *    故下行合并后必须本地优先恢复：① 云端 read_at 空但本地已读 → 保留本地 read_at；
-   *    ② 云端尚未删除的「已清除」行被拉回 → 按 clearedKeys 剔除，绝不重建。
+   * 通知「已读 / 已清除」= 从 notifications 表删除 + 记 resolved_notif_keys（持久，独立于
+   * 通知行是否存在）。刷新时：① 下行拉回的「已处理」残留行按 resolved/cleared 键剔除；
+   * ② 旧版遗留的 read_at 已读项也一并过滤。故刷新后已处理通知绝不重现。
    */
   const load = useCallback(async () => {
     if (!user) {
@@ -128,37 +126,33 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       return
     }
-    // 快照：记录下行覆盖前的本地已读 + 已清除键，用于下行后本地优先恢复
-    const before = await loadLocal(user.id)
-    const beforeById = new Map(before.map((n) => [n.id, n]))
-    const clearedKeys = await getClearedNotifKeys()
-    setNotifications(before)
+    const local = await loadLocal(user.id)
+    setNotifications(local)
     setLoading(false)
     try {
       await seedFromServer(TABLE, user.id)
+      // 已处理（已读/已清除）的键集合：阻断扫描重建 + 下行拉回
+      const suppressed = new Set<string>([
+        ...(await getResolvedNotifKeys()),
+        ...(await getClearedNotifKeys()),
+      ])
       const after = await localAll<Notification>(TABLE, user.id)
-      // ① 恢复本地已读：云端 read_at 为空但本地原本已读 → 用本地快照回填（本地优先）
+      // 剔除被云端拉回的「已处理」通知（delete 上行失败时云端仍残留，下行会带回来）
       for (const n of after) {
-        const prev = beforeById.get(n.id)
-        if (prev?.read_at && !n.read_at) {
-          await localPut(TABLE, {
-            ...n,
-            read_at: prev.read_at,
-            updated_at: prev.updated_at ?? n.updated_at,
-          })
-        }
+        if (suppressed.has(notifKey(n))) await localDelete(TABLE, n.id)
       }
-      // ② 剔除下行拉回的「已清除」行（云端 delete 尚未到达时）
-      for (const n of after) {
-        if (clearedKeys.has(notifKey(n))) await localDelete(TABLE, n.id)
-      }
+      // 最终展示：排除已处理键 + 旧版遗留的已读项（read_at 有值）
       const finalLocal = (await loadLocal(user.id)).filter(
-        (n) => !clearedKeys.has(notifKey(n)),
+        (n) => !suppressed.has(notifKey(n)) && !n.read_at,
       )
       setNotifications(finalLocal)
+      if (typeof console !== 'undefined') {
+        console.debug(
+          `[notif] load: 本地初始=${local.length} 下行后=${after.length} 已处理键=${suppressed.size} 最终展示=${finalLocal.length}`,
+        )
+      }
     } catch {
       /* 离线或网络异常：本地数据已展示，无需报错 */
-      setNotifications(before.filter((n) => !clearedKeys.has(notifKey(n))))
     }
   }, [user])
 
@@ -183,11 +177,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           if (payload.eventType === 'DELETE') {
             const oldRow = payload.old as Partial<Notification>
             const id = oldRow.id
-            // 跨端"清除"语义同步：任何设备一键清除后，云端删除事件会广播到所有设备，
-            // 收方在本地 cleared_notif_keys 补一条该键，本机的 60s 扫描就不会再把它建回来。
+            // 跨端"已处理"语义同步：任何设备已读/清除后，云端删除事件会广播到所有设备，
+            // 收方在本地 resolved_notif_keys 补一条该键，本机的扫描就不会再把它建回来。
             if (oldRow.entity_type && oldRow.entity_id && oldRow.deadline_at) {
               try {
-                await addClearedNotifKeys([
+                await addResolvedNotifKeys([
                   notifKey({
                     entity_type: oldRow.entity_type,
                     entity_id: oldRow.entity_id,
@@ -195,7 +189,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
                   }),
                 ])
               } catch {
-                /* 写 cleared 失败不影响主流程 */
+                /* 写 resolved 失败不影响主流程 */
               }
             }
             // 直接从内存里删（不依赖 db）——避免冲突
@@ -248,12 +242,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       // 先清理历史遗留的重复条目（旧逻辑「已读后重建」制造的噪音）
       const removed = await dedupeExisting(user.id)
       if (removed > 0) setNotifications(await loadLocal(user.id))
-      const localExisting = await localAll<Notification>(TABLE, user.id)
-      // 用户已"一键清除"过的键集合（持久化在 Dexie，跨刷新、跨会话都生效）
-      const clearedKeys = await getClearedNotifKeys()
-
-      // 已通知过的键集合（含已读）——命中即跳过，杜绝重复轰炸
-      const notifiedKeys = new Set<string>(localExisting.map(notifKey))
+      // 已处理（已读/已清除）的键集合：持久化在 Dexie，跨刷新、跨会话都生效。
+      // 不再从本地 notifications 表推导（已读即从表移除，表内不再有该键），
+      // 改由独立的 resolved_notif_keys / cleared_notif_keys 记忆，scan 永不重建已处理通知。
+      const suppressed = new Set<string>([
+        ...(await getResolvedNotifKeys()),
+        ...(await getClearedNotifKeys()),
+      ])
 
       // 收集到期实体
       const due: Array<{
@@ -294,8 +289,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       let created = 0
       for (const e of due) {
         const key = notifKey(e)
-        if (clearedKeys.has(key)) continue // 用户已一键清除过 → 永不重建
-        if (notifiedKeys.has(key)) continue // 已通知过（含已读）→ 永不重复
+        if (suppressed.has(key)) continue // 已读或已清除过 → 永不重建
         const row: Notification = {
           id: crypto.randomUUID(),
           user_id: user.id,
@@ -316,7 +310,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           ),
         )
         created++
-        notifiedKeys.add(key)
       }
       return created
     } finally {
@@ -357,60 +350,46 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       const current = await localGet<Notification>(TABLE, id)
       if (!current) return
-      const nowIso = new Date().toISOString()
-      const row: Notification = {
-        ...current,
-        read_at: nowIso,
-        updated_at: nowIso,
-      }
-      await localPut(TABLE, row)
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? row : n)),
-      )
-      await enqueueAndMaybeFlush(TABLE, 'update', id, row)
+      const key = notifKey(current)
+      // 已读 = 从列表移除 + 记已处理键（scan 永不重建），契合「已读即从列表消失」
+      await localDelete(TABLE, id)
+      await enqueueAndMaybeFlush(TABLE, 'delete', id, current)
+      await addResolvedNotifKeys([key])
+      setNotifications((prev) => prev.filter((n) => n.id !== id))
     },
     [],
   )
 
   const markAllRead = useCallback(async () => {
     if (!user) return
-    const nowIso = new Date().toISOString()
-    const updates = notifications
-      .filter((n) => !n.read_at)
-      .map((n) => ({
-        ...n,
-        read_at: nowIso,
-        updated_at: nowIso,
-      }))
-    if (!updates.length) return
-    // 一次性批量 upsert 本地
-    for (const row of updates) {
-      await localPut(TABLE, row)
-      await enqueueAndMaybeFlush(TABLE, 'update', row.id, row)
+    const all = await localAll<Notification>(TABLE, user.id)
+    if (!all.length) return
+    const keys = all.map(notifKey)
+    for (const n of all) {
+      await localDelete(TABLE, n.id)
+      await enqueueAndMaybeFlush(TABLE, 'delete', n.id, n)
     }
-    setNotifications((prev) =>
-      prev.map((n) => (n.read_at ? n : { ...n, read_at: nowIso, updated_at: nowIso })),
-    )
-  }, [user, notifications])
+    await addResolvedNotifKeys(keys)
+    setNotifications([])
+  }, [user])
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read_at).length,
     [notifications],
   )
 
-  /** 一键清空：本地逐条删除并入队补传；同时把"已清键"持久化到 cleared_notif_keys，
-   *  阻断 60s 兜底扫描把刚清掉的通知又建回来。 */
+  /** 一键清空：本地逐条删除并入队补传；同时把"已处理"键持久化到 resolved_notif_keys，
+   *  阻断扫描把刚清掉的通知又建回来（语义同 markAllRead：已处理即从列表消失）。 */
   const clearAll = useCallback(async () => {
     if (!user) return
     const all = await localAll<Notification>(TABLE, user.id)
     if (!all.length) return
-    // 先把要清的键全部记录（不依赖后面的删除是否成功，确保扫描不会重建）
     const keys = all.map(notifKey)
-    await addClearedNotifKeys(keys)
     for (const n of all) {
       await localDelete(TABLE, n.id)
-      await enqueueAndMaybeFlush(TABLE, 'delete', n.id)
+      await enqueueAndMaybeFlush(TABLE, 'delete', n.id, n)
     }
+    await addResolvedNotifKeys(keys)
     setNotifications([])
   }, [user])
 

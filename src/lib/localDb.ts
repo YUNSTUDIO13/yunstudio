@@ -47,6 +47,10 @@ interface LocalDB extends Dexie {
   bugs: Table<Bug, string>
   sprints: Table<Sprint, string>
   notifications: Table<Notification, string>
+  /** 用户已"已读/已清除"过的通知唯一键（entity_type:entity_id:deadline_at）
+   *  用于阻断扫描把已处理通知又建回来。仅本机语义，不上云。
+   *  与 cleared_notif_keys 区别：cleared 是"一键清除"语义，resolved 是"已读或已清除"的统一去重记忆。 */
+  resolved_notif_keys: Table<{ key: string; resolved_at: string }, string>
   tag_categories: Table<TagCategory, string>
   tag_values: Table<TagValue, string>
   /** 用户已"一键清除"过的通知唯一键（entity_type:entity_id:deadline_at）
@@ -148,6 +152,23 @@ db.version(8).stores({
   movies: 'id, user_id, updated_at',
   books: 'id, user_id, updated_at',
   cleared_notif_keys: 'key, cleared_at',
+  outbox: 'id, table, rowId, createdAt',
+})
+
+// v9：新增 resolved_notif_keys（已读/已清除通知的去重记忆，断绝扫描重建）
+db.version(9).stores({
+  todos: 'id, user_id, updated_at, tag_id',
+  requirements: 'id, user_id, updated_at, tag_id',
+  bugs: 'id, user_id, updated_at, tag_id',
+  sprints: 'id, user_id, updated_at, tag_id',
+  notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
+  tag_categories: 'id, user_id, updated_at, name',
+  tag_values: 'id, category_id, updated_at',
+  apps: 'id, user_id, updated_at',
+  movies: 'id, user_id, updated_at',
+  books: 'id, user_id, updated_at',
+  cleared_notif_keys: 'key, cleared_at',
+  resolved_notif_keys: 'key, resolved_at',
   outbox: 'id, table, rowId, createdAt',
 })
 
@@ -256,6 +277,21 @@ export async function addClearedNotifKeys(keys: string[]): Promise<void> {
   const now = new Date().toISOString()
   await db.cleared_notif_keys.bulkPut(
     keys.map((key) => ({ key, cleared_at: now })),
+  )
+}
+
+/** 取所有"已处理（已读/已清除）"的通知键集合（扫描去重用，独立于通知行是否存在） */
+export async function getResolvedNotifKeys(): Promise<Set<string>> {
+  const rows = await db.resolved_notif_keys.toArray()
+  return new Set(rows.map((r) => r.key))
+}
+
+/** 批量记录"已处理"键（幂等：同 key 重复写入只更新 resolved_at） */
+export async function addResolvedNotifKeys(keys: string[]): Promise<void> {
+  if (!keys.length) return
+  const now = new Date().toISOString()
+  await db.resolved_notif_keys.bulkPut(
+    keys.map((key) => ({ key, resolved_at: now })),
   )
 }
 
