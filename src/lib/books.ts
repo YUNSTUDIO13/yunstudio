@@ -179,10 +179,34 @@ export async function uploadBookCover(file: File, userId: string): Promise<strin
 }
 
 /**
- * 公网封面 URL（豆瓣 doubanio.com 直链）直接采用，不做中转：
- * 该直链浏览器可直接加载（CachedImage 已做应用级缓存），
- * 重传到 Storage 反而可能因跨域污染 canvas 而失败。后续若需自托管可在此 fetch→重传。
+ * 封面入库统一「压缩 WebP → 转存 Storage book-covers/{userId}/{uuid}.webp」，与 movies 对齐
+ * （省 DB 空间、永久自托管，豆瓣失效不影响已存数据）。
+ * 兼容三种入参（幂等）：
+ *  - 已是自家 Storage URL → 原样返回，不重复上传；
+ *  - data URI（book-search 内嵌 base64）→ 解码为 blob；
+ *  - 豆瓣 doubanio.com 直链（历史旧数据）→ 经 book-search 代理 fetch（带 CORS，拿可读 blob）。
+ * 转存失败抛错，由调用方 catch 后保留原 cover 兜底（读路径 proxiedCover 仍可渲染，不丢封面）。
  */
-export async function uploadBookImage(url: string, _userId: string): Promise<string> {
-  return url
+export async function uploadBookImage(url: string, userId: string): Promise<string> {
+  if (!url) return ''
+  if (url.includes('supabase.co/storage')) return url
+  let blob: Blob
+  if (url.startsWith('data:')) {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('decode data uri failed')
+    blob = await res.blob()
+  } else {
+    const proxyUrl = proxiedCover(url)
+    const res = await fetch(proxyUrl)
+    if (!res.ok) throw new Error(`fetch cover via proxy failed: ${res.status}`)
+    blob = await res.blob()
+  }
+  const webp = await compressToWebpIfSmaller(blob, 0.82)
+  const path = `${userId}/${crypto.randomUUID()}.webp`
+  const { error } = await supabase.storage
+    .from('book-covers')
+    .upload(path, webp, { upsert: false, contentType: 'image/webp' })
+  if (error) throw error
+  const { data } = supabase.storage.from('book-covers').getPublicUrl(path)
+  return data.publicUrl
 }

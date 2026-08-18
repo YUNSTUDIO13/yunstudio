@@ -836,7 +836,7 @@ function NewBookModal({
       setFetching(true)
       try {
         const data = await fetchBookByTitle(title, year)
-        // 公网封面直链（豆瓣 doubanio.com）直接采用，无需重传 Storage（uploadBookImage 已做直通）
+        // 封面（data URI / 豆瓣直链）先存入 preview 供即时预览，落库时由 persist 统一压缩转存 Storage
         const cover = data.cover
         setPreview({ ...data, cover })
         // 类型/作者：仅在用户尚未手动填写时，用豆瓣建议值预填（用户填了则保留覆盖）
@@ -1185,7 +1185,7 @@ function BatchImportModal({
       seen.add(key)
       try {
         const data = await fetchBookByTitle(r.title, r.year)
-        const cover = data.cover ? await uploadBookImage(data.cover, userId).catch(() => '') : ''
+        const cover = data.cover ? await uploadBookImage(data.cover, userId).catch(() => data.cover) : ''
         const nowIso = new Date().toISOString()
         const book: Book = {
           id: crypto.randomUUID(),
@@ -2035,11 +2035,21 @@ export default function BooksPage() {
 
   const persist = useCallback(
     async (book: Book) => {
-      await db.books.put(book)
-      await enqueueAndMaybeFlush('books', book.created_at === book.updated_at ? 'insert' : 'update', book.id, book)
+      // 懒迁移：旧封面（data URI / 豆瓣直链）→ 压缩转存 Storage（与 movies 对齐，省 DB 空间、永久自托管）
+      let finalBook = book
+      if (book.cover && !book.cover.includes('supabase.co/storage')) {
+        try {
+          const url = await uploadBookImage(book.cover, userId)
+          finalBook = { ...book, cover: url, cover_failed: false }
+        } catch {
+          // 转存失败 → 保留原 cover（data URI/豆瓣 URL），读路径 proxiedCover 仍可渲染，不丢封面
+        }
+      }
+      await db.books.put(finalBook)
+      await enqueueAndMaybeFlush('books', finalBook.created_at === finalBook.updated_at ? 'insert' : 'update', finalBook.id, finalBook)
       await reload()
     },
-    [reload],
+    [reload, userId],
   )
 
   const handleSaveBook = (updated: Book) => {
@@ -2070,7 +2080,7 @@ export default function BooksPage() {
     const data = await syncBook(m)
     // 若本地缺封面，从豆瓣拉取并压缩上传到 Storage（失败则留空）
     let cover = m.cover
-    if (!cover && data.cover) cover = await uploadBookImage(data.cover, userId).catch(() => '')
+    if (!cover && data.cover) cover = await uploadBookImage(data.cover, userId).catch(() => data.cover)
     const updated: Book = {
       ...m,
       cover,
