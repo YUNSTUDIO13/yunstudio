@@ -113,21 +113,52 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // 防重入：scanDueEntities 60s interval 与用户主动刷新不应同时入队
   const scanningRef = useRef(false)
 
-  /** 加载：本地优先，联网再注水 */
+  /**
+   * 加载：本地优先，联网再注水。
+   * ⚠️ 根治「刷新丢失」：seedFromServer 下行用 mergeServerIntoLocal 的 bulkPut 整行覆盖本地
+   *    Dexie。通知的「已读(read_at)」「已清除(cleared_notif_keys)」是用户本地行为，若上行
+   *    （markRead/clearAll 的 outbox flush）因弱网/时序未把状态推上云端，下行就会用云端旧值
+   *    （read_at=null / 行仍在）把本地打回原形 —— 表现为「刷新必现」。
+   *    故下行合并后必须本地优先恢复：① 云端 read_at 空但本地已读 → 保留本地 read_at；
+   *    ② 云端尚未删除的「已清除」行被拉回 → 按 clearedKeys 剔除，绝不重建。
+   */
   const load = useCallback(async () => {
     if (!user) {
       setNotifications([])
       setLoading(false)
       return
     }
-    const local = await loadLocal(user.id)
-    setNotifications(local)
+    // 快照：记录下行覆盖前的本地已读 + 已清除键，用于下行后本地优先恢复
+    const before = await loadLocal(user.id)
+    const beforeById = new Map(before.map((n) => [n.id, n]))
+    const clearedKeys = await getClearedNotifKeys()
+    setNotifications(before)
     setLoading(false)
     try {
       await seedFromServer(TABLE, user.id)
-      setNotifications(await loadLocal(user.id))
+      const after = await localAll<Notification>(TABLE, user.id)
+      // ① 恢复本地已读：云端 read_at 为空但本地原本已读 → 用本地快照回填（本地优先）
+      for (const n of after) {
+        const prev = beforeById.get(n.id)
+        if (prev?.read_at && !n.read_at) {
+          await localPut(TABLE, {
+            ...n,
+            read_at: prev.read_at,
+            updated_at: prev.updated_at ?? n.updated_at,
+          })
+        }
+      }
+      // ② 剔除下行拉回的「已清除」行（云端 delete 尚未到达时）
+      for (const n of after) {
+        if (clearedKeys.has(notifKey(n))) await localDelete(TABLE, n.id)
+      }
+      const finalLocal = (await loadLocal(user.id)).filter(
+        (n) => !clearedKeys.has(notifKey(n)),
+      )
+      setNotifications(finalLocal)
     } catch {
       /* 离线或网络异常：本地数据已展示，无需报错 */
+      setNotifications(before.filter((n) => !clearedKeys.has(notifKey(n))))
     }
   }, [user])
 

@@ -59,19 +59,17 @@ export default function NotificationBell() {
   const navigate = useNavigate()
 
   function toggleOpen() {
-    setOpen((prev) => {
-      const next = !prev
-      if (next) {
-        setHighlightIds(
-          new Set(notifications.filter((n) => !n.read_at).map((n) => n.id)),
-        )
-        // 点击通知按钮 = 已读，红点即刻消失，60s 扫描也不会再把它们建回来
-        if (unreadCount > 0) void markAllRead()
-      } else {
-        setHighlightIds(new Set())
-      }
-      return next
-    })
+    const next = !open
+    setOpen(next)
+    if (next) {
+      // 点击通知按钮 = 已读，红点即刻消失，60s 扫描也不会再把它们建回来
+      // 注意：副作用（setHighlightIds / markAllRead）放在事件处理函数体内，
+      // 不嵌在 setOpen 的 state-updater 纯函数里（React 反模式，StrictMode 会双调用）
+      setHighlightIds(new Set(notifications.filter((n) => !n.read_at).map((n) => n.id)))
+      if (unreadCount > 0) void markAllRead()
+    } else {
+      setHighlightIds(new Set())
+    }
   }
 
   // 点击外部 / Esc 关闭
