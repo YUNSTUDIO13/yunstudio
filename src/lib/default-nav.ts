@@ -87,6 +87,13 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       groups: [{ id: 'g_books_1', title: '阅读志', modules: ['books'] }],
     },
     {
+      id: 'p_travel',
+      title: '旅行',
+      iconKey: 'map',
+      order: 10,
+      groups: [{ id: 'g_travel_1', title: '旅行志', modules: ['travel'] }],
+    },
+    {
       id: 'p_system_settings',
       title: '系统设置',
       iconKey: 'gear',

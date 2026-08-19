@@ -14,6 +14,7 @@ import type {
   App,
   Movie,
   Book,
+  Travel,
 } from '../types'
 
 export type EntityTable =
@@ -27,6 +28,7 @@ export type EntityTable =
   | 'apps'
   | 'movies'
   | 'books'
+  | 'travels'
 
 export type SyncOpType = 'insert' | 'update' | 'delete'
 
@@ -59,6 +61,7 @@ interface LocalDB extends Dexie {
   apps: Table<App, string>
   movies: Table<Movie, string>
   books: Table<Book, string>
+  travels: Table<Travel, string>
   outbox: Table<OutboxOp, string>
 }
 
@@ -172,6 +175,24 @@ db.version(9).stores({
   outbox: 'id, table, rowId, createdAt',
 })
 
+// v10：新增 travels 表（个人旅行记录 / 旅行地图，本地优先，暂未接云端）
+db.version(10).stores({
+  todos: 'id, user_id, updated_at, tag_id',
+  requirements: 'id, user_id, updated_at, tag_id',
+  bugs: 'id, user_id, updated_at, tag_id',
+  sprints: 'id, user_id, updated_at, tag_id',
+  notifications: 'id, user_id, entity_type, entity_id, created_at, updated_at',
+  tag_categories: 'id, user_id, updated_at, name',
+  tag_values: 'id, category_id, updated_at',
+  apps: 'id, user_id, updated_at',
+  movies: 'id, user_id, updated_at',
+  books: 'id, user_id, updated_at',
+  travels: 'id, user_id, updated_at, province, order',
+  cleared_notif_keys: 'key, cleared_at',
+  resolved_notif_keys: 'key, resolved_at',
+  outbox: 'id, table, rowId, createdAt',
+})
+
 /** 类型化表引用，避免 any 满天飞 */
 function tableRef<T>(table: EntityTable): Table<T> {
   switch (table) {
@@ -195,6 +216,8 @@ function tableRef<T>(table: EntityTable): Table<T> {
       return db.movies as unknown as Table<T>
     case 'books':
       return db.books as unknown as Table<T>
+    case 'travels':
+      return db.travels as unknown as Table<T>
   }
 }
 

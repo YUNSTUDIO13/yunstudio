@@ -11,6 +11,7 @@ import Apps from './Apps'
 import UISettings from './UISettings'
 import Movies from './Movies'
 import Books from './Books'
+import Travel from './Travel'
 
 /**
  * 统一模块页：根据 /modules/:id 反查并渲染对应内置组件
@@ -44,6 +45,8 @@ export default function ModulePage() {
       return <Movies />
     case 'books':
       return <Books />
+    case 'travel':
+      return <Travel />
     default:
       return <Navigate to="/modules/overview" replace />
   }
