@@ -172,6 +172,12 @@ db.version(9).stores({
   outbox: 'id, table, rowId, createdAt',
 })
 
+// v10：空占位。旅行模块实验版曾把本地库升到 v10（带 travels 表），现模块已删除，
+// 但加载过该版本的浏览器 IndexedDB 仍停在 v10。保留此空版本声明以吸收该升级，
+// 避免 Dexie 报「本地版本高于 schema 最高版本」而导致所有本地优先模块启动崩溃。
+// travels 表作为孤儿留在 IndexedDB 中，不被代码引用，无害。
+db.version(10).stores({})
+
 /** 类型化表引用，避免 any 满天飞 */
 function tableRef<T>(table: EntityTable): Table<T> {
   switch (table) {
