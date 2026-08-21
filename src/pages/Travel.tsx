@@ -237,28 +237,73 @@ function PlaneRoute({
     <g>
       <defs>
         <path id={pathId} d={pathD} />
-        <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="b" />
+        {/* 双层高斯模糊：粗模糊 + 细模糊叠加，做出"光晕"质感 */}
+        <filter id={filterId} x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4" result="b1" />
+          <feGaussianBlur stdDeviation="1.5" in="SourceGraphic" result="b2" />
           <feMerge>
-            <feMergeNode in="b" />
+            <feMergeNode in="b1" />
+            <feMergeNode in="b2" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
       </defs>
-      {/* 主虚线弧线（流动动画） */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke="rgba(255,255,255,0.6)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeDasharray="16 14"
-        filter={`url(#${filterId})`}
+
+      {/* 多层 stroke（5 层叠加做出"光带"质感，从外到内） */}
+
+      {/* 1. 最外层宽光晕（粗 stroke 弱 alpha） */}
+      <path d={pathD} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="12" filter="url(#glow-white)" />
+      {/* 2. 中等光带 */}
+      <path d={pathD} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="5" filter="url(#glow-white)" />
+      {/* 3. 主流动虚线（核心 dash + 流动动画） */}
+      <path d={pathD} fill="none"
+        stroke="rgba(255,255,255,0.7)"
+        strokeWidth="1.5"
         className="traj-plane-line"
+        filter={`url(#${filterId})`}
+      />
+      {/* 4. 快速亮头（能量脉冲 1，沿弧线快移的小亮段） */}
+      <path d={pathD} fill="none"
+        stroke="rgba(255,255,255,0.95)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray="16 300"
+        filter={`url(#${filterId})`}
       >
-        <animate attributeName="stroke-dashoffset" from="0" to="-30" dur="0.65s" repeatCount="indefinite" />
+        <animate attributeName="stroke-dashoffset" from="0" to="-316" dur="1.6s" repeatCount="indefinite" />
       </path>
-      {/* 飞机图标（沿弧线移动） */}
+      {/* 5. 拖尾光晕（能量脉冲 2，粗 stroke 弱 alpha 跟随亮头） */}
+      <path d={pathD} fill="none"
+        stroke="rgba(200,215,255,0.55)"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeDasharray="28 288"
+        filter="url(#glow-white)"
+      >
+        <animate attributeName="stroke-dashoffset" from="-12" to="-328" dur="1.6s" repeatCount="indefinite" />
+      </path>
+      {/* 6. 二次波（能量脉冲 3，错时启动） */}
+      <path d={pathD} fill="none"
+        stroke="rgba(255,255,255,0.7)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="10 306"
+        filter={`url(#${filterId})`}
+      >
+        <animate attributeName="stroke-dashoffset" from="0" to="-316" dur="1.6s" begin="0.8s" repeatCount="indefinite" />
+      </path>
+      {/* 7. 微粒闪烁（小粒 sparkle 快速移动） */}
+      <path d={pathD} fill="none"
+        stroke="rgba(255,255,255,0.5)"
+        strokeWidth="1"
+        strokeLinecap="round"
+        strokeDasharray="2 50"
+        filter={`url(#${filterId})`}
+      >
+        <animate attributeName="stroke-dashoffset" from="0" to="-52" dur="0.45s" repeatCount="indefinite" />
+      </path>
+
+      {/* 飞机图标（沿弧线移动 + glow） */}
       <g className="icon-plane" filter={`url(#${filterId})`}>
         <animateMotion dur="3.8s" repeatCount="indefinite" rotate="auto">
           <mpath href={`#${pathId}`} />
@@ -273,7 +318,8 @@ function PlaneRoute({
           </svg>
         </g>
       </g>
-      {/* 起点 + 终点圆点（node-pulse 脉冲） */}
+
+      {/* 起点 + 终点大光球（node-pulse 脉冲） */}
       <circle cx={x1} cy={y1} r="4.5" fill="rgba(255,255,255,0.95)" filter={`url(#${filterId})`} className="node-pulse" />
       <circle cx={x2} cy={y2} r="4.5" fill="rgba(255,255,255,0.95)" filter={`url(#${filterId})`} className="node-pulse" style={{ animationDelay: '0.9s' }} />
     </g>
@@ -301,27 +347,55 @@ function TrainRoute({
       <defs>
         <path id={pathId} d={pathD} />
         <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2" result="b" />
+          <feGaussianBlur stdDeviation="2.5" result="b" />
           <feMerge>
             <feMergeNode in="b" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
       </defs>
-      {/* 主虚线轨道 */}
+
+      {/* 1. 宽外层光晕（粗 stroke 弱 alpha） */}
+      <path d={pathD} fill="none" stroke="rgba(154,162,177,0.06)" strokeWidth="10" filter="url(#glow-gray)" />
+      {/* 2. 中等光带 */}
+      <path d={pathD} fill="none" stroke="rgba(154,162,177,0.18)" strokeWidth="4" filter="url(#glow-gray)" />
+      {/* 3. 主流动虚线轨道 */}
       <path
         d={pathD}
         fill="none"
-        stroke="rgba(154,162,177,0.65)"
-        strokeWidth="2.5"
+        stroke="rgba(154,162,177,0.7)"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeDasharray="18 8"
-        filter={`url(#${filterId})`}
         className="traj-train-line"
+        filter={`url(#${filterId})`}
+      />
+      {/* 4. 移动能量脉冲（列车头） */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(185,195,215,0.95)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray="22 300"
+        filter={`url(#${filterId})`}
       >
-        <animate attributeName="stroke-dashoffset" from="0" to="-26" dur="1.0s" repeatCount="indefinite" />
+        <animate attributeName="stroke-dashoffset" from="0" to="-322" dur="2s" repeatCount="indefinite" />
       </path>
-      {/* 高铁图标（沿弧线移动） */}
+      {/* 5. 次级拖尾（错时启动） */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(154,162,177,0.45)"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeDasharray="30 300"
+        filter="url(#glow-gray)"
+      >
+        <animate attributeName="stroke-dashoffset" from="-8" to="-338" dur="2s" repeatCount="indefinite" />
+      </path>
+
+      {/* 高铁图标（沿弧线移动 + glow） */}
       <g className="icon-train" filter={`url(#${filterId})`}>
         <animateMotion dur="5s" repeatCount="indefinite" rotate="auto">
           <mpath href={`#${pathId}`} />
@@ -331,7 +405,8 @@ function TrainRoute({
         <rect x="2" y="-4" width="4" height="4" rx="1" fill="rgba(210,220,235,0.6)" />
         <rect x="-8" y="2" width="16" height="1.5" rx="0.75" fill="rgba(154,162,177,0.5)" />
       </g>
-      {/* 起点 + 终点圆点 */}
+
+      {/* 起点 + 终点圆点（node-pulse 脉冲） */}
       <circle cx={x1} cy={y1} r="4" fill="rgba(154,162,177,0.95)" filter={`url(#${filterId})`} className="node-pulse" />
       <circle cx={x2} cy={y2} r="4" fill="rgba(154,162,177,0.95)" filter={`url(#${filterId})`} className="node-pulse" style={{ animationDelay: '1s' }} />
     </g>
@@ -359,27 +434,53 @@ function DriveRoute({
       <defs>
         <path id={pathId} d={pathD} />
         <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.8" result="b" />
+          <feGaussianBlur stdDeviation="2" result="b" />
           <feMerge>
             <feMergeNode in="b" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
       </defs>
-      {/* 主虚线路面 */}
+
+      {/* 1. 宽外层路面（粗 stroke 弱 alpha） */}
+      <path d={pathD} fill="none" stroke="rgba(92,101,119,0.12)" strokeWidth="9" filter="url(#glow-dim)" />
+      {/* 2. 主流动虚线路面 */}
       <path
         d={pathD}
         fill="none"
-        stroke="rgba(120,132,155,0.55)"
+        stroke="rgba(120,132,155,0.65)"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeDasharray="4 10"
-        filter={`url(#${filterId})`}
         className="traj-drive-line"
+        filter={`url(#${filterId})`}
+      />
+      {/* 3. 移动前大灯（沿弧线移动的能量块） */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(155,165,185,0.95)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray="14 300"
+        filter={`url(#${filterId})`}
       >
-        <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="2.0s" repeatCount="indefinite" />
+        <animate attributeName="stroke-dashoffset" from="0" to="-314" dur="3s" repeatCount="indefinite" />
       </path>
-      {/* 汽车图标（沿弧线移动） */}
+      {/* 4. 拖尾光晕（粗 stroke 弱 alpha） */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(120,132,155,0.35)"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeDasharray="24 300"
+        filter="url(#glow-dim)"
+      >
+        <animate attributeName="stroke-dashoffset" from="-10" to="-334" dur="3s" repeatCount="indefinite" />
+      </path>
+
+      {/* 汽车图标（沿弧线移动 + glow） */}
       <g className="icon-car" filter={`url(#${filterId})`}>
         <animateMotion dur="6.5s" repeatCount="indefinite" rotate="auto">
           <mpath href={`#${pathId}`} />
@@ -389,7 +490,8 @@ function DriveRoute({
         <circle cx="-5.5" cy="5" r="2.5" fill="rgba(90,100,120,0.7)" stroke="rgba(140,150,170,0.4)" strokeWidth="0.5" />
         <circle cx="5.5" cy="5" r="2.5" fill="rgba(90,100,120,0.7)" stroke="rgba(140,150,170,0.4)" strokeWidth="0.5" />
       </g>
-      {/* 起点 + 终点圆点 */}
+
+      {/* 起点 + 终点圆点（node-pulse 脉冲） */}
       <circle cx={x1} cy={y1} r="3.5" fill="rgba(120,132,155,0.9)" filter={`url(#${filterId})`} className="node-pulse" />
       <circle cx={x2} cy={y2} r="3.5" fill="rgba(120,132,155,0.9)" filter={`url(#${filterId})`} className="node-pulse" style={{ animationDelay: '1.2s' }} />
     </g>
@@ -407,6 +509,30 @@ function TrajectoryLayer({
   if (!visible) return null
   return (
     <g className="trajectory-layer">
+      {/* 公共 glow filter（三种亮度递减） */}
+      <defs>
+        <filter id="glow-white" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="glow-gray" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="glow-dim" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.5" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
       {routes.map((r, i) => {
         const key = `${r.from.adcode}-${r.to.adcode}-${r.mode}-${i}`
         if (r.mode === 'plane') return <PlaneRoute key={key} from={r.from} to={r.to} />
