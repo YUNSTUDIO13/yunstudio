@@ -100,8 +100,11 @@
   /* detail panel 移动端全屏 */
   /* detail panel 移动端全屏：left/right/top=0 + bottom 留 70px 避开底部 dock */
   body .detail-panel { left: 0; right: 0; top: 0; bottom: 70px; width: 100%; border-radius: 16px 16px 0 0; }
-  /* 图例在窄屏可换行 */
-  .t-legend { flex-wrap: wrap; gap: 6px 10px; }
+  /* 图例：移动端仅图标（隐藏文字），与旅行轨迹 toggle 同行不换行 */
+  .t-legend { flex-wrap: nowrap; gap: 6px; }
+  .t-legend .t-legend-text { display: none; }
+  .t-legend .item { padding: 6px 8px; flex-shrink: 0; }
+  .t-legend .route-toggle { margin-left: auto; flex-shrink: 0; }
 }
 
   
