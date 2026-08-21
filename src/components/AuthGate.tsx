@@ -8,7 +8,13 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
   const { hydrated } = useDashboard()
 
-  if (loading) {
+  // 开发预览后门：URL 带 preview=1 时跳过登录与加载等待，方便无账号本地查看模块效果。
+  // 不影响正式登录流程（去掉参数即恢复原样）。
+  const isPreview =
+    new URLSearchParams(window.location.search).get('preview') === '1' ||
+    window.location.hash.includes('preview=1')
+
+  if (loading && !isPreview) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas text-sm text-ink-mute">
         加载中…
@@ -16,13 +22,13 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     )
   }
 
-  if (!session) {
+  if (!session && !isPreview) {
     return <Login />
   }
 
   // 等待 dashboard 云端布局加载完成：本地有数据则同步放行（首帧渲染本地，不闪），
   // 本地无数据（清缓存/首次）则短暂显示加载中，避免先渲染默认布局再跳联网最新的闪屏。
-  if (!hydrated) {
+  if (!hydrated && !isPreview) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas text-sm text-ink-mute">
         加载中…

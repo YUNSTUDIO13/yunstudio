@@ -48,7 +48,7 @@ export const ICONS: Record<IconKey, ReactNode> = {
   news: svg(<><path d="M3 5h12a2 2 0 012 2v12H5a2 2 0 01-2-2z" /><path d="M3 5v12" /><path d="M8 9h6M8 12h6M8 15h4" /></>),
   film: svg(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8" cy="8" r="1.2" fill="currentColor" /><circle cx="16" cy="8" r="1.2" fill="currentColor" /><circle cx="8" cy="16" r="1.2" fill="currentColor" /><circle cx="16" cy="16" r="1.2" fill="currentColor" /><path d="M12 4v16" /></>),
   book: svg(<><path d="M4 4h11a2 2 0 012 2v14H6a2 2 0 01-2-2z" /><path d="M17 6h3v14H6" /><path d="M4 4v14" /></>),
-  travel: svg(<><path d="M12 21s-7-6.5-7-11a7 7 0 0114 0c0 4.5-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></>),
+  travel: svg(<><path d="M14.106 5.553a2 2 0 0 0 0 2.894L15.5 9.8a1 1 0 0 1 0 1.414L9.414 17.3a1 1 0 0 1-1.414 0L6.5 15.8a2 2 0 0 1 0-2.894L9.4 10.3a1 1 0 0 1 1.414 0l1.5 1.5a1 1 0 0 0 1.414 0L14.106 11.5a2 2 0 0 0 0-2.894L12.5 7.3a1 1 0 0 1 0-1.414L14.106 5.553z" /><path d="M3.5 6.5v14L9 18l6 2.5 5.5-2.5v-14L15 6.5 9 4 3.5 6.5z" /></>),
 }
 
 // 供配置页面板用的图标标签（中文短标签，避免选择时一脸懵）

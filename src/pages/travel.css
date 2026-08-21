@@ -4,15 +4,26 @@
    草稿里的中性灰阶 / 未定义 token（--bg/--card-2/--text-dim/--line-soft/--c-ink-* 等）
    全部在此映射成主工程语义变量，使旅行模块与全站皮肤一致。 */
 .travel-page {
-  --c-accent-rgb: var(--c-accent-rgb);
-  --c-accent: var(--c-accent);
-  --c-accent-soft: var(--c-accent-soft);
-  --c-accent-border: var(--c-accent-border);
-  --c-accent-glow: var(--c-accent-glow);
-  --c-accent-2-rgb: var(--c-accent-rgb);
-  --c-line: var(--c-line);
+  /* ★★★ 1:1 还原 design 中性灰白：覆盖主工程靛紫液体色（对比度不够导致地图"看不见"）。
+        主工程 liquid-glass 默认 --c-accent-rgb: 124,133,245（紫），0.55 透明描边在 #040408 上
+        ≈ rgb(70,75,138)，几乎不可见；design 用 226,232,240，0.55 透明 ≈ rgb(126,130,134)，
+        中亮灰，对比度明显。travel 模块局部 override 不影响其他模块。 */
+  --c-accent-rgb: 226, 232, 240;
+  --c-accent-2-rgb: 226, 232, 240;
+  --c-accent: rgb(var(--c-accent-rgb));
+  --c-accent-2: rgb(var(--c-accent-2-rgb));
+  --c-accent-soft: rgba(255, 255, 255, 0.10);
+  --c-accent-border: rgba(255, 255, 255, 0.26);
+  --c-accent-glow: rgba(255, 255, 255, 0.28);
+  --line-soft: rgba(var(--c-accent-rgb), 0.10);
+  --line: rgba(255, 255, 255, 0.08);
+  --c-line: rgba(255, 255, 255, 0.08);
   --c-canvas-rgb: var(--c-canvas-rgb);
-  --c-bg: #ffffff;
+  /* ★ 设计稿 preview.html --c-bg 跟随 canvas-rgb（liquid-glass=#040408、flat-light=#F9FAFB），
+     与 accent 形成反色对比 → .new-btn/.dp-tab.active/.fab-add/.t-btn-primary 在各主题下
+     都有"按钮背景=accent / 按钮文字=canvas 反色"的高对比组合。
+     此处写死 #ffffff 导致暗主题下"灰白按钮+白字"几乎看不见，已改为跟 design 对齐。 */
+  --c-bg: rgb(var(--c-canvas-rgb));
   --c-card: var(--card);
   --c-card-2: var(--card-2, var(--canvas));
   --c-modal: var(--modal);
@@ -26,17 +37,61 @@
   --bg-2: var(--modal);
   --card: var(--card);
   --card-2: var(--canvas);
-  --line: var(--c-line);
-  --line-soft: var(--c-line);
   --text: var(--ink-base);
   --text-dim: var(--ink-soft);
   --text-mute: var(--ink-mute);
 }
 .travel-page { display: flex; flex-direction: column; height: calc(100vh - 48px); box-sizing: border-box; overflow: hidden; }
 @media (max-width: 767px) {
+  /* 移动端：整页高度自适应，纵向堆叠；地图在上、右侧卡片在下方 */
   .travel-page { height: auto; min-height: calc(100vh - 48px); overflow: visible; }
-  .t-app { grid-template-columns: 1fr; grid-template-rows: none; overflow-y: auto; }
-  .detail-panel { left: 0; }
+  /* 改用 flex column：grid 单列+子元素 flex:1 容易塌陷为 0 高度，flex column 更可控。
+     ★ 用 body .t-app 提升 specificity（0,2,0 vs PC 端 .t-app 的 0,1,0），
+        否则 PC 端后定义的 grid 60/40 会胜出，mobile 完全不生效。 */
+  body .t-app {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+    padding: 12px;
+    gap: 12px;
+  }
+  /* 地图区域：固定高度（按宽度等比），保证可读 */
+  .t-left { height: auto; flex-shrink: 0; }
+  .t-left .map-card {
+    height: 50vh;
+    min-height: 320px;
+    max-height: 560px;
+    border-radius: 14px;
+  }
+  /* 移动端右侧卡片列表：flex column + 最小高度（避免被父 flex 压缩为 0） */
+  .t-right { display: flex; flex-direction: column; height: auto; min-height: 280px; flex-shrink: 0; }
+  .scroll-area { flex: none; height: auto; min-height: 200px; overflow: visible; }
+  /* 移动端瀑布流：单列（窄屏单列更易阅读） */
+  .waterfall { column-count: 1; padding: 4px 8px 8px 4px; }
+  /* 移动端 empty-state 更显眼（避免"完全空白"看起来像页面坏掉） */
+  .empty-state {
+    border: 1px dashed var(--c-accent-border);
+    background: rgba(var(--c-accent-rgb), 0.04);
+    color: var(--text);
+    padding: 28px 16px;
+    margin: 12px 0;
+  }
+  .empty-state .arrow { color: rgb(var(--c-accent-rgb)); }
+  /* 左 header / 统计 / 工具栏：紧凑 */
+  .left-header { flex-wrap: wrap; gap: 8px; padding: 0 4px 10px 4px; }
+  .t-stats { flex-wrap: wrap; gap: 8px; padding-bottom: 10px; }
+  .t-stat { min-width: 0; flex: 1; padding: 8px 10px; }
+  .t-stat .val { font-size: 15px; }
+  .toolbar { flex-wrap: wrap; gap: 8px; padding: 4px 4px 12px 4px; }
+  .t-search { flex: 1; min-width: 200px; }
+  /* 移动端 fab 缩小，避开内容 */
+  .fab-add { right: 16px; bottom: 16px; width: 44px; height: 44px; }
+  .fab-add svg { width: 20px; height: 20px; }
+  /* detail panel 移动端全屏 */
+  .detail-panel { left: 0; right: 0; width: 100%; border-radius: 16px 16px 0 0; }
+  /* 图例在窄屏可换行 */
+  .t-legend { flex-wrap: wrap; gap: 6px 10px; }
 }
 
   
@@ -61,9 +116,12 @@
   .brand { display: flex; align-items: center; gap: 12px; }
   .brand .logo {
     width: 36px; height: 36px; border-radius: 10px;
-    background: linear-gradient(135deg, rgb(var(--c-accent-rgb)), rgb(var(--c-accent-2-rgb)));
-    display: grid; place-items: center; color: var(--c-bg);
-    box-shadow: 0 0 24px rgba(var(--c-accent-rgb),0.35);
+    /* 跟 .new-btn 一致：深色玻璃底 + 白字 + accent 边 + 深色投影（不再是浅灰白"发光"样式） */
+    background: linear-gradient(180deg, var(--c-modal), var(--c-card));
+    color: #fff;
+    border: 1px solid rgba(var(--c-accent-rgb), 0.35);
+    display: grid; place-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
   }
   .brand .logo svg { width: 20px; height: 20px; }
   .title h1 {
@@ -122,28 +180,26 @@
   #map { display: block; width: 100%; height: 100%; }
 
   .prov {
-    fill: rgba(var(--c-accent-rgb), 0.07);
-    stroke: rgba(var(--c-accent-rgb), 0.6);
-    stroke-width: 0.8;
+    fill: rgba(var(--c-accent-rgb), 0.06);
+    stroke: rgba(var(--c-accent-rgb), 0.55);
+    stroke-width: 0.7;
     cursor: pointer;
-    /* 基础描边即带光晕：无任何行程时地图轮廓也"发光" */
-    filter: drop-shadow(0 0 4px rgba(var(--c-accent-rgb), 0.35)) drop-shadow(0 0 14px rgba(var(--c-accent-rgb), 0.10));
     transition: fill .25s ease, stroke .25s ease, filter .25s ease, transform .25s ease;
     transform-box: fill-box;
     transform-origin: center;
   }
   .prov:hover {
-    fill: rgba(var(--c-accent-rgb), 0.35);
+    fill: rgba(var(--c-accent-rgb), 0.28);
     stroke: rgb(var(--c-accent-rgb));
-    stroke-width: 1.6;
-    filter: drop-shadow(0 0 10px var(--c-accent-soft)) drop-shadow(0 4px 16px rgba(var(--c-accent-rgb), 0.55));
-    transform: translateY(-3px) scale(1.02);
+    stroke-width: 1.4;
+    filter: drop-shadow(0 0 8px var(--c-accent-soft)) drop-shadow(0 4px 12px rgba(var(--c-accent-rgb),0.4));
+    transform: translateY(-3px) scale(1.012);
   }
   .prov.visited {
-    fill: rgba(var(--c-accent-rgb), 0.68);
+    fill: rgba(var(--c-accent-rgb), 0.55);
     stroke: rgb(var(--c-accent-2-rgb));
-    stroke-width: 1.4;
-    filter: drop-shadow(0 0 8px var(--c-accent-soft)) drop-shadow(0 0 18px rgba(var(--c-accent-rgb), 0.45));
+    stroke-width: 1.2;
+    filter: drop-shadow(0 0 6px var(--c-accent-soft));
   }
   .marker {
     fill: rgb(var(--c-accent-2-rgb));
@@ -158,8 +214,8 @@
   }
   .marker-ripple.go { animation: ripple 1.6s ease-out infinite; }
   @keyframes ripple {
-    0% { r: 4; opacity: 0.9; }
-    100% { r: 18; opacity: 0; }
+    0% { r: 3; opacity: 0.9; }
+    100% { r: 14; opacity: 0; }
   }
   .topo line { stroke-linecap: round; fill: none; }
   .topo .wave-c { stroke: rgb(var(--c-accent-rgb)); }
@@ -198,9 +254,67 @@
     background: rgba(255,255,255,0.02);
   }
   .t-legend .dot { width: 8px; height: 8px; border-radius: 999px; }
-  .t-legend .plane { background: rgb(var(--c-accent-rgb)); box-shadow: 0 0 6px var(--c-accent-soft); }
-  .t-legend .train { background: #9aa2b1; box-shadow: 0 0 6px rgba(154,162,177,0.4); }
-  .t-legend .car { background: #5c6577; box-shadow: 0 0 6px rgba(92,101,119,0.5); }
+  .t-legend .plane {
+    background: transparent;
+    color: rgb(226, 232, 240);
+    text-shadow: 0 0 6px rgba(226, 232, 240, 0.6);
+    font-size: 11px;
+    line-height: 1;
+  }
+  .t-legend .train {
+    background: transparent;
+    color: #9aa2b1;
+    text-shadow: 0 0 6px rgba(154, 162, 177, 0.5);
+    font-size: 11px;
+    line-height: 1;
+  }
+  .t-legend .car {
+    background: transparent;
+    color: #5c6577;
+    text-shadow: 0 0 6px rgba(92, 101, 119, 0.5);
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  /* ===== 路线 toggle 切换（旅程轨迹 / 隐藏轨迹，占位 UI，功能后续） ===== */
+  .route-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.02);
+    font-size: 11px;
+    user-select: none;
+    margin-left: auto;
+  }
+  .rt-label {
+    color: var(--text);
+    transition: opacity .2s ease, color .2s ease;
+    padding: 0 2px;
+    cursor: pointer;
+  }
+  .rt-label.dim { color: var(--text-mute); }
+  .rt-switch {
+    position: relative;
+    width: 30px; height: 16px;
+    border: 0; padding: 0;
+    border-radius: 999px;
+    background: rgba(var(--c-accent-rgb),0.25);
+    cursor: pointer;
+    transition: background .2s ease;
+    flex-shrink: 0;
+  }
+  .rt-switch.on { background: rgb(var(--c-accent-rgb)); }
+  .rt-knob {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    border-radius: 999px;
+    background: var(--c-bg);
+    transition: transform .2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .rt-switch.on .rt-knob { transform: translateX(14px); }
 
   /* ===== Right: new layout ===== */
   .t-right { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; }
@@ -255,14 +369,17 @@
     flex-shrink: 0;
     display: inline-flex; align-items: center; gap: 6px;
     padding: 8px 14px;
-    background: linear-gradient(90deg, rgb(var(--c-accent-rgb)), rgb(var(--c-accent-rgb)));
-    color: var(--c-bg); font-weight: 700; font-size: 12px;
-    border: 0; border-radius: 10px;
+    /* image#2 风格：深色玻璃底 + 白字（暗主题下的 primary CTA），跟详情按钮的"浅底深字"区分层级 */
+    background: linear-gradient(180deg, var(--c-modal), var(--c-card));
+    color: #fff; font-weight: 700; font-size: 12px;
+    border: 1px solid rgba(var(--c-accent-rgb),0.35);
+    border-radius: 10px;
     cursor: pointer;
-    box-shadow: 0 0 18px rgba(var(--c-accent-rgb),0.35);
+    /* 深色投影为主，hover 才出微 accent 光反馈 */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     transition: all .2s ease;
   }
-  .new-btn:hover { transform: translateY(-1px); box-shadow: 0 0 24px rgba(var(--c-accent-rgb),0.55); }
+  .new-btn:hover { transform: translateY(-1px); border-color: rgba(var(--c-accent-rgb),0.6); box-shadow: 0 4px 12px rgba(0,0,0,0.45), 0 0 10px rgba(var(--c-accent-rgb),0.2); }
   .new-btn svg { width: 12px; height: 12px; }
 
   /* sort/filter popover */
@@ -299,9 +416,9 @@
     color: var(--text); font-size: 12px; outline: 0;
   }
 
-  /* ===== Waterfall (masonry) ===== */
+  /* ===== Waterfall (两列瀑布流：column-count 报纸式布局；去掉 height:100% 避免内容超出时横向溢出多列) ===== */
   .scroll-area {
-    flex: 1; min-height: 0; overflow-y: auto;
+    flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
     position: relative;
   }
   .scroll-area::-webkit-scrollbar { width: 6px; }
@@ -309,10 +426,11 @@
   .scroll-area::-webkit-scrollbar-track { background: transparent; }
 
   .waterfall {
+    /* 两列瀑布流（一排2个，小红书 app 同款）。不设 height：让 columns 按内容自然向下增长，
+       外层 .scroll-area 负责纵向滚动；设了 height 反而会让 columns 在固定高度下溢出产生更多列 = 横向滚根因。 */
     column-count: 2;
     column-gap: 12px;
     padding: 4px 12px 8px 4px;
-    height: 100%;
   }
   .wf-item {
     break-inside: avoid;
@@ -497,7 +615,7 @@
     transition: all .2s ease;
     white-space: nowrap;
   }
-  .dp-tab.active { color: var(--c-bg); background: rgb(var(--c-accent-rgb)); border-color: rgb(var(--c-accent-rgb)); box-shadow: 0 0 14px var(--c-accent-soft); }
+  .dp-tab.active { color: #fff; background: linear-gradient(180deg, var(--c-modal), var(--c-card)); border-color: rgba(var(--c-accent-rgb), 0.35); box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
   .dp-tab.add {
     color: rgb(var(--c-accent-rgb)); border-style: dashed;
   }
@@ -659,20 +777,21 @@
   }
   .tl-item.dragging { opacity: 0.4; }
 
-  /* 右下角悬浮添加按钮 */
+  /* 右下角悬浮添加按钮：跟 .new-btn 一致（深色玻璃 + 白字 + 深色投影） */
   .fab-add {
     position: absolute; right: 22px; bottom: 22px;
     width: 48px; height: 48px;
-    background: linear-gradient(135deg, rgb(var(--c-accent-rgb)), rgb(var(--c-accent-rgb)));
-    color: var(--c-bg);
-    border: 0; border-radius: 999px;
+    background: linear-gradient(180deg, var(--c-modal), var(--c-card));
+    color: #fff;
+    border: 1px solid rgba(var(--c-accent-rgb), 0.35);
+    border-radius: 999px;
     display: grid; place-items: center;
     cursor: pointer;
-    box-shadow: 0 8px 24px rgba(var(--c-accent-rgb),0.45);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4);
     z-index: 6;
-    transition: transform .2s ease;
+    transition: transform .2s ease, box-shadow .2s ease;
   }
-  .fab-add:hover { transform: translateY(-2px) scale(1.05); }
+  .fab-add:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 8px 20px rgba(0,0,0,0.45), 0 0 10px rgba(var(--c-accent-rgb),0.18); }
   .fab-add svg { width: 22px; height: 22px; }
 
   /* 模块添加弹出菜单 */
@@ -716,11 +835,16 @@
   .t-modal-mask.show { display: flex; }
   .t-modal {
     width: 480px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px); /* 留 32px 上下边距，内容超出时内部滚动 */
     background: linear-gradient(180deg, var(--card), var(--bg-2));
     border: 1px solid var(--line);
     border-radius: 16px;
     padding: 22px 22px 18px 22px;
     box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(var(--c-accent-rgb),0.10);
+    /* 信息过多时支持上下滚动（新建、添加行程等多字段弹窗） */
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; /* iOS 弹性滚动 */
   }
   .t-modal h3 {
     margin: 0 0 4px 0; font-size: 18px; font-weight: 700;
@@ -803,14 +927,16 @@
   .t-btn-secondary:hover { color: var(--text); border-color: var(--line); }
   .t-btn-primary {
     padding: 10px 22px;
-    background: linear-gradient(90deg, rgb(var(--c-accent-rgb)), rgb(var(--c-accent-rgb)));
-    color: var(--c-bg); font-weight: 700; font-size: 13px;
-    border: 0; border-radius: 10px;
+    /* 跟 .new-btn 一致：深色玻璃底 + 白字 + 深色投影 */
+    background: linear-gradient(180deg, var(--c-modal), var(--c-card));
+    color: #fff; font-weight: 700; font-size: 13px;
+    border: 1px solid rgba(var(--c-accent-rgb), 0.35);
+    border-radius: 10px;
     cursor: pointer;
-    box-shadow: 0 0 18px rgba(var(--c-accent-rgb),0.35);
-    transition: all .2s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.28);
+    transition: transform .2s ease, box-shadow .2s ease;
   }
-  .t-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 24px rgba(var(--c-accent-rgb),0.55); }
+  .t-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.35), 0 0 10px rgba(var(--c-accent-rgb),0.18); }
   .t-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* 同步小提示 */
@@ -841,3 +967,71 @@
   box-shadow: 0 0 12px rgba(var(--c-accent-rgb),0.18);
 }
 .wf-cover img { display: block; width: 100%; height: auto; }
+
+/* ===== 交通方式选择按钮（飞机 / 高铁 / 自驾） ===== */
+.t-transport-row {
+  display: flex; gap: 8px; margin-top: 4px;
+}
+.t-transport-opt {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .18s ease;
+}
+.t-transport-opt:hover {
+  border-color: rgba(var(--c-accent-rgb), 0.3);
+  color: var(--text);
+}
+.t-transport-opt .ico {
+  font-size: 22px;
+  line-height: 1;
+  filter: grayscale(0.4);
+  opacity: 0.7;
+  transition: all .18s ease;
+}
+.t-transport-opt.active {
+  background: linear-gradient(180deg, var(--c-modal), var(--c-card));
+  border-color: rgba(var(--c-accent-rgb), 0.35);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+.t-transport-opt.active .ico {
+  filter: grayscale(0);
+  opacity: 1;
+}
+
+/* ===== 轨迹动画（参考桌面「轨迹动画迭代优化」1:1 复刻，去掉 ripple-anim 圆环） ===== */
+@keyframes traj-dash-fast { to { stroke-dashoffset: -30; } }
+@keyframes traj-dash-mid  { to { stroke-dashoffset: -26; } }
+@keyframes traj-dash-slow { to { stroke-dashoffset: -14; } }
+@keyframes traj-plane-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255,255,255,0.7)); }
+  50%      { filter: drop-shadow(0 0 10px rgba(255,255,255,0.95)); }
+}
+@keyframes traj-train-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(154,162,177,0.5)); }
+  50%      { filter: drop-shadow(0 0 7px rgba(154,162,177,0.85)); }
+}
+@keyframes traj-car-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(120,132,155,0.4)); }
+  50%      { filter: drop-shadow(0 0 5px rgba(120,132,155,0.75)); }
+}
+@keyframes traj-node-pulse {
+  0%   { opacity: 0.95; transform: scale(1); }
+  60%  { opacity: 0.55; transform: scale(1.35); }
+  100% { opacity: 0.95; transform: scale(1); }
+}
+.traj-plane-line { animation: traj-dash-fast 0.65s linear infinite; }
+.traj-train-line { animation: traj-dash-mid  1s   linear infinite; }
+.traj-drive-line { animation: traj-dash-slow 2s   linear infinite; }
+.icon-plane { animation: traj-plane-glow 1.8s ease-in-out infinite; }
+.icon-train { animation: traj-train-glow 2.0s ease-in-out infinite; }
+.icon-car   { animation: traj-car-glow   2.4s ease-in-out infinite; }
+.node-pulse { animation: traj-node-pulse 2s   ease-in-out infinite; transform-box: fill-box; transform-origin: center; }

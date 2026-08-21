@@ -158,22 +158,20 @@ function migrateConfig(cfg: NavConfig): NavConfig {
     }
   }
 
-  // 旅行模块（2026-08-21）：向老账户的导航一次性追加「旅行」一级 Tab（含默认 travel 模块）。
-  // 与 ui-settings 同源的一次性前向迁移；用户后续删除该 Tab 不再自动恢复（尊重主动删除）。
+  // 旅行模块（2026-08-21 修正）：
+  //  1) 旧版本可能把「旅行」设为菜单模式（groups 挂 travel 模块），这里一次性转成「直接打开」模式
+  //     （directModule: 'travel'），点击 dock 直达旅行模块、不再弹二级菜单。
+  //  2) 彻底移除「缺失自动补回」逻辑——此前 hasTravel 只看 groups（漏掉 directModule 场景）、
+  //     且每次加载 migrateConfig 都会补，导致用户删掉旅行 Tab 后又被自动加回来（「删了又自动生成」）。
+  //     现在尊重用户主动删除，缺失不再自动补回。
   {
-    const hasTravel = primaries.some((p) => p.groups.some((g) => g.modules.includes('travel')))
-    if (!hasTravel) {
-      const travelPrimary = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_travel')
-      if (travelPrimary) {
-        primaries = [
-          ...primaries,
-          {
-            ...travelPrimary,
-            id: 'p_travel',
-            groups: travelPrimary.groups.map((g) => ({ ...g, id: uid('g') })),
-          },
-        ]
-      }
+    const travelIdx = primaries.findIndex((p) => p.id === 'p_travel')
+    if (travelIdx >= 0 && !primaries[travelIdx].directModule) {
+      primaries = [
+        ...primaries.slice(0, travelIdx),
+        { ...primaries[travelIdx], directModule: 'travel', groups: [] },
+        ...primaries.slice(travelIdx + 1),
+      ]
     }
   }
 

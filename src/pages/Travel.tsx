@@ -176,15 +176,260 @@ async function compressImage(file: File, maxDim = 1280, quality = 0.82): Promise
   })
 }
 
+// ─── 轨迹动画（参考桌面「轨迹动画迭代优化」项目 1:1 复刻，去掉 ripple-anim 圆环）───
+
+// 贝塞尔控制点（垂直方向偏移，弧度）
+function bezierControlPoint(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  lift = 0.38,
+): [number, number] {
+  const mx = (x1 + x2) / 2
+  const my = (y1 + y2) / 2
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const len = Math.sqrt(dx * dx + dy * dy)
+  return [mx - dy * lift, my + dx * lift - len * lift * 0.5]
+}
+
+// 飞机：二次贝塞尔弧线（lift=0.38 最弧）
+function quadBezierPath(x1: number, y1: number, x2: number, y2: number, lift = 0.3): string {
+  const [cx, cy] = bezierControlPoint(x1, y1, x2, y2, lift)
+  return `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`
+}
+
+// 高铁：轻微弧线（lift=0.12）
+function trainPath(x1: number, y1: number, x2: number, y2: number): string {
+  const [cx, cy] = bezierControlPoint(x1, y1, x2, y2, 0.12)
+  return `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`
+}
+
+// 自驾：S 形三次贝塞尔
+function drivePath(x1: number, y1: number, x2: number, y2: number): string {
+  const dx = (x2 - x1) / 3
+  const dy = (y2 - y1) / 3
+  const c1x = x1 + dx - dy * 0.1
+  const c1y = y1 + dy + dx * 0.1
+  const c2x = x2 - dx + dy * 0.1
+  const c2y = y2 - dy - dx * 0.1
+  return `M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`
+}
+
+// 飞机轨迹（最亮）—— 仅主弧线 + 飞机移动 + 终点脉冲，去掉 ripple-anim 圆环
+function PlaneRoute({
+  from,
+  to,
+}: {
+  from: { adcode: string; cx: number; cy: number }
+  to: { adcode: string; cx: number; cy: number }
+}) {
+  const x1 = from.cx,
+    y1 = from.cy,
+    x2 = to.cx,
+    y2 = to.cy
+  const pathD = quadBezierPath(x1, y1, x2, y2, 0.38)
+  const pathId = `plane-path-${from.adcode}-${to.adcode}`
+  const filterId = `glow-plane-${from.adcode}-${to.adcode}`
+
+  return (
+    <g>
+      <defs>
+        <path id={pathId} d={pathD} />
+        <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {/* 主虚线弧线（流动动画） */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(255,255,255,0.6)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray="16 14"
+        filter={`url(#${filterId})`}
+        className="traj-plane-line"
+      >
+        <animate attributeName="stroke-dashoffset" from="0" to="-30" dur="0.65s" repeatCount="indefinite" />
+      </path>
+      {/* 飞机图标（沿弧线移动） */}
+      <g className="icon-plane" filter={`url(#${filterId})`}>
+        <animateMotion dur="3.8s" repeatCount="indefinite" rotate="auto">
+          <mpath href={`#${pathId}`} />
+        </animateMotion>
+        <circle r="10" fill="rgba(255,255,255,0.14)" />
+        <g transform="translate(-7,-7)">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path
+              d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"
+              fill="white"
+            />
+          </svg>
+        </g>
+      </g>
+      {/* 起点 + 终点圆点（node-pulse 脉冲） */}
+      <circle cx={x1} cy={y1} r="4.5" fill="rgba(255,255,255,0.95)" filter={`url(#${filterId})`} className="node-pulse" />
+      <circle cx={x2} cy={y2} r="4.5" fill="rgba(255,255,255,0.95)" filter={`url(#${filterId})`} className="node-pulse" style={{ animationDelay: '0.9s' }} />
+    </g>
+  )
+}
+
+// 高铁轨迹（中等亮度）—— 主虚线 + 高铁沿弧线移动 + 终点脉冲
+function TrainRoute({
+  from,
+  to,
+}: {
+  from: { adcode: string; cx: number; cy: number }
+  to: { adcode: string; cx: number; cy: number }
+}) {
+  const x1 = from.cx,
+    y1 = from.cy,
+    x2 = to.cx,
+    y2 = to.cy
+  const pathD = trainPath(x1, y1, x2, y2)
+  const pathId = `train-path-${from.adcode}-${to.adcode}`
+  const filterId = `glow-train-${from.adcode}-${to.adcode}`
+
+  return (
+    <g>
+      <defs>
+        <path id={pathId} d={pathD} />
+        <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {/* 主虚线轨道 */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(154,162,177,0.65)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray="18 8"
+        filter={`url(#${filterId})`}
+        className="traj-train-line"
+      >
+        <animate attributeName="stroke-dashoffset" from="0" to="-26" dur="1.0s" repeatCount="indefinite" />
+      </path>
+      {/* 高铁图标（沿弧线移动） */}
+      <g className="icon-train" filter={`url(#${filterId})`}>
+        <animateMotion dur="5s" repeatCount="indefinite" rotate="auto">
+          <mpath href={`#${pathId}`} />
+        </animateMotion>
+        <rect x="-9" y="-6" width="18" height="12" rx="3" fill="rgba(154,162,177,0.2)" stroke="rgba(154,162,177,0.5)" strokeWidth="0.8" />
+        <rect x="-6" y="-4" width="4" height="4" rx="1" fill="rgba(210,220,235,0.6)" />
+        <rect x="2" y="-4" width="4" height="4" rx="1" fill="rgba(210,220,235,0.6)" />
+        <rect x="-8" y="2" width="16" height="1.5" rx="0.75" fill="rgba(154,162,177,0.5)" />
+      </g>
+      {/* 起点 + 终点圆点 */}
+      <circle cx={x1} cy={y1} r="4" fill="rgba(154,162,177,0.95)" filter={`url(#${filterId})`} className="node-pulse" />
+      <circle cx={x2} cy={y2} r="4" fill="rgba(154,162,177,0.95)" filter={`url(#${filterId})`} className="node-pulse" style={{ animationDelay: '1s' }} />
+    </g>
+  )
+}
+
+// 自驾轨迹（最暗）—— 主虚线 + 汽车沿弧线移动 + 终点脉冲
+function DriveRoute({
+  from,
+  to,
+}: {
+  from: { adcode: string; cx: number; cy: number }
+  to: { adcode: string; cx: number; cy: number }
+}) {
+  const x1 = from.cx,
+    y1 = from.cy,
+    x2 = to.cx,
+    y2 = to.cy
+  const pathD = drivePath(x1, y1, x2, y2)
+  const pathId = `drive-path-${from.adcode}-${to.adcode}`
+  const filterId = `glow-drive-${from.adcode}-${to.adcode}`
+
+  return (
+    <g>
+      <defs>
+        <path id={pathId} d={pathD} />
+        <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.8" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {/* 主虚线路面 */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(120,132,155,0.55)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray="4 10"
+        filter={`url(#${filterId})`}
+        className="traj-drive-line"
+      >
+        <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="2.0s" repeatCount="indefinite" />
+      </path>
+      {/* 汽车图标（沿弧线移动） */}
+      <g className="icon-car" filter={`url(#${filterId})`}>
+        <animateMotion dur="6.5s" repeatCount="indefinite" rotate="auto">
+          <mpath href={`#${pathId}`} />
+        </animateMotion>
+        <rect x="-9" y="-4" width="18" height="9" rx="2.5" fill="rgba(120,132,155,0.25)" stroke="rgba(140,152,175,0.55)" strokeWidth="0.8" />
+        <path d="M-3,-4 L3,-4 L5,-0.5 L-5,-0.5 Z" fill="rgba(200,210,225,0.5)" />
+        <circle cx="-5.5" cy="5" r="2.5" fill="rgba(90,100,120,0.7)" stroke="rgba(140,150,170,0.4)" strokeWidth="0.5" />
+        <circle cx="5.5" cy="5" r="2.5" fill="rgba(90,100,120,0.7)" stroke="rgba(140,150,170,0.4)" strokeWidth="0.5" />
+      </g>
+      {/* 起点 + 终点圆点 */}
+      <circle cx={x1} cy={y1} r="3.5" fill="rgba(120,132,155,0.9)" filter={`url(#${filterId})`} className="node-pulse" />
+      <circle cx={x2} cy={y2} r="3.5" fill="rgba(120,132,155,0.9)" filter={`url(#${filterId})`} className="node-pulse" style={{ animationDelay: '1.2s' }} />
+    </g>
+  )
+}
+
+// 轨迹层：按 mode 渲染对应路线（visible=false 时整个 layer 隐藏）
+function TrajectoryLayer({
+  routes,
+  visible,
+}: {
+  routes: { from: { adcode: string; cx: number; cy: number }; to: { adcode: string; cx: number; cy: number }; mode: 'plane' | 'train' | 'drive' }[]
+  visible: boolean
+}) {
+  if (!visible) return null
+  return (
+    <g className="trajectory-layer">
+      {routes.map((r, i) => {
+        const key = `${r.from.adcode}-${r.to.adcode}-${r.mode}-${i}`
+        if (r.mode === 'plane') return <PlaneRoute key={key} from={r.from} to={r.to} />
+        if (r.mode === 'train') return <TrainRoute key={key} from={r.from} to={r.to} />
+        return <DriveRoute key={key} from={r.from} to={r.to} />
+      })}
+    </g>
+  )
+}
+
 // ─── 中国地图（Web Mercator 烘焙 path，零运行时依赖） ───────────────────────
 function ChinaMap({
   visited,
   counts,
   onProvinceClick,
+  showTrajectory,
+  routes,
 }: {
   visited: Set<string>
   counts: Record<string, number>
   onProvinceClick: (adcode: string, name: string) => void
+  showTrajectory: boolean
+  routes: { from: { adcode: string; cx: number; cy: number }; to: { adcode: string; cx: number; cy: number }; mode: 'plane' | 'train' | 'drive' }[]
 }) {
   const [hover, setHover] = useState<string | null>(null)
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null)
@@ -278,6 +523,8 @@ function ChinaMap({
             </g>
           )
         })}
+        {/* 轨迹动画层（旅程轨迹 / 隐藏轨迹 toggle 控制） */}
+        <TrajectoryLayer routes={routes} visible={showTrajectory} />
       </svg>
       <div
         className={`tip${tip ? ' show' : ''}`}
@@ -315,6 +562,27 @@ export default function Travel() {
   }>({ open: false, travelId: '', dayIndex: 0 })
   const [cardPop, setCardPop] = useState<{ id: string; x: number; y: number } | null>(null)
   const [toastMsg, setToastMsg] = useState('')
+  // 轨迹动画显隐：开启后展示出发地→目的地的航线/铁路/自驾线，关闭后隐藏
+  // 持久化到 localStorage（"重新打开网页也保持开启状态"）
+  const [showTrajectory, setShowTrajectoryState] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return window.localStorage.getItem('pw.travel.showTrajectory') === '1'
+    } catch {
+      return false
+    }
+  })
+  const setShowTrajectory = (v: boolean | ((prev: boolean) => boolean)) => {
+    setShowTrajectoryState((prev) => {
+      const next = typeof v === 'function' ? v(prev) : v
+      try {
+        window.localStorage.setItem('pw.travel.showTrajectory', next ? '1' : '0')
+      } catch {
+        /* localStorage 不可用时静默失败 */
+      }
+      return next
+    })
+  }
   const toastTimer = useRef<number>()
 
   const showToast = useCallback((msg: string) => {
@@ -331,7 +599,11 @@ export default function Travel() {
   }, [])
 
   const load = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      // preview=1 匿名态：user=null 不进异步加载，直接关掉 loading 显示空态，避免「正在载入…」占位一直挂在那
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       await reload(userId)
@@ -406,6 +678,22 @@ export default function Travel() {
     return s
   }, [travels, resolveAdcode])
 
+  // 轨迹动画 routes：从 travels 提取（每条 travel = 1 条轨迹，从出发地 → 目的地）
+  // 起点 / 终点都允许是未点亮的省份（用户要求"轨迹链接的地方不一定是点亮的地图区域"）
+  const trajectoryRoutes = useMemo(() => {
+    return travels
+      .map((t) => {
+        const fromAdcode = t.departure_province_adcode || ''
+        const toAdcode = t.province_adcode || ''
+        if (!fromAdcode || !toAdcode || fromAdcode === toAdcode) return null
+        const from = CHINA_GEO.find((g) => g.adcode === fromAdcode)
+        const to = CHINA_GEO.find((g) => g.adcode === toAdcode)
+        if (!from || !to) return null
+        return { from, to, mode: (t.transport_mode || 'plane') as 'plane' | 'train' | 'drive' }
+      })
+      .filter(Boolean) as { from: typeof CHINA_GEO[number]; to: typeof CHINA_GEO[number]; mode: 'plane' | 'train' | 'drive' }[]
+  }, [travels])
+
   const provinceCounts = useMemo(() => {
     const c: Record<string, number> = {}
     travels.forEach((t) => {
@@ -467,11 +755,17 @@ export default function Travel() {
   // ── 新建旅行 ──
   const [cityText, setCityText] = useState('')
   const [citySuggest, setCitySuggest] = useState<typeof CITIES>([])
+  // 出发地：与目的地同套城市联想逻辑，独立 state/ref 避免互相干扰
+  const [departureText, setDepartureText] = useState('')
+  const [departureSuggest, setDepartureSuggest] = useState<typeof CITIES>([])
+  const departureProvince = useRef<{ name: string; adcode: string }>({ name: '', adcode: '' })
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [coverText, setCoverText] = useState('')
   const [coverPreview, setCoverPreview] = useState('')
   const [createErr, setCreateErr] = useState('')
+  // 交通方式：决定轨迹动画类型（plane/train/drive），默认飞机
+  const [transportMode, setTransportMode] = useState<'plane' | 'train' | 'drive'>('plane')
 
   const onCityInput = (v: string) => {
     setCityText(v)
@@ -489,6 +783,21 @@ export default function Travel() {
     pickedProvince.current = { name: c.provinceName, adcode: c.provinceAdcode }
   }
   const pickedProvince = useRef<{ name: string; adcode: string }>({ name: '', adcode: '' })
+
+  const onDepartureInput = (v: string) => {
+    setDepartureText(v)
+    if (!v.trim()) {
+      setDepartureSuggest([])
+      return
+    }
+    const q = v.trim().toLowerCase()
+    setDepartureSuggest(CITIES.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8))
+  }
+  const pickDeparture = (c: (typeof CITIES)[number]) => {
+    setDepartureText(c.name)
+    setDepartureSuggest([])
+    departureProvince.current = { name: c.provinceName, adcode: c.provinceAdcode }
+  }
 
   const onCoverPick = async (file?: File) => {
     if (!file) return
@@ -517,6 +826,13 @@ export default function Travel() {
       const hit = CITIES.find((c) => c.name === city)
       if (hit) prov = { name: hit.provinceName, adcode: hit.provinceAdcode }
     }
+    // 出发地：可选，未填则不写字段；未点选联想项时同样按城市名反查省
+    const depText = departureText.trim()
+    let dep = departureProvince.current
+    if (depText && !dep.adcode) {
+      const hit = CITIES.find((c) => c.name === depText)
+      if (hit) dep = { name: hit.provinceName, adcode: hit.provinceAdcode }
+    }
     const dc = dayCount(startDate, endDate)
     const nc = nightCount(startDate, endDate)
     const emoji = EMOJI_POOL[Math.floor(Math.random() * EMOJI_POOL.length)]
@@ -533,6 +849,15 @@ export default function Travel() {
       end_date: endDate,
       cover: coverPreview,
       days: createDays(startDate, endDate),
+      // 出发地：未填则不写字段（undefined），老数据无此字段保持兼容
+      ...(depText
+        ? {
+            departure_city: depText,
+            departure_province_adcode: dep.adcode || '',
+            departure_province_name: dep.name || '',
+          }
+        : {}),
+      transport_mode: transportMode,
       created_at: now,
       updated_at: now,
     }
@@ -544,12 +869,16 @@ export default function Travel() {
     setCreateOpen(false)
     setCityText('')
     setCitySuggest([])
+    setDepartureText('')
+    setDepartureSuggest([])
     setStartDate('')
     setEndDate('')
     setCoverText('')
     setCoverPreview('')
     setCreateErr('')
+    setTransportMode('plane')
     pickedProvince.current = { name: '', adcode: '' }
+    departureProvince.current = { name: '', adcode: '' }
     // 直接打开详情，方便继续添加行程
     setDetailId(rec.id)
     setActiveTab(0)
@@ -678,17 +1007,22 @@ export default function Travel() {
     showToast('同步完成')
   }
 
-  // 省份点击（地图）：若该地区有记录则筛选，否则提示
+  // 省份点击（地图）：点击某省 → 右侧仅展示该省；再点同一省 → 取消筛选展示全部
   const onProvinceClick = (adcode: string, name: string) => {
-    const c = provinceCounts[adcode] ?? 0
-    if (c > 0) {
-      setFilterRegion(name)
+    // 再点同一省份 → 取消筛选，展示全部数据
+    if (filterRegion === name) {
+      setFilterRegion('')
       setFilterYear('')
       setQuery('')
-      showToast(`已筛选：${name}（${c} 次记录）`)
-    } else {
-      showToast(`${name} · 还没有旅行记录`)
+      showToast('已显示全部记录')
+      return
     }
+    // 点击省份 → 仅展示该省（无条件筛选，无记录则右侧显示空态）
+    const c = provinceCounts[adcode] ?? 0
+    setFilterRegion(name)
+    setFilterYear('')
+    setQuery('')
+    showToast(c > 0 ? `已筛选：${name}（${c} 次记录）` : `${name} · 还没有旅行记录`)
   }
 
   // 总览：各模块计数
@@ -718,12 +1052,12 @@ export default function Travel() {
             <div className="brand">
               <div className="logo">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
-                  <circle cx="12" cy="9" r="2.5" />
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
                 </svg>
               </div>
               <div className="title">
-                <h1>我的旅行轨迹地图</h1>
+                <h1>我的旅行行光地图</h1>
                 <div className="sub">Cyberspatial Cartography · Data-driven Itinerary</div>
               </div>
             </div>
@@ -760,20 +1094,46 @@ export default function Travel() {
             </div>
           </div>
 
-          <ChinaMap visited={visitedSet} counts={provinceCounts} onProvinceClick={onProvinceClick} />
+          <ChinaMap
+            visited={visitedSet}
+            counts={provinceCounts}
+            onProvinceClick={onProvinceClick}
+            showTrajectory={showTrajectory}
+            routes={trajectoryRoutes}
+          />
 
           <div className="t-legend">
             <span className="item">
-              <span className="dot plane" /> 航空线路
+              <span className="dot plane">✈</span> 航空线路
             </span>
             <span className="item">
-              <span className="dot train" /> 高速铁路
+              <span className="dot train">🚄</span> 高速铁路
             </span>
             <span className="item">
-              <span className="dot car" /> 自驾公路
+              <span className="dot car">🚗</span> 自驾公路
             </span>
-            <span className="item" style={{ marginLeft: 'auto', color: 'rgb(var(--c-accent-rgb))' }}>
-              💡 点亮省份由新建的旅行记录自动驱动
+            <span className="route-toggle">
+              <span
+                className={`rt-label${showTrajectory ? '' : ' dim'}`}
+                onClick={() => setShowTrajectory(true)}
+              >
+                旅程轨迹
+              </span>
+              <button
+                className={`rt-switch${showTrajectory ? ' on' : ''}`}
+                type="button"
+                onClick={() => setShowTrajectory(!showTrajectory)}
+                aria-label="切换轨迹显示"
+                title="开启/关闭轨迹动画（持久化）"
+              >
+                <span className="rt-knob" />
+              </button>
+              <span
+                className={`rt-label${showTrajectory ? ' dim' : ''}`}
+                onClick={() => setShowTrajectory(false)}
+              >
+                隐藏轨迹
+              </span>
             </span>
           </div>
         </div>
@@ -999,7 +1359,13 @@ export default function Travel() {
                     <div className="dp-title">{detail.title}</div>
                     <div className="dp-sub">
                       行程日期 · {detail.start_date} → {detail.end_date}
-                      {detail.province_name && <> · 📍 {detail.province_name}</>}
+                      {detail.departure_city ? (
+                        // 有出发地：「出发地 ~ 目的地」（不重复显示，简洁路线感）
+                        <> · {detail.departure_city} ~ {detail.city}</>
+                      ) : (
+                        // 老数据无出发地：保持原「📍 目的地」
+                        detail.province_name && <> · 📍 {detail.province_name}</>
+                      )}
                     </div>
                   </div>
                   <button
@@ -1227,6 +1593,39 @@ export default function Travel() {
             <h3>新建旅行记录</h3>
             <div className="t-modal-sub">WHERE · WHEN · INFO</div>
 
+            {/* 出发地：可选，与"你想去哪里"同套城市联想逻辑 */}
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M2 22h20" />
+                  <path d="M9 17l-3 4 5.5-5.5L17 8l-2.5-2.5L9 11l-5.5 5.5 4 1.5z" />
+                  <path d="M17 8l4-4" />
+                  <path d="M21 4l-4 4" />
+                </svg>
+                你从哪出发？
+              </div>
+              <div className="desc">支持全球多级城市，输入关键词自动联想</div>
+              <input
+                className="t-input"
+                placeholder="例如：上海、北京、广州…"
+                value={departureText}
+                autoComplete="off"
+                onChange={(e) => onDepartureInput(e.target.value)}
+              />
+              <div className={`t-suggest${departureSuggest.length ? ' show' : ''}`}>
+                {departureSuggest.map((c) => (
+                  <div
+                    className="sg"
+                    key={c.name + c.provinceName}
+                    onClick={() => pickDeparture(c)}
+                  >
+                    <span className="name">{c.name}</span>
+                    <span className="prov">{c.country || c.provinceName}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="t-field">
               <div className="label">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1291,6 +1690,35 @@ export default function Travel() {
                   共 {dayCount(startDate, endDate)} 天 {nightCount(startDate, endDate)} 夜
                 </div>
               )}
+            </div>
+
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" transform="translate(0, -2) scale(1)" />
+                  <path d="M17 8l4-4" />
+                  <path d="M21 4l-4 4" />
+                </svg>
+                交通方式
+              </div>
+              <div className="desc">决定地图上的轨迹动画样式（飞机最亮 / 高铁中等 / 自驾最暗）</div>
+              <div className="t-transport-row">
+                {([
+                  { k: 'plane' as const, label: '飞机', icon: '✈' },
+                  { k: 'train' as const, label: '高铁', icon: '🚄' },
+                  { k: 'drive' as const, label: '自驾', icon: '🚗' },
+                ]).map((opt) => (
+                  <button
+                    key={opt.k}
+                    type="button"
+                    className={`t-transport-opt${transportMode === opt.k ? ' active' : ''}`}
+                    onClick={() => setTransportMode(opt.k)}
+                  >
+                    <span className="ico">{opt.icon}</span>
+                    <span className="lbl">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="t-field">

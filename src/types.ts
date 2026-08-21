@@ -382,6 +382,13 @@ export interface Travel {
   days: TravelDay[] // 行程时间轴（嵌套 JSON）
   created_at: string
   updated_at: string
+  // 出发地（可选，老数据无则不展示；仅在 detail panel 顶部显示「出发地～目的地」，
+  // 不点亮出发地省份的地图——地图只点亮目的地）
+  departure_city?: string
+  departure_province_adcode?: string
+  departure_province_name?: string
+  // 交通方式（决定轨迹动画类型：飞机/高铁/自驾）
+  transport_mode?: 'plane' | 'train' | 'drive'
 }
 
 export type TravelInput = {

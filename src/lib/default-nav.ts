@@ -91,7 +91,9 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       title: '旅行',
       iconKey: 'travel',
       order: 10,
-      groups: [{ id: 'g_travel_1', title: '旅行志', modules: ['travel'] }],
+      // 直接模式：点击 dock 直达旅行模块，不弹二级菜单
+      directModule: 'travel',
+      groups: [],
     },
     {
       id: 'p_system_settings',
