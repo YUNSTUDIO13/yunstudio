@@ -256,7 +256,11 @@
     border-radius: 999px;
     background: rgba(255,255,255,0.02);
   }
-  .t-legend .dot { width: 8px; height: 8px; border-radius: 999px; }
+  .t-legend .dot {
+    width: 13px; height: 13px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+  }
   .t-legend .plane {
     background: transparent;
     color: rgb(226, 232, 240);

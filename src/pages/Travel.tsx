@@ -1229,20 +1229,40 @@ export default function Travel() {
 
           <div className="t-legend">
             <span className="item">
-              <span className="dot plane">✈</span> 航空线路
+              <span className="dot plane">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" />
+                </svg>
+              </span>{' '}
+              航空线路
             </span>
             <span className="item">
-              <span className="dot train">🚄</span> 高速铁路
+              <span className="dot train">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                  <rect x="2" y="5" width="20" height="14" rx="3.5" />
+                  <rect x="5.5" y="8" width="4.5" height="5" rx="1" fill="#0E1015" />
+                  <rect x="14" y="8" width="4.5" height="5" rx="1" fill="#0E1015" />
+                </svg>
+              </span>{' '}
+              高速铁路
             </span>
             <span className="item">
-              <span className="dot car">🚗</span> 自驾公路
+              <span className="dot car">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                  <rect x="2" y="6" width="20" height="10" rx="2.5" />
+                  <path d="M6.5 6l2.5-3h6l2.5 3" fill="#0E1015" />
+                  <circle cx="7" cy="16.5" r="3" fill="#0E1015" />
+                  <circle cx="17" cy="16.5" r="3" fill="#0E1015" />
+                </svg>
+              </span>{' '}
+              自驾公路
             </span>
             <span className="route-toggle">
               <span
                 className={`rt-label${showTrajectory ? '' : ' dim'}`}
                 onClick={() => setShowTrajectory(true)}
               >
-                旅程轨迹
+                旅行轨迹
               </span>
               <button
                 className={`rt-switch${showTrajectory ? ' on' : ''}`}
@@ -1253,12 +1273,6 @@ export default function Travel() {
               >
                 <span className="rt-knob" />
               </button>
-              <span
-                className={`rt-label${showTrajectory ? ' dim' : ''}`}
-                onClick={() => setShowTrajectory(false)}
-              >
-                隐藏轨迹
-              </span>
             </span>
           </div>
         </div>
