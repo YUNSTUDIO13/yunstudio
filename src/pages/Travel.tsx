@@ -343,21 +343,30 @@ export default function Travel() {
   useEffect(() => () => forceUnlockBodyScroll(), [])
 
   // ── 派生数据 ──
+  // 省码反查兜底：老记录若 province_adcode 为空（旧版本直接打字新建），按城市名反查，保证地图点亮
+  const resolveAdcode = useCallback((t: Travel): string => {
+    if (t.province_adcode) return t.province_adcode
+    const hit = CITIES.find((c) => c.name === t.city)
+    return hit?.provinceAdcode ?? ''
+  }, [])
+
   const visitedSet = useMemo(() => {
     const s = new Set<string>()
     travels.forEach((t) => {
-      if (t.province_adcode) s.add(t.province_adcode)
+      const ad = resolveAdcode(t)
+      if (ad) s.add(ad)
     })
     return s
-  }, [travels])
+  }, [travels, resolveAdcode])
 
   const provinceCounts = useMemo(() => {
     const c: Record<string, number> = {}
     travels.forEach((t) => {
-      if (t.province_adcode) c[t.province_adcode] = (c[t.province_adcode] ?? 0) + 1
+      const ad = resolveAdcode(t)
+      if (ad) c[ad] = (c[ad] ?? 0) + 1
     })
     return c
-  }, [travels])
+  }, [travels, resolveAdcode])
 
   const visitedKm = visitedSet.size * 800 // 衍生展示指标：累计足迹（省×800km）
 
@@ -455,7 +464,12 @@ export default function Travel() {
     if (!startDate || !endDate) return setCreateErr('请选择行程日期')
     if (new Date(endDate) < new Date(startDate)) return setCreateErr('结束日期不能早于开始日期')
     if (!coverPreview) return setCreateErr('请上传一张封面图')
-    const prov = pickedProvince.current
+    // 省信息：点选联想项时已暂存；若直接打字未点选，则按城市名精确反查（保证地图点亮）
+    let prov = pickedProvince.current
+    if (!prov.adcode) {
+      const hit = CITIES.find((c) => c.name === city)
+      if (hit) prov = { name: hit.provinceName, adcode: hit.provinceAdcode }
+    }
     const dc = dayCount(startDate, endDate)
     const nc = nightCount(startDate, endDate)
     const emoji = EMOJI_POOL[Math.floor(Math.random() * EMOJI_POOL.length)]
@@ -938,6 +952,7 @@ export default function Travel() {
                     <div className="dp-title">{detail.title}</div>
                     <div className="dp-sub">
                       行程日期 · {detail.start_date} → {detail.end_date}
+                      {detail.province_name && <> · 📍 {detail.province_name}</>}
                     </div>
                   </div>
                   <button

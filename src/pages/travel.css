@@ -32,10 +32,11 @@
   --text-dim: var(--ink-soft);
   --text-mute: var(--ink-mute);
 }
-.travel-page { display: flex; flex-direction: column; height: calc(100vh - 48px); box-sizing: border-box; }
+.travel-page { display: flex; flex-direction: column; height: calc(100vh - 48px); box-sizing: border-box; overflow: hidden; }
 @media (max-width: 767px) {
-  .travel-page { height: auto; min-height: calc(100vh - 48px); }
-  .t-app { grid-template-columns: 1fr; overflow-y: auto; }
+  .travel-page { height: auto; min-height: calc(100vh - 48px); overflow: visible; }
+  .t-app { grid-template-columns: 1fr; grid-template-rows: none; overflow-y: auto; }
+  .detail-panel { left: 0; }
 }
 
   
@@ -44,13 +45,15 @@
   .t-app {
     display: grid;
     grid-template-columns: 60% 40%;
+    grid-template-rows: minmax(0, 1fr);
     height: 100%;
     gap: 16px;
     padding: 16px;
+    overflow: hidden;
   }
 
   /* ===== Left: Map dashboard (与上版一致，visit 逻辑改由数据驱动) ===== */
-  .t-left { display: flex; flex-direction: column; min-width: 0; }
+  .t-left { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .left-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 4px 14px 4px;
@@ -89,7 +92,7 @@
     display: grid; place-items: center;
   }
   .t-stat .lbl { font-size: 11px; color: var(--text-dim); letter-spacing: 0.4px; }
-  .t-stat .val { font-size: 16px; font-weight: 700; color: #fff; }
+  .t-stat .val { font-size: 16px; font-weight: 700; color: var(--ink-strong); }
   .t-stat .val em { font-style: normal; color: var(--text-dim); font-weight: 500; font-size: 12px; margin-left: 4px; }
 
   .skin-switch { display: flex; gap: 4px; align-items: center; background: var(--c-card-2, var(--card-2)); border: 1px solid var(--c-line); border-radius: 9px; padding: 3px; }
@@ -198,7 +201,7 @@
   .t-legend .car { background: #5c6577; box-shadow: 0 0 6px rgba(92,101,119,0.5); }
 
   /* ===== Right: new layout ===== */
-  .t-right { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+  .t-right { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; }
 
   .toolbar {
     display: flex; align-items: center; gap: 8px;
@@ -406,7 +409,7 @@
 
   .wf-info { padding: 18px 12px 12px 12px; }
   .wf-title {
-    font-size: 14px; color: #fff; font-weight: 700;
+    font-size: 14px; color: var(--ink-strong); font-weight: 700;
     letter-spacing: 0.4px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
@@ -429,7 +432,7 @@
 
   /* ===== Detail Panel（点击卡片后作为二级页从右滑入全屏覆盖） ===== */
   .detail-panel {
-    position: fixed; inset: 0; z-index: 60;
+    position: fixed; top: 0; right: 0; bottom: 0; left: 120px; z-index: 60;
     display: flex; flex-direction: column;
     background: var(--bg);
     overflow: hidden;
@@ -517,7 +520,7 @@
   }
   .day-header .day-title {
     font-size: 18px; font-weight: 700;
-    color: #fff; letter-spacing: 0.5px;
+    color: var(--ink-strong); letter-spacing: 0.5px;
   }
   .day-header .day-date {
     font-size: 12px; color: var(--text-dim);
@@ -554,7 +557,7 @@
     margin-bottom: 8px;
   }
   .mod-card .mod-ico svg { width: 16px; height: 16px; }
-  .mod-card .mod-name { font-size: 12px; color: #fff; font-weight: 600; }
+  .mod-card .mod-name { font-size: 12px; color: var(--ink-strong); font-weight: 600; }
   .mod-card .mod-meta { margin-top: 2px; font-size: 10px; color: var(--text-dim); }
   .mod-card .mod-num { position: absolute; right: 10px; top: 10px; font-size: 18px; font-weight: 800; color: rgb(var(--c-accent-rgb)); }
   /* 模块卡统一中性灰白（去掉 purple/pink/orange/green 彩色变体） */
@@ -599,7 +602,7 @@
     position: relative;
   }
   .tl-content .tl-title {
-    font-size: 13px; color: #fff; font-weight: 600;
+    font-size: 13px; color: var(--ink-strong); font-weight: 600;
   }
   .tl-content .tl-meta {
     margin-top: 4px; font-size: 11px; color: var(--text-dim);
