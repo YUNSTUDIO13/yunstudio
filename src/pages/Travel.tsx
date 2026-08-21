@@ -303,14 +303,15 @@ function PlaneRoute({
         <animate attributeName="stroke-dashoffset" from="0" to="-52" dur="0.45s" repeatCount="indefinite" />
       </path>
 
-      {/* 飞机图标（沿弧线移动 + glow）。rotate="auto" 让机头自动朝向路径切线（目标方向），
-          与参考项目 1:1 一致（无需额外 rotate） */}
+      {/* 飞机图标（沿弧线移动 + glow）。rotate="auto" 让 x 轴对齐路径切线；
+          但飞机 path 机头本身朝右下约 12°，需内层 rotate(-15) 回正，机头才正对目标 */}
       <g className="icon-plane" filter={`url(#${filterId})`}>
         <animateMotion dur="3.8s" repeatCount="indefinite" rotate="auto">
           <mpath href={`#${pathId}`} />
         </animateMotion>
         <circle r="10" fill="rgba(255,255,255,0.14)" />
-        <g transform="translate(-7,-7)">
+        {/* rotate(-15)：飞机 path 机头默认朝右下约 12°，逆时针 15° 回正，使机头对准飞行切线方向 */}
+        <g transform="rotate(-15) translate(-7,-7)">
           <svg viewBox="0 0 24 24" width="14" height="14">
             <path
               d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"
