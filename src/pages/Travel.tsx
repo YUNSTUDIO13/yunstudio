@@ -1,23 +1,24 @@
 // 旅行模块（Travel）—— 个人旅行志
-// 本地优先（Dexie travels 表）+ outbox 补传 Supabase（与 movies/books 一致）
-// 地图：省份点亮由 travels 的 province_adcode 反查派生；hover 浮起 + 发光
-// 详情：总览 + 无缝 Day 滚动（滚动联动顶部 tab）；行程条目支持 增/删/改/上下移
-// 封面：新建行程必传，压缩为 WebP/JPEG data URL 落库（离线可用，同步时作为文本列上云）
+// 1:1 复刻 drafts/travel/preview.html 设计稿：地图主视觉 + 航线图例 + 省份统计
+//   + 城市记录瀑布流 + 按天无缝详情 + 城市联想新建弹窗 + 添加项弹窗 + 9 模块总览。
+// 数据：本地优先（Dexie travels 表）+ outbox 补传 Supabase + Realtime，零 mock。
+// 地图：province_adcode 反查省级行政区，有该省记录则对应省份点亮（中国地图 Web Mercator 烘焙 path）。
+// 封面：新建必传，压缩为 WebP/JPEG data URL 落库（离线可用，同步时作为文本列上云）。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { db, pendingRowIds } from '../lib/localDb'
+import { forceUnlockBodyScroll } from '../components/ui'
+import { db, localPut, localDelete } from '../lib/localDb'
 import { supabase } from '../lib/supabase'
 import {
   seedFromServer,
   enqueueAndMaybeFlush,
   setSyncStatusHandler,
 } from '../lib/sync'
-import { useMediaQuery } from '../lib/useMediaQuery'
 import { CHINA_GEO, CHINA_VIEWBOX, type ChinaGeo } from '../lib/china-geo'
-import { forceUnlockBodyScroll } from '../components/ui'
 import type { Travel, TravelDay, TravelItem } from '../types'
+import './travel.css'
 
-// ─── 功能类型（行程时间轴条目的"功能标题"） ───────────────────────────────
+// ─── 功能类型（行程时间轴条目的"功能标题" + 内联 SVG 图标） ───────────────
 interface ModuleMeta {
   name: string
   icon: string
@@ -25,8 +26,8 @@ interface ModuleMeta {
 export const MODULE_LABELS: Record<string, ModuleMeta> = {
   transport: { name: '交通', icon: '🚆' },
   hotel: { name: '住宿', icon: '🏨' },
-  food: { name: '吃喝', icon: '🍜' },
   attraction: { name: '景点', icon: '📍' },
+  food: { name: '吃喝', icon: '🍜' },
   shopping: { name: '购物', icon: '🛍️' },
   entertainment: { name: '娱乐', icon: '🎡' },
   checkin: { name: '打卡', icon: '📸' },
@@ -37,13 +38,76 @@ export const MODULE_LABELS: Record<string, ModuleMeta> = {
   place: { name: '地点', icon: '🗺️' },
   custom: { name: '自定义', icon: '✨' },
 }
+// 总览卡片展示的 8 个模块（与设计稿一致）
+const OVERVIEW_TYPES = [
+  'transport', 'hotel', 'attraction', 'food', 'shopping', 'entertainment', 'checkin', 'note',
+]
 const MODULE_KEYS = Object.keys(MODULE_LABELS)
+
+// ─── 城市联想数据源（真实城市 → 省级行政区；海外城市 provinceAdcode 为空不点亮地图） ──
+interface CitySeed {
+  name: string
+  provinceName: string
+  country?: string
+}
+const CITY_SEEDS: CitySeed[] = [
+  { name: '北京', provinceName: '北京市' }, { name: '上海', provinceName: '上海市' },
+  { name: '天津', provinceName: '天津市' }, { name: '重庆', provinceName: '重庆市' },
+  { name: '广州', provinceName: '广东省' }, { name: '深圳', provinceName: '广东省' },
+  { name: '杭州', provinceName: '浙江省' }, { name: '成都', provinceName: '四川省' },
+  { name: '武汉', provinceName: '湖北省' }, { name: '西安', provinceName: '陕西省' },
+  { name: '南京', provinceName: '江苏省' }, { name: '苏州', provinceName: '江苏省' },
+  { name: '长沙', provinceName: '湖南省' }, { name: '张家界', provinceName: '湖南省' },
+  { name: '青岛', provinceName: '山东省' }, { name: '济南', provinceName: '山东省' },
+  { name: '烟台', provinceName: '山东省' }, { name: '威海', provinceName: '山东省' },
+  { name: '厦门', provinceName: '福建省' }, { name: '福州', provinceName: '福建省' },
+  { name: '昆明', provinceName: '云南省' }, { name: '丽江', provinceName: '云南省' },
+  { name: '大理', provinceName: '云南省' }, { name: '西双版纳', provinceName: '云南省' },
+  { name: '三亚', provinceName: '海南省' }, { name: '海口', provinceName: '海南省' },
+  { name: '哈尔滨', provinceName: '黑龙江省' }, { name: '大连', provinceName: '辽宁省' },
+  { name: '沈阳', provinceName: '辽宁省' }, { name: '长春', provinceName: '吉林省' },
+  { name: '郑州', provinceName: '河南省' }, { name: '洛阳', provinceName: '河南省' },
+  { name: '合肥', provinceName: '安徽省' }, { name: '黄山', provinceName: '安徽省' },
+  { name: '南昌', provinceName: '江西省' }, { name: '婺源', provinceName: '江西省' },
+  { name: '贵阳', provinceName: '贵州省' }, { name: '桂林', provinceName: '广西壮族自治区' },
+  { name: '北海', provinceName: '广西壮族自治区' }, { name: '拉萨', provinceName: '西藏自治区' },
+  { name: '兰州', provinceName: '甘肃省' }, { name: '敦煌', provinceName: '甘肃省' },
+  { name: '西宁', provinceName: '青海省' }, { name: '银川', provinceName: '宁夏回族自治区' },
+  { name: '乌鲁木齐', provinceName: '新疆维吾尔自治区' }, { name: '喀什', provinceName: '新疆维吾尔自治区' },
+  { name: '呼和浩特', provinceName: '内蒙古自治区' }, { name: '石家庄', provinceName: '河北省' },
+  { name: '太原', provinceName: '山西省' }, { name: '香港', provinceName: '香港特别行政区' },
+  { name: '澳门', provinceName: '澳门特别行政区' }, { name: '台北', provinceName: '台湾省' },
+  { name: '东京', provinceName: '日本', country: '日本' }, { name: '大阪', provinceName: '日本', country: '日本' },
+  { name: '首尔', provinceName: '韩国', country: '韩国' }, { name: '曼谷', provinceName: '泰国', country: '泰国' },
+  { name: '新加坡', provinceName: '新加坡', country: '新加坡' }, { name: '巴厘岛', provinceName: '印度尼西亚', country: '印度尼西亚' },
+  { name: '巴黎', provinceName: '法国', country: '法国' }, { name: '伦敦', provinceName: '英国', country: '英国' },
+  { name: '罗马', provinceName: '意大利', country: '意大利' }, { name: '纽约', provinceName: '美国', country: '美国' },
+  { name: '迪拜', provinceName: '阿联酋', country: '阿联酋' }, { name: '悉尼', provinceName: '澳大利亚', country: '澳大利亚' },
+]
+const PROVINCE_ADCODE_BY_NAME: Record<string, string> = Object.fromEntries(
+  CHINA_GEO.filter((g) => g.name && g.adcode !== '100000_JD').map((g) => [g.name, g.adcode]),
+)
+const CITIES = CITY_SEEDS.map((c) => ({
+  name: c.name,
+  provinceName: c.provinceName,
+  country: c.country,
+  provinceAdcode: PROVINCE_ADCODE_BY_NAME[c.provinceName] ?? '',
+}))
+
+// 省级行政区（34 个，剔除南海诸岛框）
+const PROVINCES: ChinaGeo[] = CHINA_GEO.filter(
+  (g) => g.adcode !== '100000_JD' && g.name,
+)
 
 // ─── 辅助 ────────────────────────────────────────────────────────────────
 function dayCount(s: string, e: string): number {
+  if (!s || !e) return 1
   const a = new Date(s + 'T00:00:00')
   const b = new Date(e + 'T00:00:00')
   return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86400000) + 1)
+}
+function nightCount(s: string, e: string): number {
+  return Math.max(0, dayCount(s, e) - 1)
 }
 function dayDate(start: string, idx: number): string {
   const d = new Date(start + 'T00:00:00')
@@ -56,6 +120,7 @@ function dayDate(start: string, idx: number): string {
 function uid(): string {
   return crypto.randomUUID()
 }
+const EMOJI_POOL = ['🌏', '✈️', '🗺️', '🧳', '🏝️', '⛰️', '🏙️', '🌆', '🚞']
 
 // 压缩上传图片为 data URL（WebP 优先，不支持则回退 JPEG）
 async function compressImage(file: File, maxDim = 1280, quality = 0.82): Promise<string> {
@@ -74,7 +139,7 @@ async function compressImage(file: File, maxDim = 1280, quality = 0.82): Promise
         canvas.height = h
         const ctx = canvas.getContext('2d')
         if (!ctx) return reject(new Error('无法创建画布'))
-        ctx.drawImage(img, 0,0, w, h)
+        ctx.drawImage(img, 0, 0, w, h)
         let url = canvas.toDataURL('image/webp', quality)
         if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', quality)
         resolve(url)
@@ -85,1158 +150,1329 @@ async function compressImage(file: File, maxDim = 1280, quality = 0.82): Promise
   })
 }
 
-// 省份下拉（34 省级行政区，剔除南海诸岛）
-const PROVINCES: ChinaGeo[] = CHINA_GEO.filter(
-  (g) => g.adcode !== '100000' && !g.name.includes('南海'),
-)
-
-// ─── 中国地图 ────────────────────────────────────────────────────────────
+// ─── 中国地图（Web Mercator 烘焙 path，零运行时依赖） ───────────────────────
 function ChinaMap({
   visited,
+  counts,
   onProvinceClick,
 }: {
   visited: Set<string>
-  onProvinceClick: (adcode: string) => void
+  counts: Record<string, number>
+  onProvinceClick: (adcode: string, name: string) => void
 }) {
   const [hover, setHover] = useState<string | null>(null)
+  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  const handleMove = (e: React.MouseEvent, g: ChinaGeo) => {
+    const rect = cardRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const c = counts[g.adcode] ?? 0
+    setTip({
+      x,
+      y,
+      text: `${g.name}${c > 0 ? ` · 已记录 ${c} 次` : ''}`,
+    })
+  }
+
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-3 backdrop-blur-xl">
-      <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-white/90">我的旅行地图</h2>
-        <span className="text-xs text-white/40">已点亮 {visited.size} 省</span>
-      </div>
+    <div className="map-card" ref={cardRef}>
+      <span className="corner tl" />
+      <span className="corner tr" />
+      <span className="corner bl" />
+      <span className="corner br" />
       <svg
+        id="map"
         viewBox={CHINA_VIEWBOX}
-        className="h-auto w-full"
-        style={{ display: 'block' }}
         preserveAspectRatio="xMidYMid meet"
+        style={{ display: 'block' }}
       >
+        <defs>
+          <pattern id="tgrid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M40 0H0V40" fill="none" stroke="rgba(124,133,245,0.06)" strokeWidth="0.6" />
+          </pattern>
+        </defs>
+        <rect x="0" y="0" width="1000" height="979" fill="url(#tgrid)" />
         {CHINA_GEO.map((g) => {
+          if (g.adcode === '100000_JD') {
+            return (
+              <g key="nanhai">
+                <path className="nanhai-frame" d={g.path} />
+                <text className="nanhai-label" x="780" y="930">
+                  南海诸岛
+                </text>
+              </g>
+            )
+          }
           const isVisited = visited.has(g.adcode)
-          const isHover = hover === g.adcode
-          const baseFill = isVisited ? 'rgb(124,133,245)' : 'rgba(255,255,255,0.10)'
-          const fill = isHover ? 'rgb(150,158,250)' : baseFill
           return (
             <path
               key={g.adcode}
+              className={`prov${isVisited ? ' visited' : ''}${hover === g.adcode ? ' hover' : ''}`}
               d={g.path}
-              fill={fill}
-              stroke="rgba(0,0,0,0.5)"
-              strokeWidth={0.6}
-              style={{
-                cursor: isVisited ? 'pointer' : 'default',
-                transition: 'fill .2s ease, transform .15s ease, filter .2s ease',
-                transform: isHover ? 'translateY(-2px)' : 'none',
-                filter: isHover
-                  ? 'drop-shadow(0 4px 12px rgba(124,133,245,0.65))'
-                  : isVisited
-                  ? 'drop-shadow(0 0 4px rgba(124,133,245,0.35))'
-                  : 'none',
-              }}
               onMouseEnter={() => setHover(g.adcode)}
-              onMouseLeave={() => setHover(null)}
-              onClick={() => isVisited && onProvinceClick(g.adcode)}
+              onMouseMove={(e) => handleMove(e, g)}
+              onMouseLeave={() => {
+                setHover(null)
+                setTip(null)
+              }}
+              onClick={() => onProvinceClick(g.adcode, g.name)}
             />
           )
         })}
+        {CHINA_GEO.map((g) => {
+          if (g.adcode === '100000_JD' || !visited.has(g.adcode)) return null
+          return (
+            <g key={`mk-${g.adcode}`} style={{ pointerEvents: 'none' }}>
+              <circle className="marker show" cx={g.cx} cy={g.cy} r={4} />
+              <circle className="marker-ripple go" cx={g.cx} cy={g.cy} r={3} />
+            </g>
+          )
+        })}
       </svg>
-      <p className="mt-1 text-center text-[11px] text-white/35">
-        鼠标悬停省份高亮 · 点亮的省份代表去过（由行程记录自动派生）
-      </p>
-    </div>
-  )
-}
-
-// ─── 行程卡片 ────────────────────────────────────────────────────────────
-function TripCard({
-  trip,
-  onOpen,
-  onEdit,
-  onDelete,
-}: {
-  trip: Travel
-  onOpen: (t: Travel) => void
-  onEdit: (t: Travel) => void
-  onDelete: (t: Travel) => void
-}) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const days = dayCount(trip.start_date, trip.end_date)
-  const nights = Math.max(days - 1, 0)
-  useEffect(() => {
-    if (!menuOpen) return
-    function onDoc(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [menuOpen])
-
-  return (
-    <div
-      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/5 transition hover:border-white/20"
-      onClick={() => onOpen(trip)}
-    >
-      {/* 封面（必传，无图不显示封面区） */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/40">
-        <img
-          src={trip.cover}
-          alt={trip.title}
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-        <span className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-lg backdrop-blur-md">
-          {trip.emoji || '✈️'}
-        </span>
-        <span className="absolute bottom-2 right-3 text-xs font-medium text-white/90">
-          {trip.province_name} · {days}天{nights}夜
-        </span>
-      </div>
-      <div className="p-3">
-        <div className="truncate text-sm font-semibold text-white/90">{trip.title}</div>
-        <div className="mt-1 flex items-center gap-1.5 text-xs text-white/45">
-          <span>{trip.start_date}</span>
-          <span className="h-1 w-1 rounded-full bg-white/30" />
-          <span>{trip.end_date}</span>
-        </div>
-      </div>
-
-      {/* 三点菜单（对齐观影"更多"浮层样式） */}
-      <div className="absolute right-2 top-2" ref={menuRef}>
-        <button
-          aria-label="更多"
-          onClick={(e) => {
-            e.stopPropagation()
-            setMenuOpen((v) => !v)
-          }}
-          className="grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white/90 backdrop-blur-md transition hover:bg-black/70"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="12" cy="19" r="1.6" />
-          </svg>
-        </button>
-        {menuOpen && (
-          <div
-            className="animate-popover absolute right-0 top-10 z-40 w-36 overflow-hidden rounded-xl border border-white/10 bg-[#15151c]/95 p-1.5 shadow-2xl backdrop-blur-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => {
-                setMenuOpen(false)
-                onEdit(trip)
-              }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/85 transition hover:bg-white/10"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
-                <path d="M4 20h4l11-11-4-4L4 16v4z" />
-              </svg>
-              编辑
-            </button>
-            <button
-              onClick={() => {
-                setMenuOpen(false)
-                onDelete(trip)
-              }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-danger transition hover:bg-danger/10"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-danger">
-                <path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M7 7l1 13a2 2 0 002 2h4a2 2 0 002-2l1-13" />
-              </svg>
-              删除
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── 行程时间轴条目 ──────────────────────────────────────────────────────
-function TimelineItem({
-  item,
-  index,
-  onEdit,
-  onDelete,
-  onMove,
-}: {
-  item: TravelItem
-  index: number
-  onEdit: (i: number) => void
-  onDelete: (i: number) => void
-  onMove: (i: number, dir: -1 | 1) => void
-}) {
-  const meta = MODULE_LABELS[item.type] ?? MODULE_LABELS.custom
-  return (
-    <div className="relative rounded-xl border border-white/10 bg-white/5 p-3 pl-4">
-      {/* 左侧时间轴竖线 dot */}
-      <span className="absolute left-1.5 top-4 h-2 w-2 -translate-x-1/2 rounded-full bg-accent" />
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">{meta.icon}</span>
-            <span className="text-xs text-white/50">{meta.name}</span>
-            {item.time && <span className="text-xs text-accent">{item.time}</span>}
-          </div>
-          <div className="mt-0.5 truncate text-sm font-medium text-white/90">{item.title}</div>
-          {item.note && <div className="mt-1 text-xs leading-relaxed text-white/55">{item.note}</div>}
-          {item.img && (
-            <img
-              src={item.img}
-              alt={item.title}
-              className="mt-2 max-h-36 w-auto rounded-lg border border-white/10 object-cover"
-              loading="lazy"
-            />
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1 opacity-60 transition group-hover:opacity-100">
-          <button
-            aria-label="上移"
-            onClick={() => onMove(index, -1)}
-            className="grid h-6 w-6 place-items-center rounded-md bg-black/40 text-white/70 transition hover:bg-accent/20 hover:text-accent"
-          >
-            ↑
-          </button>
-          <button
-            aria-label="下移"
-            onClick={() => onMove(index, 1)}
-            className="grid h-6 w-6 place-items-center rounded-md bg-black/40 text-white/70 transition hover:bg-accent/20 hover:text-accent"
-          >
-            ↓
-          </button>
-          <button
-            aria-label="编辑"
-            onClick={() => onEdit(index)}
-            className="grid h-6 w-6 place-items-center rounded-md bg-black/40 text-white/70 transition hover:bg-accent/20 hover:text-accent"
-          >
-            ✎
-          </button>
-          <button
-            aria-label="删除"
-            onClick={() => onDelete(index)}
-            className="grid h-6 w-6 place-items-center rounded-md bg-black/40 text-white/70 transition hover:bg-danger/20 hover:text-danger"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── 行程详情面板 ────────────────────────────────────────────────────────
-function TravelDetailPanel({
-  trip,
-  onClose,
-  onChange,
-  onDelete,
-}: {
-  trip: Travel
-  onClose: () => void
-  onChange: (t: Travel) => void
-  onDelete: (t: Travel) => void
-}) {
-  const isMobile = useMediaQuery('(max-width: 767px)')
-  const days = trip.days ?? []
-  const tabs = useMemo(() => ['总览', ...days.map((_, i) => `Day${i + 1}`)], [days.length])
-  const [activeTab, setActiveTab] = useState('总览')
-  const [showAdd, setShowAdd] = useState(false)
-  const [editing, setEditing] = useState<{ dayIdx: number; itemIdx: number } | null>(null)
-  const bodyRef = useRef<HTMLDivElement>(null)
-  const tabRefs = useRef<Record<string, HTMLElement | null>>({})
-
-  const scrollToTab = (tab: string) => {
-    const el = tabRefs.current[tab]
-    if (el && bodyRef.current) {
-      bodyRef.current.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' })
-    }
-  }
-
-  // 滚动联动：body 滚动时高亮最靠顶的 section 对应 tab
-  useEffect(() => {
-    const body = bodyRef.current
-    if (!body) return
-    let raf = 0
-    const onScroll = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        const top = body.scrollTop + 12
-        let current = '总览'
-        for (const t of tabs) {
-          const el = tabRefs.current[t]
-          if (el && el.offsetTop <= top) current = t
-        }
-        setActiveTab(current)
-      })
-    }
-    body.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      body.removeEventListener('scroll', onScroll)
-      cancelAnimationFrame(raf)
-    }
-  }, [tabs])
-
-  const mutateItems = (dayIdx: number, fn: (items: TravelItem[]) => TravelItem[]) => {
-    const nextDays = days.map((d, i) =>
-      i === dayIdx ? { items: fn(d.items) } : d,
-    )
-    onChange({ ...trip, days: nextDays, updated_at: new Date().toISOString() })
-  }
-
-  const handleAdd = (dayIdx: number, item: TravelItem) => {
-    mutateItems(dayIdx, (items) => [item, ...items])
-    setShowAdd(false)
-  }
-  const handleEditSave = (item: TravelItem) => {
-    if (!editing) return
-    const { dayIdx, itemIdx } = editing
-    mutateItems(dayIdx, (items) => items.map((it, i) => (i === itemIdx ? item : it)))
-    setEditing(null)
-  }
-  const handleDelete = (dayIdx: number, itemIdx: number) => {
-    mutateItems(dayIdx, (items) => items.filter((_, i) => i !== itemIdx))
-  }
-  const handleMove = (dayIdx: number, itemIdx: number, dir: -1 | 1) => {
-    mutateItems(dayIdx, (items) => {
-      const to = itemIdx + dir
-      if (to < 0 || to >= items.length) return items
-      const arr = [...items]
-      ;[arr[itemIdx], arr[to]] = [arr[to], arr[itemIdx]]
-      return arr
-    })
-  }
-
-  const totalDays = dayCount(trip.start_date, trip.end_date)
-  const itemCount = days.reduce((s, d) => s + d.items.length, 0)
-
-  return (
-    <div
-      className={
-        isMobile
-          ? 'fixed inset-0 z-50 flex flex-col bg-[#0b0d13]'
-          : 'fixed right-0 top-0 z-50 flex h-full w-[min(460px,92vw)] flex-col border-l border-white/10 bg-[#0b0d13] shadow-2xl'
-      }
-    >
-      {/* 头部 */}
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 truncate text-base font-semibold text-white/90">
-            <span className="text-lg">{trip.emoji || '✈️'}</span>
-            {trip.title}
-          </div>
-          <div className="mt-0.5 text-xs text-white/45">
-            {trip.province_name} · {totalDays}天{Math.max(totalDays - 1, 0)}夜 · {itemCount} 条记录
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            aria-label="删除行程"
-            onClick={() => onDelete(trip)}
-            className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-danger transition hover:bg-danger/15"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M7 7l1 13a2 2 0 002 2h4a2 2 0 002-2l1-13" />
-            </svg>
-          </button>
-          <button
-            aria-label="关闭"
-            onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
-      {/* tab 栏（sticky 风格：滚动联动） */}
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-white/10 px-3 py-2">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setActiveTab(t)
-              scrollToTab(t)
-            }}
-            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              activeTab === t ? 'bg-accent/20 text-accent' : 'text-white/60 hover:bg-white/10'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-        <button
-          onClick={() => setShowAdd(true)}
-          className="ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/10 text-white/80 transition hover:bg-accent/20 hover:text-accent"
-          aria-label="添加行程模块"
-        >
-          +
-        </button>
-      </div>
-
-      {/* 滚动主体 */}
-      <div ref={bodyRef} className="flex-1 overflow-y-auto px-4 py-3">
-        {/* 总览 */}
-        <section
-          ref={(el) => {
-            tabRefs.current['总览'] = el
-          }}
-          className="mb-5"
-        >
-          <div className="aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
-            <img src={trip.cover} alt={trip.title} className="h-full w-full object-cover" />
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-lg bg-white/5 px-3 py-2">
-              <div className="text-xs text-white/40">目的地</div>
-              <div className="text-white/85">{trip.city}</div>
-            </div>
-            <div className="rounded-lg bg-white/5 px-3 py-2">
-              <div className="text-xs text-white/40">省份</div>
-              <div className="text-white/85">{trip.province_name}</div>
-            </div>
-            <div className="rounded-lg bg-white/5 px-3 py-2">
-              <div className="text-xs text-white/40">出发</div>
-              <div className="text-white/85">{trip.start_date}</div>
-            </div>
-            <div className="rounded-lg bg-white/5 px-3 py-2">
-              <div className="text-xs text-white/40">返程</div>
-              <div className="text-white/85">{trip.end_date}</div>
-            </div>
-          </div>
-        </section>
-
-        {/* 逐 Day 无缝衔接 */}
-        {days.map((d, dayIdx) => (
-          <section
-            key={dayIdx}
-            ref={(el) => {
-              tabRefs.current[`Day${dayIdx + 1}`] = el
-            }}
-            className="mb-1"
-          >
-            <div className="sticky top-0 z-10 -mx-4 mb-2 bg-[#0b0d13]/95 px-4 py-2 backdrop-blur">
-              <div className="flex items-baseline gap-2">
-                <span className="text-xs font-bold tracking-widest text-accent">
-                  DAY {String(dayIdx + 1).padStart(2, '0')}
-                </span>
-                <span className="text-xs text-white/40">/ {String(totalDays).padStart(2, '0')}</span>
-                <span className="ml-auto text-xs text-white/35">{dayDate(trip.start_date, dayIdx)}</span>
-              </div>
-            </div>
-            {d.items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-xs text-white/35">
-                这一天暂无记录，点右上角 ＋ 添加模块
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {d.items.map((it, itemIdx) => (
-                  <TimelineItem
-                    key={it.id}
-                    item={it}
-                    index={itemIdx}
-                    onEdit={() => setEditing({ dayIdx, itemIdx })}
-                    onDelete={() => handleDelete(dayIdx, itemIdx)}
-                    onMove={(i, dir) => handleMove(dayIdx, i, dir)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        ))}
-        <div className="h-10" />
-      </div>
-
-      {/* 添加 / 编辑 行程模块 dialog */}
-      {showAdd && (
-        <ItemDialog
-          title="添加行程模块"
-          okLabel="添加到时间轴"
-          onClose={() => setShowAdd(false)}
-          onSave={(it) => handleAdd(activeDayIdx(activeTab), it)}
-        />
-      )}
-      {editing && (
-        <ItemDialog
-          title="编辑行程模块"
-          okLabel="保存修改"
-          initial={days[editing.dayIdx]?.items[editing.itemIdx]}
-          onClose={() => setEditing(null)}
-          onSave={handleEditSave}
-        />
-      )}
-    </div>
-  )
-}
-
-function activeDayIdx(tab: string): number {
-  const m = tab.match(/^Day(\d+)$/)
-  return m ? parseInt(m[1], 10) - 1 : 0
-}
-
-// ─── 行程条目 dialog（新增 / 编辑共用） ──────────────────────────────────
-function ItemDialog({
-  title,
-  okLabel,
-  initial,
-  onClose,
-  onSave,
-}: {
-  title: string
-  okLabel: string
-  initial?: TravelItem
-  onClose: () => void
-  onSave: (item: TravelItem) => void
-}) {
-  const [type, setType] = useState(initial?.type ?? 'transport')
-  const [customTitle, setCustomTitle] = useState(initial?.title ?? '')
-  const [time, setTime] = useState(initial?.time ?? defaultHHMM())
-  const [note, setNote] = useState(initial?.note ?? '')
-  const [img, setImg] = useState<string | null>(initial?.img ?? null)
-  const [imgName, setImgName] = useState(initial?.img ? '已附图片（可重新选择替换）' : '')
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const onFile = async (file?: File) => {
-    if (!file) return
-    try {
-      const url = await compressImage(file)
-      setImg(url)
-      setImgName(file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name)
-    } catch {
-      setImgName('图片处理失败，请重试')
-    }
-  }
-
-  const submit = () => {
-    const meta = MODULE_LABELS[type]
-    const t: TravelItem = {
-      id: initial?.id ?? uid(),
-      type,
-      title: customTitle.trim() || `新建${meta?.name ?? '条目'}`,
-      time,
-      note: note.trim(),
-      img,
-    }
-    onSave(t)
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15151c] p-4 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className={`tip${tip ? ' show' : ''}`}
+        style={tip ? { left: tip.x, top: tip.y } : undefined}
       >
-        <h3 className="text-base font-semibold text-white/90">{title}</h3>
-        <div className="mt-3 space-y-3">
-          <div>
-            <label className="mb-1 block text-xs text-white/50">功能标题</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50"
-            >
-              {MODULE_KEYS.map((k) => (
-                <option key={k} value={k} className="bg-[#15151c]">
-                  {MODULE_LABELS[k].icon} {MODULE_LABELS[k].name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-white/50">自定义标题</label>
-            <input
-              value={customTitle}
-              onChange={(e) => setCustomTitle(e.target.value)}
-              placeholder="留空则默认按功能标题"
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-white/50">时间</label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50 [color-scheme:dark]"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-white/50">图片上传（可选）</label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => onFile(e.target.files?.[0])}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="flex w-full items-center justify-between rounded-lg border border-dashed border-white/15 bg-black/30 px-3 py-2 text-sm text-white/70 transition hover:border-accent/40"
-            >
-              <span className="truncate">{imgName || '选择图片'}</span>
-              <span className="text-accent">浏览</span>
-            </button>
-            {img && (
-              <img src={img} alt="预览" className="mt-2 max-h-28 w-auto rounded-lg border border-white/10" />
-            )}
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-white/50">备注</label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              placeholder="可选"
-              className="w-full resize-none rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50"
-            />
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:bg-white/10"
-          >
-            取消
-          </button>
-          <button
-            onClick={submit}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black transition hover:bg-accent/90"
-          >
-            {okLabel}
-          </button>
-        </div>
+        {tip?.text}
       </div>
     </div>
   )
 }
 
-function defaultHHMM(): string {
-  const h = String(new Date().getHours()).padStart(2, '0')
-  return `${h}:00`
-}
-
-// ─── 新建行程 dialog ─────────────────────────────────────────────────────
-function NewTripModal({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void
-  onSave: (t: Travel) => void
-}) {
-  const [title, setTitle] = useState('')
-  const [provinceAdcode, setProvinceAdcode] = useState(PROVINCES[0]?.adcode ?? '')
-  const [city, setCity] = useState('')
-  const [emoji, setEmoji] = useState('✈️')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [cover, setCover] = useState<string | null>(null)
-  const [coverName, setCoverName] = useState('')
-  const [coverErr, setCoverErr] = useState('')
-  const [busy, setBusy] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const province = PROVINCES.find((p) => p.adcode === provinceAdcode)
-  const days = startDate && endDate ? dayCount(startDate, endDate) : 1
-
-  const onFile = async (file?: File) => {
-    setCoverErr('')
-    if (!file) return
-    try {
-      const url = await compressImage(file, 1600, 0.85)
-      setCover(url)
-      setCoverName(file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name)
-    } catch {
-      setCoverErr('封面处理失败，请重试')
-    }
-  }
-
-  const submit = () => {
-    if (!cover) {
-      setCoverErr('请上传封面图（必填）')
-      return
-    }
-    if (!startDate || !endDate) {
-      setCoverErr('请选择出发与返程日期')
-      return
-    }
-    setBusy(true)
-    const now = new Date().toISOString()
-    const t: Travel = {
-      id: uid(),
-      user_id: '', // 由调用方补充（persist 时以当前登录用户覆盖）
-      title: title.trim() || `${city || province?.name || '旅行'} ${days}天${Math.max(days - 1, 0)}夜`,
-      city: city.trim() || province?.name || '',
-      province_adcode: province?.adcode ?? '',
-      province_name: province?.name ?? '',
-      emoji,
-      start_date: startDate,
-      end_date: endDate,
-      cover,
-      days: Array.from({ length: days }, () => ({ items: [] }) as TravelDay),
-      created_at: now,
-      updated_at: now,
-    }
-    onSave(t)
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div
-        className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#15151c] p-4 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-base font-semibold text-white/90">新建行程</h3>
-        <div className="mt-3 space-y-3">
-          <div>
-            <label className="mb-1 block text-xs text-white/50">行程标题</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="留空自动生成（城市 + 天数）"
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-white/50">省份</label>
-              <select
-                value={provinceAdcode}
-                onChange={(e) => setProvinceAdcode(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50"
-              >
-                {PROVINCES.map((p) => (
-                  <option key={p.adcode} value={p.adcode} className="bg-[#15151c]">
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-white/50">目的地城市</label>
-              <input
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="如 长沙"
-                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-white/50">主题 emoji</label>
-              <input
-                value={emoji}
-                onChange={(e) => setEmoji(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-white/50">天数（自动算）</label>
-              <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/70">
-                {days} 天 {Math.max(days - 1, 0)} 夜
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-white/50">出发日</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50 [color-scheme:dark]"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-white/50">返程日</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-accent/50 [color-scheme:dark]"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-white/50">封面图（必填）</label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => onFile(e.target.files?.[0])}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="flex w-full items-center justify-between rounded-lg border border-dashed border-white/15 bg-black/30 px-3 py-2 text-sm text-white/70 transition hover:border-accent/40"
-            >
-              <span className="truncate">{coverName || '选择封面图片'}</span>
-              <span className="text-accent">浏览</span>
-            </button>
-            {cover && (
-              <img src={cover} alt="封面预览" className="mx-auto mt-2 max-h-32 rounded-lg border border-white/10" />
-            )}
-            {coverErr && <div className="mt-1 text-xs text-danger">{coverErr}</div>}
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:bg-white/10"
-          >
-            取消
-          </button>
-          <button
-            onClick={submit}
-            disabled={busy}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black transition hover:bg-accent/90 disabled:opacity-50"
-          >
-            创建
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── 主页面 ──────────────────────────────────────────────────────────────
-export default function TravelPage() {
+// ─── 主组件 ──────────────────────────────────────────────────────────────
+export default function Travel() {
   const { user } = useAuth()
   const userId = user?.id ?? 'anonymous'
+
   const [travels, setTravels] = useState<Travel[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [showSearch, setShowSearch] = useState(false)
-  const [showFunc, setShowFunc] = useState(false)
-  const [showNew, setShowNew] = useState(false)
-  const [selected, setSelected] = useState<Travel | null>(null)
-  const [del, setDel] = useState<Travel | null>(null)
-  const [syncError, setSyncError] = useState<string | null>(null)
-  const funcRef = useRef<HTMLDivElement>(null)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<'desc' | 'asc'>('desc')
+  const [filterRegion, setFilterRegion] = useState('')
+  const [filterYear, setFilterYear] = useState('')
+  const [sortPop, setSortPop] = useState(false)
+  const [filterPop, setFilterPop] = useState(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState(0) // 0 = 总览，1..N = Day
+  const [editing, setEditing] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [addItem, setAddItem] = useState<{
+    open: boolean
+    travelId: string
+    dayIndex: number
+    editId?: string
+  }>({ open: false, travelId: '', dayIndex: 0 })
+  const [cardPop, setCardPop] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [toastMsg, setToastMsg] = useState('')
+  const toastTimer = useRef<number>()
 
-  useEffect(() => {
-    if (!showFunc) return
-    function onDoc(e: MouseEvent) {
-      if (funcRef.current && !funcRef.current.contains(e.target as Node)) setShowFunc(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [showFunc])
-
-  useEffect(() => {
-    setSyncStatusHandler((s) => {
-      if (s.ok) setSyncError(null)
-      else setSyncError(s.msg ?? '同步到云端失败')
-    })
-    return () => setSyncStatusHandler(null)
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg)
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToastMsg(''), 1800)
   }, [])
 
-  // 安全网：卸载时释放可能的滚动锁
-  useEffect(() => () => { forceUnlockBodyScroll() }, [])
-
-  const reload = useCallback(async () => {
-    if (!user) {
-      setTravels([])
-      setLoading(false)
-      return
-    }
-    const rows = await db.travels.where('user_id').equals(userId).toArray()
-    rows.sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)) || b.created_at.localeCompare(a.created_at))
+  // ── 数据加载：本地优先 + 云端注水 + Realtime ──
+  const reload = useCallback(async (uid: string) => {
+    const rows = (await db.travels.where('user_id').equals(uid).toArray()) as Travel[]
+    rows.sort((a, b) => b.created_at.localeCompare(a.created_at))
     setTravels(rows)
-    setLoading(false)
-  }, [user, userId])
+  }, [])
 
-  const reconcileOrphans = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return
+  const load = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
     try {
-      const { data, error } = await supabase.from('travels').select('id').eq('user_id', userId)
-      if (error || !data) return
-      const cloudIds = new Set((data as { id: string }[]).map((r) => r.id))
-      const locals = await db.travels.where('user_id').equals(userId).toArray()
-      const pending = await pendingRowIds('travels')
-      const orphanIds = locals.map((t) => t.id).filter((id) => !cloudIds.has(id) && !pending.has(id))
-      if (orphanIds.length) {
-        await db.travels.bulkDelete(orphanIds)
-        const delSet = new Set(orphanIds)
-        setTravels((prev) => prev.filter((t) => !delSet.has(t.id)))
-      }
-    } catch {
-      /* 对账失败静默，不阻塞主流程 */
+      await reload(userId)
+      await seedFromServer('travels', userId)
+      await reload(userId)
+    } finally {
+      setLoading(false)
     }
-  }, [userId])
+  }, [user, userId, reload])
 
-  // 加载 + Realtime
   useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      await reload()
-      if (cancelled) return
-      const localCount = await db.travels.where('user_id').equals(userId).count()
-      if (localCount === 0) {
-        await seedFromServer('travels', userId)
-        if (cancelled) return
-        await reload()
-      }
-      if (!cancelled) await reconcileOrphans()
-    }
     void load()
-    const timer = window.setInterval(() => {
-      if (!cancelled) void reconcileOrphans()
-    }, 30000)
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, [userId, reload, reconcileOrphans])
+  }, [load])
 
+  // 同步状态错误提示
+  useEffect(() => {
+    setSyncStatusHandler?.((s) => {
+      if (!s.ok && s.msg) showToast(s.msg)
+    })
+    return () => setSyncStatusHandler?.(null)
+  }, [showToast])
+
+  // Realtime：云端变更补进本地（INSERT/UPDATE upsert，DELETE 精确删）
   useEffect(() => {
     if (!user) return
-    const channel = supabase
+    const ch = supabase
       .channel(`travels:${userId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'travels', filter: `user_id=eq.${userId}` },
-        (payload: { eventType?: string; old?: { id?: string }; new?: Record<string, unknown> }) => {
-          const et = payload.eventType
-          const oldId = payload.old?.id
-          const newRow = payload.new as (Record<string, unknown> & { id?: string }) | undefined
-          if (et === 'DELETE' || (oldId && !newRow?.id)) {
+        (payload: { eventType: string; new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
+          if (payload.eventType === 'DELETE') {
+            const oldId = payload.old?.id as string | undefined
             if (oldId) {
               void db.travels.delete(oldId)
               setTravels((prev) => prev.filter((t) => t.id !== oldId))
-              setSelected((s) => (s && s.id === oldId ? null : s))
             }
-            return
-          }
-          if (newRow?.id) {
-            void (async () => {
-              const pending = await pendingRowIds('travels')
-              if (!pending.has(String(newRow.id))) {
-                await db.travels.put(newRow as unknown as Travel)
-              }
-              await reload()
-            })()
+          } else if (payload.new) {
+            const row = payload.new as unknown as Travel
+            void db.travels.put(row)
+            setTravels((prev) => {
+              const idx = prev.findIndex((t) => t.id === row.id)
+              const next = idx >= 0 ? prev.map((t) => (t.id === row.id ? row : t)) : [row, ...prev]
+              return next.sort((a, b) => b.created_at.localeCompare(a.created_at))
+            })
           }
         },
       )
       .subscribe()
     return () => {
-      supabase.removeChannel(channel)
+      void supabase.removeChannel(ch)
     }
   }, [user, userId])
 
-  const persist = useCallback(
-    async (t: Travel) => {
-      const row: Travel = { ...t, user_id: userId }
-      await db.travels.put(row)
-      await enqueueAndMaybeFlush('travels', t.created_at === t.updated_at ? 'insert' : 'update', t.id, row)
-      await reload()
-    },
-    [reload, userId],
+  // 卸载时解锁可能存在的 body 滚动锁
+  useEffect(() => () => forceUnlockBodyScroll(), [])
+
+  // ── 派生数据 ──
+  const visitedSet = useMemo(() => {
+    const s = new Set<string>()
+    travels.forEach((t) => {
+      if (t.province_adcode) s.add(t.province_adcode)
+    })
+    return s
+  }, [travels])
+
+  const provinceCounts = useMemo(() => {
+    const c: Record<string, number> = {}
+    travels.forEach((t) => {
+      if (t.province_adcode) c[t.province_adcode] = (c[t.province_adcode] ?? 0) + 1
+    })
+    return c
+  }, [travels])
+
+  const visitedKm = visitedSet.size * 800 // 衍生展示指标：累计足迹（省×800km）
+
+  const years = useMemo(() => {
+    const ys = new Set<string>()
+    travels.forEach((t) => {
+      if (t.start_date) ys.add(t.start_date.slice(0, 4))
+    })
+    return Array.from(ys).sort().reverse()
+  }, [travels])
+
+  const filtered = useMemo(() => {
+    let list = travels.slice()
+    if (query.trim()) {
+      const q = query.trim().toLowerCase()
+      list = list.filter(
+        (t) =>
+          t.city.toLowerCase().includes(q) ||
+          t.title.toLowerCase().includes(q) ||
+          (t.province_name || '').toLowerCase().includes(q),
+      )
+    }
+    if (filterRegion) list = list.filter((t) => t.province_name === filterRegion)
+    if (filterYear) list = list.filter((t) => t.start_date?.startsWith(filterYear))
+    list.sort((a, b) =>
+      sort === 'desc'
+        ? b.start_date.localeCompare(a.start_date)
+        : a.start_date.localeCompare(b.start_date),
+    )
+    return list
+  }, [travels, query, filterRegion, filterYear, sort])
+
+  const detail = useMemo(
+    () => travels.find((t) => t.id === detailId) ?? null,
+    [travels, detailId],
   )
 
-  const handleNewTrip = (t: Travel) => {
-    setShowNew(false)
-    void (async () => {
-      try {
-        await persist(t)
-      } catch (e) {
-        console.error('[travel] 新建落库失败:', e)
-      }
-    })()
+  // ── 持久化助手 ──
+  const persist = useCallback(
+    async (updated: Travel) => {
+      const row = { ...updated, updated_at: new Date().toISOString() }
+      await localPut('travels', row)
+      await enqueueAndMaybeFlush('travels', 'update', row.id, row)
+      setTravels((prev) =>
+        prev.map((t) => (t.id === row.id ? row : t)).sort((a, b) => b.created_at.localeCompare(a.created_at)),
+      )
+    },
+    [],
+  )
+
+  // ── 新建旅行 ──
+  const [cityText, setCityText] = useState('')
+  const [citySuggest, setCitySuggest] = useState<typeof CITIES>([])
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [coverText, setCoverText] = useState('')
+  const [coverPreview, setCoverPreview] = useState('')
+  const [createErr, setCreateErr] = useState('')
+
+  const onCityInput = (v: string) => {
+    setCityText(v)
+    if (!v.trim()) {
+      setCitySuggest([])
+      return
+    }
+    const q = v.trim().toLowerCase()
+    setCitySuggest(CITIES.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8))
+  }
+  const pickCity = (c: (typeof CITIES)[number]) => {
+    setCityText(c.name)
+    setCitySuggest([])
+    // 暂存选中的省信息，提交时用到
+    pickedProvince.current = { name: c.provinceName, adcode: c.provinceAdcode }
+  }
+  const pickedProvince = useRef<{ name: string; adcode: string }>({ name: '', adcode: '' })
+
+  const onCoverPick = async (file?: File) => {
+    if (!file) return
+    try {
+      const url = await compressImage(file)
+      setCoverText(file.name)
+      setCoverPreview(url)
+      setCreateErr('')
+    } catch {
+      setCreateErr('图片处理失败，请换一张')
+    }
   }
 
-  const handleDeleteTrip = (t: Travel) => {
-    setDel(null)
-    setSelected(null)
-    void (async () => {
-      try {
-        await db.travels.delete(t.id)
-        await enqueueAndMaybeFlush('travels', 'delete', t.id)
-        await reload()
-      } catch (e) {
-        console.error('[travel] 删除落库失败:', e)
-      }
-    })()
+  const createDays = (s: string, e: string): TravelDay[] =>
+    Array.from({ length: dayCount(s, e) }, () => ({ items: [] }))
+
+  const submitCreate = async () => {
+    const city = cityText.trim()
+    if (!city) return setCreateErr('请填写目的地')
+    if (!startDate || !endDate) return setCreateErr('请选择行程日期')
+    if (new Date(endDate) < new Date(startDate)) return setCreateErr('结束日期不能早于开始日期')
+    if (!coverPreview) return setCreateErr('请上传一张封面图')
+    const prov = pickedProvince.current
+    const dc = dayCount(startDate, endDate)
+    const nc = nightCount(startDate, endDate)
+    const emoji = EMOJI_POOL[Math.floor(Math.random() * EMOJI_POOL.length)]
+    const now = new Date().toISOString()
+    const rec: Travel = {
+      id: uid(),
+      user_id: userId,
+      title: `${city} ${dc}天${nc}夜行程`,
+      city,
+      province_adcode: prov.adcode,
+      province_name: prov.name,
+      emoji,
+      start_date: startDate,
+      end_date: endDate,
+      cover: coverPreview,
+      days: createDays(startDate, endDate),
+      created_at: now,
+      updated_at: now,
+    }
+    await localPut('travels', rec)
+    await enqueueAndMaybeFlush('travels', 'insert', rec.id, rec)
+    setTravels((prev) => [rec, ...prev])
+    showToast('已生成旅行规划')
+    // 重置 + 关闭
+    setCreateOpen(false)
+    setCityText('')
+    setCitySuggest([])
+    setStartDate('')
+    setEndDate('')
+    setCoverText('')
+    setCoverPreview('')
+    setCreateErr('')
+    pickedProvince.current = { name: '', adcode: '' }
+    // 直接打开详情，方便继续添加行程
+    setDetailId(rec.id)
+    setActiveTab(0)
+    setEditing(false)
   }
 
-  const handleDetailChange = (t: Travel) => {
-    void (async () => {
-      try {
-        await persist(t)
-        setSelected(t)
-      } catch (e) {
-        console.error('[travel] 详情更新落库失败:', e)
-      }
-    })()
+  // ── 删除旅行 ──
+  const deleteTravel = async (id: string) => {
+    if (!window.confirm('确定删除这条旅行记录吗？此操作不可撤销。')) return
+    await localDelete('travels', id)
+    await enqueueAndMaybeFlush('travels', 'delete', id)
+    setTravels((prev) => prev.filter((t) => t.id !== id))
+    if (detailId === id) setDetailId(null)
+    showToast('已删除')
   }
 
-  const visited = useMemo(() => new Set(travels.map((t) => t.province_adcode).filter(Boolean)), [travels])
+  // ── 添加 / 编辑 行程项 ──
+  const [aiType, setAiType] = useState('attraction')
+  const [aiTitle, setAiTitle] = useState('')
+  const [aiTime, setAiTime] = useState('')
+  const [aiNote, setAiNote] = useState('')
+  const [aiImg, setAiImg] = useState('')
+  const [aiImgName, setAiImgName] = useState('')
+  const [aiPreview, setAiPreview] = useState('')
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return travels
-    return travels.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) ||
-        t.city.toLowerCase().includes(q) ||
-        t.province_name.toLowerCase().includes(q),
+  const openAddItem = (travelId: string, dayIndex: number, editId?: string) => {
+    if (!detail) return
+    const day = detail.days[dayIndex]
+    if (!day) return
+    if (editId) {
+      const it = day.items.find((i) => i.id === editId)
+      if (it) {
+        setAiType(it.type)
+        setAiTitle(it.title)
+        setAiTime(it.time)
+        setAiNote(it.note)
+        setAiImg(it.img ?? '')
+        setAiImgName(it.img ? '已附图片' : '')
+        setAiPreview(it.img ?? '')
+      }
+    } else {
+      setAiType('attraction')
+      setAiTitle('')
+      setAiTime('')
+      setAiNote('')
+      setAiImg('')
+      setAiImgName('')
+      setAiPreview('')
+    }
+    setAddItem({ open: true, travelId, dayIndex, editId })
+    setAddMenuOpen(false)
+  }
+
+  const onAiImg = async (file?: File) => {
+    if (!file) return
+    try {
+      const url = await compressImage(file)
+      setAiImg(url)
+      setAiImgName(file.name)
+      setAiPreview(url)
+    } catch {
+      showToast('图片处理失败')
+    }
+  }
+
+  const submitAddItem = async () => {
+    if (!detail) return
+    const title = aiTitle.trim() || MODULE_LABELS[aiType].name
+    const item: TravelItem = {
+      id: addItem.editId ?? uid(),
+      time: aiTime,
+      type: aiType,
+      title,
+      note: aiNote.trim(),
+      img: aiImg || null,
+    }
+    const days = detail.days.map((d, i) => {
+      if (i !== addItem.dayIndex) return d
+      if (addItem.editId) {
+        return { items: d.items.map((it) => (it.id === addItem.editId ? item : it)) }
+      }
+      return { items: [...d.items, item] }
+    })
+    const updated = { ...detail, days }
+    await persist(updated)
+    setAddItem({ open: false, travelId: '', dayIndex: 0 })
+    showToast(addItem.editId ? '已更新' : '已添加')
+  }
+
+  // 行程项：上移 / 下移 / 删除
+  const moveItem = async (dayIndex: number, itemId: string, dir: -1 | 1) => {
+    if (!detail) return
+    const days = detail.days.map((d, i) => {
+      if (i !== dayIndex) return d
+      const arr = d.items.slice()
+      const idx = arr.findIndex((it) => it.id === itemId)
+      const j = idx + dir
+      if (idx < 0 || j < 0 || j >= arr.length) return d
+      ;[arr[idx], arr[j]] = [arr[j], arr[idx]]
+      return { items: arr }
+    })
+    await persist({ ...detail, days })
+  }
+  const deleteItem = async (dayIndex: number, itemId: string) => {
+    if (!detail) return
+    const days = detail.days.map((d, i) =>
+      i === dayIndex ? { items: d.items.filter((it) => it.id !== itemId) } : d,
     )
-  }, [travels, search])
+    await persist({ ...detail, days })
+  }
 
-  const openByProvince = (adcode: string) => {
-    const t = travels.find((x) => x.province_adcode === adcode)
-    if (t) setSelected(t)
+  // 新增一天
+  const addDay = async () => {
+    if (!detail) return
+    await persist({ ...detail, days: [...detail.days, { items: [] }] })
+    setActiveTab(detail.days.length + 1)
+    showToast('已添加新的一天')
+  }
+
+  // 同步按钮
+  const syncNow = async () => {
+    showToast('正在同步云端…')
+    await seedFromServer('travels', userId)
+    await reload(userId)
+    await enqueueAndMaybeFlush('travels', 'update', '', undefined)
+    showToast('同步完成')
+  }
+
+  // 省份点击（地图）：若该地区有记录则筛选，否则提示
+  const onProvinceClick = (adcode: string, name: string) => {
+    const c = provinceCounts[adcode] ?? 0
+    if (c > 0) {
+      setFilterRegion(name)
+      setFilterYear('')
+      setQuery('')
+      showToast(`已筛选：${name}（${c} 次记录）`)
+    } else {
+      showToast(`${name} · 还没有旅行记录`)
+    }
+  }
+
+  // 总览：各模块计数
+  const overviewCounts = useMemo(() => {
+    const c: Record<string, number> = {}
+    detail?.days.forEach((d) =>
+      d.items.forEach((it) => {
+        c[it.type] = (c[it.type] ?? 0) + 1
+      }),
+    )
+    return c
+  }, [detail])
+
+  // ── 渲染 ──
+  const closeDetail = () => {
+    setDetailId(null)
+    setEditing(false)
+    setAddMenuOpen(false)
   }
 
   return (
-    <div className="relative w-full">
-      {/* 顶部导航：固定透明 */}
-      <nav className="fixed left-0 right-0 top-0 z-30 bg-transparent">
-        <div className="flex items-center justify-between gap-2.5 px-[10px] py-4 md:pl-[120px] md:pr-12">
-          <h1 className="flex items-baseline gap-1 text-base font-semibold text-white/90">
-            旅行记录
-            <span className="text-xs font-normal text-white/40">{travels.length} 段</span>
-          </h1>
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => {
-                setShowSearch((s) => !s)
-                if (showSearch) setSearch('')
-              }}
-              aria-label="搜索"
-              className={`grid h-9 w-9 place-items-center rounded-full backdrop-blur-md transition ${
-                showSearch ? 'bg-accent/20 text-accent' : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </button>
-            {showSearch && (
-              <input
-                autoFocus
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="搜索目的地 / 城市"
-                className="h-9 w-40 rounded-full border border-white/10 bg-black/40 px-4 text-sm text-white/90 outline-none backdrop-blur-md focus:border-accent/50 md:w-56"
-              />
-            )}
-            <div className="relative" ref={funcRef}>
-              <button
-                onClick={() => setShowFunc((f) => !f)}
-                aria-label="功能"
-                aria-haspopup="menu"
-                aria-expanded={showFunc}
-                className="grid h-9 w-9 place-items-center rounded-full bg-white/10 backdrop-blur-md transition hover:bg-white/20"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
+    <div className="travel-page" style={{ height: 'calc(100vh - 48px)' }}>
+      <div className="t-app">
+        {/* ===== 左侧：地图仪表盘 ===== */}
+        <div className="t-left">
+          <div className="left-header">
+            <div className="brand">
+              <div className="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
+                  <circle cx="12" cy="9" r="2.5" />
                 </svg>
-              </button>
-              {showFunc && (
-                <div className="animate-popover absolute right-0 top-11 z-40 w-40 overflow-hidden rounded-xl border border-white/10 bg-[#15151c]/95 p-1.5 shadow-2xl backdrop-blur-xl">
-                  <button
+              </div>
+              <div className="title">
+                <h1>我的旅行轨迹地图</h1>
+                <div className="sub">Cyberspatial Cartography · Data-driven Itinerary</div>
+              </div>
+            </div>
+            <div className="t-stats">
+              <div className="t-stat">
+                <div className="ico">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
+                    <circle cx="12" cy="9" r="2.5" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="lbl">已造访省份</div>
+                  <div className="val">
+                    {visitedSet.size}
+                    <em>/34</em>
+                  </div>
+                </div>
+              </div>
+              <div className="t-stat">
+                <div className="ico">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 12h6l3-7 3 14 3-7h3" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="lbl">旅行里程</div>
+                  <div className="val">
+                    {visitedKm}
+                    <em> km</em>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <ChinaMap visited={visitedSet} counts={provinceCounts} onProvinceClick={onProvinceClick} />
+
+          <div className="t-legend">
+            <span className="item">
+              <span className="dot plane" /> 航空线路
+            </span>
+            <span className="item">
+              <span className="dot train" /> 高速铁路
+            </span>
+            <span className="item">
+              <span className="dot car" /> 自驾公路
+            </span>
+            <span className="item" style={{ marginLeft: 'auto', color: 'rgb(var(--c-accent-rgb))' }}>
+              💡 点亮省份由新建的旅行记录自动驱动
+            </span>
+          </div>
+        </div>
+
+        {/* ===== 右侧：工具栏 + 瀑布流 ===== */}
+        <div className="t-right" style={{ position: 'relative' }}>
+          <div className="toolbar">
+            <div className="t-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4-4" />
+              </svg>
+              <input
+                placeholder="搜索目的地、标题…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <div
+              className="icon-btn"
+              title="排序"
+              onClick={() => {
+                setSortPop((v) => !v)
+                setFilterPop(false)
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
+              </svg>
+              <span className="badge-tip">{sort === 'desc' ? '行程时间倒序' : '行程时间正序'}</span>
+            </div>
+            <div
+              className="icon-btn"
+              title="筛选"
+              onClick={() => {
+                setFilterPop((v) => !v)
+                setSortPop(false)
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 5h18M6 12h12M10 19h4" />
+              </svg>
+              <span className="badge-tip">筛选</span>
+            </div>
+            <div className="icon-btn" title="同步" onClick={() => void syncNow()}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12a9 9 0 0115-6.7M21 12a9 9 0 01-15 6.7" />
+                <path d="M21 4v5h-5M3 20v-5h5" />
+              </svg>
+              <span className="badge-tip">刷新从云端同步</span>
+            </div>
+            <button className="new-btn" onClick={() => setCreateOpen(true)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              新建
+            </button>
+
+            {/* 排序弹窗 */}
+            <div className={`t-popover${sortPop ? ' show' : ''}`} style={{ right: '148px' }}>
+              <div className="head">排序方式</div>
+              <div
+                className={`item${sort === 'desc' ? ' active' : ''}`}
+                onClick={() => {
+                  setSort('desc')
+                  setSortPop(false)
+                }}
+              >
+                <span className="ico">⏱</span> 按行程时间倒序 <span className="check">✓</span>
+              </div>
+              <div
+                className={`item${sort === 'asc' ? ' active' : ''}`}
+                onClick={() => {
+                  setSort('asc')
+                  setSortPop(false)
+                }}
+              >
+                <span className="ico">⏱</span> 按行程时间正序 <span className="check">✓</span>
+              </div>
+            </div>
+
+            {/* 筛选弹窗 */}
+            <div className={`t-popover${filterPop ? ' show' : ''}`} style={{ right: '96px' }}>
+              <div className="head">地区</div>
+              <select
+                className="t-input"
+                value={filterRegion}
+                onChange={(e) => setFilterRegion(e.target.value)}
+                style={{ width: '100%', padding: '7px 8px', borderRadius: '8px' }}
+              >
+                <option value="">全部地区</option>
+                {PROVINCES.map((p) => (
+                  <option key={p.adcode} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <div className="sep" />
+              <div className="head">行程时间</div>
+              <select
+                className="t-input"
+                value={filterYear}
+                onChange={(e) => setFilterYear(e.target.value)}
+                style={{ width: '100%', padding: '7px 8px', borderRadius: '8px' }}
+              >
+                <option value="">全部</option>
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y} 年
+                  </option>
+                ))}
+              </select>
+              <div className="sep" />
+              <div
+                className="item"
+                style={{ color: 'var(--text-dim)' }}
+                onClick={() => {
+                  setFilterRegion('')
+                  setFilterYear('')
+                  setFilterPop(false)
+                }}
+              >
+                清除筛选
+              </div>
+            </div>
+          </div>
+
+          <div className="scroll-area">
+            <div className="waterfall">
+              {filtered.length === 0 && !loading && (
+                <div className="empty-state">
+                  还没有旅行记录，点击右上角「新建」开始规划你的第一程 ✈️
+                  <div className="arrow">↓</div>
+                </div>
+              )}
+              {loading && (
+                <div className="empty-state">正在载入旅行地图…</div>
+              )}
+              {filtered.map((t) => {
+                const dc = dayCount(t.start_date, t.end_date)
+                const nc = nightCount(t.start_date, t.end_date)
+                return (
+                  <div
+                    className="wf-item"
+                    key={t.id}
                     onClick={() => {
-                      setShowFunc(false)
-                      setShowNew(true)
+                      setDetailId(t.id)
+                      setActiveTab(0)
+                      setEditing(false)
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/85 transition hover:bg-white/10"
                   >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
-                      <path d="M12 5v14M5 12h14" />
+                    <div className="wf-cover">
+                      {t.cover ? (
+                        <img src={t.cover} alt={t.title} />
+                      ) : (
+                        <div
+                          className="cover-bg"
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background:
+                              'linear-gradient(135deg, rgba(124,133,245,0.5), rgba(124,133,245,0.15))',
+                          }}
+                        />
+                      )}
+                      <div className="vignette" />
+                      <div className="wf-emoji">{t.emoji || '🌏'}</div>
+                    </div>
+                    <div
+                      className="wf-more"
+                      role="button"
+                      aria-expanded={cardPop?.id === t.id}
+                      title="更多"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const r = (e.target as HTMLElement).getBoundingClientRect()
+                        setCardPop(
+                          cardPop?.id === t.id
+                            ? null
+                            : { id: t.id, x: r.right - 156, y: r.bottom + 6 },
+                        )
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="5" r="1.6" />
+                        <circle cx="12" cy="12" r="1.6" />
+                        <circle cx="12" cy="19" r="1.6" />
+                      </svg>
+                    </div>
+                    <div className="wf-info">
+                      <div className="wf-title">
+                        {t.city} · {dc}天{nc}夜
+                      </div>
+                      <div className="wf-sub">
+                        {t.start_date}
+                        <span className="pip" />
+                        {t.end_date}
+                        <span className="pip" />
+                        {t.province_name}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ===== 详情面板（从右滑入全屏覆盖） ===== */}
+          <div className={`detail-panel${detail ? ' show' : ''}`}>
+            {detail && (
+              <>
+                <div className="dp-header">
+                  <div
+                    className="dp-back"
+                    title="返回"
+                    onClick={closeDetail}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M15 18l-6-6 6-6" />
                     </svg>
-                    新建行程
+                  </div>
+                  <div className="dp-title-wrap">
+                    <div className="dp-title">{detail.title}</div>
+                    <div className="dp-sub">
+                      行程日期 · {detail.start_date} → {detail.end_date}
+                    </div>
+                  </div>
+                  <button
+                    className={`dp-edit-btn${editing ? ' active' : ''}`}
+                    onClick={() => setEditing((v) => !v)}
+                  >
+                    {editing ? '完成' : '编辑'}
                   </button>
+                </div>
+                <div className="dp-tabs">
+                  <div
+                    className={`dp-tab${activeTab === 0 ? ' active' : ''}`}
+                    onClick={() => setActiveTab(0)}
+                  >
+                    总览
+                  </div>
+                  {detail.days.map((_d, i) => (
+                    <div
+                      key={i}
+                      className={`dp-tab${activeTab === i + 1 ? ' active' : ''}`}
+                      onClick={() => setActiveTab(i + 1)}
+                    >
+                      DAY {i + 1}
+                    </div>
+                  ))}
+                  <div
+                    className="dp-tab add"
+                    onClick={() => {
+                      setActiveTab(detail.days.length)
+                      void addDay()
+                    }}
+                  >
+                    + 添加日期
+                  </div>
+                </div>
+                <div className={`dp-body${editing ? ' editing' : ''}`}>
+                  {activeTab === 0 && (
+                    <div className="overview-grid">
+                      {OVERVIEW_TYPES.map((type) => {
+                        const meta = MODULE_LABELS[type]
+                        const cnt = overviewCounts[type] ?? 0
+                        // 点击跳到第一个含该类型的天
+                        const firstDay = detail.days.findIndex((d) =>
+                          d.items.some((it) => it.type === type),
+                        )
+                        return (
+                          <div
+                            className={`mod-card${cnt > 0 ? ' purple' : ''}`}
+                            key={type}
+                            onClick={() => {
+                              if (firstDay >= 0) setActiveTab(firstDay + 1)
+                            }}
+                            style={{ cursor: firstDay >= 0 ? 'pointer' : 'default' }}
+                          >
+                            <div className="mod-ico">{meta.icon}</div>
+                            <div className="mod-name">{meta.name}</div>
+                            <div className="mod-meta">
+                              {cnt > 0 ? `${cnt} 条记录` : '暂无'}
+                            </div>
+                            <div className="mod-num">{cnt}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {activeTab > 0 &&
+                    detail.days[activeTab - 1] && (
+                      <div className="day-section is-active">
+                        <div className="day-header">
+                          <span className="day-tag">DAY {activeTab}</span>
+                          <span className="day-title">
+                            {detail.city} · 第 {activeTab} 天
+                          </span>
+                          <span className="day-line" />
+                          <span className="day-date">
+                            {dayDate(detail.start_date, activeTab - 1)}
+                          </span>
+                        </div>
+                        {detail.days[activeTab - 1].items.length === 0 && (
+                          <div className="empty-state" style={{ margin: '10px 0' }}>
+                            这一天还没有安排，点右下角 + 添加行程
+                          </div>
+                        )}
+                        {detail.days[activeTab - 1].items.map((it) => {
+                          const meta = MODULE_LABELS[it.type] ?? MODULE_LABELS.custom
+                          return (
+                            <div className="timeline" key={it.id}>
+                              <div className="tl-item">
+                                <div className="tl-time">{it.time || '—'}</div>
+                                <div className="tl-axis">
+                                  <div className="tl-dot">{meta.icon}</div>
+                                  <div className="tl-line" />
+                                </div>
+                                <div className="tl-content">
+                                  <div className="tl-title">
+                                    {meta.icon} {it.title}
+                                  </div>
+                                  <div className="tl-meta">
+                                    <span className="tl-pill">{meta.name}</span>
+                                    {it.time && <span>· {it.time}</span>}
+                                  </div>
+                                  {it.note && <div className="tl-note">{it.note}</div>}
+                                  {it.img && (
+                                    <img className="tl-thumb" src={it.img} alt={it.title} />
+                                  )}
+                                  {editing && (
+                                    <div className="tl-actions">
+                                      <button
+                                        title="上移"
+                                        onClick={() => moveItem(activeTab - 1, it.id, -1)}
+                                      >
+                                        ↑
+                                      </button>
+                                      <button
+                                        title="下移"
+                                        onClick={() => moveItem(activeTab - 1, it.id, 1)}
+                                      >
+                                        ↓
+                                      </button>
+                                      <button
+                                        className="tl-act-edit"
+                                        title="编辑"
+                                        onClick={() =>
+                                          openAddItem(detail.id, activeTab - 1, it.id)
+                                        }
+                                      >
+                                        ✎
+                                      </button>
+                                      <button
+                                        title="删除"
+                                        onClick={() => deleteItem(activeTab - 1, it.id)}
+                                      >
+                                        🗑
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                </div>
+                <button
+                  className="fab-add"
+                  title="添加"
+                  onClick={() => setAddMenuOpen((v) => !v)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
+                <div className={`add-menu${addMenuOpen ? ' show' : ''}`}>
+                  {MODULE_KEYS.map((type) => {
+                    const meta = MODULE_LABELS[type]
+                    return (
+                      <div
+                        className="am"
+                        key={type}
+                        title={meta.name}
+                        onClick={() => openAddItem(detail.id, Math.max(0, activeTab - 1))}
+                      >
+                        <div className="am-ico">{meta.icon}</div>
+                        <div>{meta.name}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ===== 卡片"更多"弹出（fixed 定位，避开 overflow） ===== */}
+      {cardPop && (
+        <div
+          className="wf-popover"
+          style={{ position: 'fixed', left: cardPop.x, top: cardPop.y }}
+        >
+          <button
+            className="wf-pop-item"
+            onClick={() => {
+              const t = travels.find((x) => x.id === cardPop.id)
+              if (t) {
+                setDetailId(t.id)
+                setActiveTab(0)
+                setEditing(false)
+              }
+              setCardPop(null)
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            打开详情
+          </button>
+          <button
+            className="wf-pop-item pop-del"
+            onClick={() => {
+              void deleteTravel(cardPop.id)
+              setCardPop(null)
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+            删除记录
+          </button>
+        </div>
+      )}
+
+      {/* ===== 创建旅行 dialog ===== */}
+      {createOpen && (
+        <div className="t-modal-mask show" onClick={(e) => {
+          if (e.target === e.currentTarget) setCreateOpen(false)
+        }}>
+          <div className="t-modal">
+            <div className="t-modal-close" onClick={() => setCreateOpen(false)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </div>
+            <h3>新建旅行记录</h3>
+            <div className="t-modal-sub">WHERE · WHEN · INFO</div>
+
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="11" r="3" />
+                  <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
+                </svg>
+                你想去哪里？
+              </div>
+              <div className="desc">支持全球多级城市，输入关键词自动联想</div>
+              <input
+                className="t-input"
+                placeholder="例如：上海、长沙、东京、巴黎…"
+                value={cityText}
+                autoComplete="off"
+                onChange={(e) => onCityInput(e.target.value)}
+              />
+              <div className={`t-suggest${citySuggest.length ? ' show' : ''}`}>
+                {citySuggest.map((c) => (
+                  <div
+                    className="sg"
+                    key={c.name + c.provinceName}
+                    onClick={() => pickCity(c)}
+                  >
+                    <span className="name">{c.name}</span>
+                    <span className="prov">{c.country || c.provinceName}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="5" width="18" height="16" rx="2" />
+                  <path d="M8 3v4M16 3v4M3 11h18" />
+                </svg>
+                你想去多久？
+              </div>
+              <div className="desc">即——行程日期（开始 / 结束），下方自动算出天数</div>
+              <div className="t-date-row">
+                <input
+                  type="date"
+                  className="t-input"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+                <input
+                  type="date"
+                  className="t-input"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              {startDate && endDate && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 11,
+                    color: 'rgb(var(--c-accent-rgb))',
+                  }}
+                >
+                  共 {dayCount(startDate, endDate)} 天 {nightCount(startDate, endDate)} 夜
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </nav>
 
-      {syncError && (
-        <div className="px-3 pt-[62px] md:pl-[120px] md:pr-12 md:pt-[92px]">
-          <div className="mb-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-            {syncError}
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="9" cy="9" r="2" />
+                  <path d="M3 17l5-5 4 4 3-3 6 6" />
+                </svg>
+                封面图（必传）
+              </div>
+              <div className="desc">本地压缩为图片后入库，离线可用、同步上云</div>
+              <label
+                className="t-input"
+                htmlFor="coverInput"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  height: 42,
+                }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  style={{ width: 16, height: 16, flexShrink: 0, opacity: 0.7 }}
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+                  {coverText || '选择图片（必传）'}
+                </span>
+              </label>
+              <input
+                id="coverInput"
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => onCoverPick(e.target.files?.[0] ?? undefined)}
+              />
+              {coverPreview && (
+                <img
+                  src={coverPreview}
+                  alt="封面预览"
+                  style={{
+                    marginTop: 8,
+                    maxWidth: '100%',
+                    maxHeight: 160,
+                    borderRadius: 10,
+                    border: '1px solid var(--line)',
+                  }}
+                />
+              )}
+            </div>
+
+            {createErr && (
+              <div style={{ color: 'rgb(185,28,28)', fontSize: 12, marginTop: 8 }}>
+                {createErr}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="t-btn-secondary" onClick={() => setCreateOpen(false)}>
+                取消
+              </button>
+              <button className="t-btn-primary" onClick={() => void submitCreate()}>
+                生成规划
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="mx-auto max-w-[1400px] px-3 pb-16 pt-[72px] md:pt-[100px]">
-        {loading ? (
-          <div className="py-20 text-center text-sm text-white/40">加载中…</div>
-        ) : travels.length === 0 ? (
-          <div className="py-20 text-center text-sm text-white/40">
-            还没有旅行记录。点击右上角「功能 → 新建行程」，地图对应省份会随之点亮。
-          </div>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-[1fr_1.05fr]">
-            {/* 左：地图（桌面 sticky） */}
-            <div className="lg:sticky lg:top-[100px] lg:h-[calc(100vh-120px)] lg:self-start">
-              <ChinaMap visited={visited} onProvinceClick={openByProvince} />
+      {/* ===== 添加 / 编辑 行程项 dialog ===== */}
+      {addItem.open && detail && (
+        <div className="t-modal-mask show" onClick={(e) => {
+          if (e.target === e.currentTarget) setAddItem({ open: false, travelId: '', dayIndex: 0 })
+        }}>
+          <div className="t-modal">
+            <div
+              className="t-modal-close"
+              onClick={() => setAddItem({ open: false, travelId: '', dayIndex: 0 })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
             </div>
-            {/* 右：瀑布流 */}
-            <div className="columns-1 gap-4 sm:columns-2 [&>*]:mb-4">
-              {visible.map((t) => (
-                <div key={t.id} className="break-inside-avoid">
-                  <TripCard
-                    trip={t}
-                    onOpen={setSelected}
-                    onEdit={setSelected}
-                    onDelete={setDel}
-                  />
+            <h3>{addItem.editId ? '编辑行程模块' : '添加行程模块'}</h3>
+            <div className="t-modal-sub">TYPE · TITLE · TIME · NOTE · IMAGE</div>
+
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 7h16M4 12h16M4 17h10" />
+                </svg>
+                功能标题
+              </div>
+              <div className="desc">选择模块类型（共 13 类）</div>
+              <select
+                className="t-input"
+                value={aiType}
+                onChange={(e) => setAiType(e.target.value)}
+              >
+                {MODULE_KEYS.map((type) => (
+                  <option key={type} value={type}>
+                    {MODULE_LABELS[type].icon} {MODULE_LABELS[type].name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 20h4l11-11-4-4L4 16v4z" />
+                </svg>
+                自定义标题
+              </div>
+              <div className="desc">给这条记录起个名字（如：护国寺小吃）</div>
+              <input
+                className="t-input"
+                placeholder="如：护国寺小吃"
+                value={aiTitle}
+                onChange={(e) => setAiTitle(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div className="t-field" style={{ flex: 1, marginBottom: 0 }}>
+                <div className="label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
+                  时间
                 </div>
-              ))}
+                <input
+                  className="t-input"
+                  type="time"
+                  value={aiTime}
+                  onChange={(e) => setAiTime(e.target.value)}
+                />
+              </div>
+              <div className="t-field" style={{ flex: 1, marginBottom: 0 }}>
+                <div className="label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                    <circle cx="9" cy="11" r="2" />
+                    <path d="M3 17l5-5 4 4 3-3 6 6" />
+                  </svg>
+                  图片上传
+                </div>
+                <label
+                  className="t-input"
+                  htmlFor="aiImg"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    cursor: 'pointer',
+                    height: 42,
+                  }}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    style={{ width: 16, height: 16, flexShrink: 0, opacity: 0.7 }}
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+                    {aiImgName || '选择图片（可选）'}
+                  </span>
+                </label>
+                <input
+                  id="aiImg"
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => onAiImg(e.target.files?.[0] ?? undefined)}
+                />
+              </div>
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* 详情面板（桌面右侧 dock / 移动端全屏） */}
-      {selected && (
-        <TravelDetailPanel
-          trip={selected}
-          onClose={() => setSelected(null)}
-          onChange={handleDetailChange}
-          onDelete={setDel}
-        />
-      )}
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 4h16v16H4z" />
+                  <path d="M4 8h16M8 4v16" />
+                </svg>
+                备注
+              </div>
+              <textarea
+                className="t-input"
+                rows={3}
+                placeholder="如：豆汁焦圈 / 麻豆腐 / 驴打滚"
+                style={{ resize: 'vertical' }}
+                value={aiNote}
+                onChange={(e) => setAiNote(e.target.value)}
+              />
+            </div>
 
-      {showNew && (
-        <NewTripModal onClose={() => setShowNew(false)} onSave={handleNewTrip} />
-      )}
+            {aiPreview && (
+              <div style={{ margin: '-6px 0 12px' }}>
+                <img
+                  id="aiPreviewImg"
+                  src={aiPreview}
+                  alt="预览"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: 160,
+                    borderRadius: 10,
+                    border: '1px solid var(--line)',
+                  }}
+                />
+              </div>
+            )}
 
-      {del && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15151c] p-4 shadow-2xl">
-            <h3 className="text-base font-semibold text-white/90">删除行程</h3>
-            <p className="mt-2 text-sm text-white/60">
-              确定删除「{del.title}」？该操作会从本地与云端一并移除，不可恢复。
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="modal-actions">
               <button
-                onClick={() => setDel(null)}
-                className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:bg-white/10"
+                className="t-btn-secondary"
+                onClick={() => setAddItem({ open: false, travelId: '', dayIndex: 0 })}
               >
                 取消
               </button>
-              <button
-                onClick={() => handleDeleteTrip(del)}
-                className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white transition hover:bg-danger/90"
-              >
-                删除
+              <button className="t-btn-primary" onClick={() => void submitAddItem()}>
+                {addItem.editId ? '保存修改' : '添加到时间轴'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ===== 全局 toast ===== */}
+      <div className={`t-toast${toastMsg ? ' show' : ''}`}>{toastMsg || '同步完成'}</div>
     </div>
   )
 }
