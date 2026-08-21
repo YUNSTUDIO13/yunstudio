@@ -99,6 +99,32 @@ const PROVINCES: ChinaGeo[] = CHINA_GEO.filter(
   (g) => g.adcode !== '100000_JD' && g.name,
 )
 
+// ─── 地图装饰层（对齐设计稿 setupMap）：等值波浪线 + 同心椭圆环，营造"科技发光"底纹 ──
+const TOPO_WAVES: { d: string; cls: string }[] = (() => {
+  const W = 1000
+  const out: { d: string; cls: string }[] = []
+  for (let i = 0; i < 9; i++) {
+    const y = 120 + i * 95 + (i % 2) * 10
+    const amp = 10 + (i % 3) * 4
+    const phase = i * 0.7
+    let d = `M 0 ${y}`
+    const step = 28
+    for (let x = step; x <= W; x += step) {
+      const yi = y + Math.sin((x / W) * Math.PI * 3 + phase) * amp
+      d += ` L ${x} ${yi.toFixed(1)}`
+    }
+    out.push({ d, cls: i % 2 ? 'wave-p' : 'wave-c' })
+  }
+  return out
+})()
+// 椭圆环按省份中心分布（cx≈625 / cy≈470）布点，覆盖国土主要区域
+const TOPO_ISO = [
+  { cx: 620, cy: 470, rx: 260, ry: 150, op: 0.16 },
+  { cx: 780, cy: 560, rx: 170, ry: 100, op: 0.13 },
+  { cx: 430, cy: 400, rx: 200, ry: 120, op: 0.12 },
+  { cx: 690, cy: 300, rx: 210, ry: 120, op: 0.1 },
+]
+
 // ─── 辅助 ────────────────────────────────────────────────────────────────
 function dayCount(s: string, e: string): number {
   if (!s || !e) return 1
@@ -195,6 +221,27 @@ function ChinaMap({
           </pattern>
         </defs>
         <rect x="0" y="0" width="1000" height="979" fill="url(#tgrid)" />
+        {/* 装饰层：等值波浪线 + 同心椭圆环（设计稿 setupMap 同款） */}
+        <g className="topo" aria-hidden>
+          {TOPO_WAVES.map((w, i) => (
+            <path key={`w${i}`} d={w.d} className={w.cls} strokeWidth={0.6} opacity={0.18} fill="none" />
+          ))}
+          {TOPO_ISO.map((e, i) =>
+            [1, 0.7, 0.4].map((f, j) => (
+              <ellipse
+                key={`iso-${i}-${j}`}
+                cx={e.cx}
+                cy={e.cy}
+                rx={e.rx * f}
+                ry={e.ry * f}
+                className={j % 2 ? 'wave-p' : 'wave-c'}
+                strokeWidth={0.6 - j * 0.1}
+                fill="none"
+                opacity={e.op * (1 - j * 0.2)}
+              />
+            )),
+          )}
+        </g>
         {CHINA_GEO.map((g) => {
           if (g.adcode === '100000_JD') {
             return (
@@ -226,8 +273,8 @@ function ChinaMap({
           if (g.adcode === '100000_JD' || !visited.has(g.adcode)) return null
           return (
             <g key={`mk-${g.adcode}`} style={{ pointerEvents: 'none' }}>
-              <circle className="marker show" cx={g.cx} cy={g.cy} r={4} />
-              <circle className="marker-ripple go" cx={g.cx} cy={g.cy} r={3} />
+              <circle className="marker show" cx={g.cx} cy={g.cy} r={5} />
+              <circle className="marker-ripple go" cx={g.cx} cy={g.cy} r={4} />
             </g>
           )
         })}
@@ -492,7 +539,7 @@ export default function Travel() {
     await localPut('travels', rec)
     await enqueueAndMaybeFlush('travels', 'insert', rec.id, rec)
     setTravels((prev) => [rec, ...prev])
-    showToast('已生成旅行规划')
+    showToast(prov.adcode ? `已生成旅行规划 · 点亮${prov.name}` : '已生成旅行规划')
     // 重置 + 关闭
     setCreateOpen(false)
     setCityText('')
