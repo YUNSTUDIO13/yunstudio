@@ -69,8 +69,13 @@
   /* 移动端右侧卡片列表：flex column + 最小高度（避免被父 flex 压缩为 0） */
   .t-right { display: flex; flex-direction: column; height: auto; min-height: 280px; flex-shrink: 0; }
   .scroll-area { flex: none; height: auto; min-height: 200px; overflow: visible; }
-  /* 移动端瀑布流：单列（窄屏单列更易阅读） */
-  .waterfall { column-count: 1; padding: 4px 8px 8px 4px; }
+  /* 移动端瀑布流：单列（窄屏单列更易阅读）；提升 specificity（body .waterfall），
+        否则 PC 端后定义的 column-count: 2 会胜出。 */
+  body .waterfall { column-count: 1; padding: 4px 8px 8px 4px; }
+  /* 移动端卡片底部元信息（日期+省）：flex-wrap 让日期自动换行两行，避免被挤断字 */
+  .wf-sub { flex-wrap: wrap; gap: 4px 6px; }
+  /* 移动端弹窗 mask：底部加 70px padding 避开 dock，flex center 让 modal 自动上移 */
+  .t-modal-mask { padding-bottom: 70px; }
   /* 移动端 empty-state 更显眼（避免"完全空白"看起来像页面坏掉） */
   .empty-state {
     border: 1px dashed var(--c-accent-border);
@@ -93,7 +98,8 @@
   .fab-add { right: 16px; bottom: 16px; width: 44px; height: 44px; }
   .fab-add svg { width: 20px; height: 20px; }
   /* detail panel 移动端全屏 */
-  .detail-panel { left: 0; right: 0; width: 100%; border-radius: 16px 16px 0 0; }
+  /* detail panel 移动端全屏：left/right/top=0 + bottom 留 70px 避开底部 dock */
+  body .detail-panel { left: 0; right: 0; top: 0; bottom: 70px; width: 100%; border-radius: 16px 16px 0 0; }
   /* 图例在窄屏可换行 */
   .t-legend { flex-wrap: wrap; gap: 6px 10px; }
 }
