@@ -1183,8 +1183,7 @@ export default function Travel() {
                 </svg>
               </div>
               <div className="title">
-                <h1>我的旅行行光地图</h1>
-                <div className="sub">Cyberspatial Cartography · Data-driven Itinerary</div>
+                <h1>我的旅行时光地图</h1>
               </div>
             </div>
             <div className="t-stats">
