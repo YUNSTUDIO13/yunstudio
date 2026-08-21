@@ -48,13 +48,14 @@
   /* 改用 flex column：grid 单列+子元素 flex:1 容易塌陷为 0 高度，flex column 更可控。
      ★ 用 body .t-app 提升 specificity（0,2,0 vs PC 端 .t-app 的 0,1,0），
         否则 PC 端后定义的 grid 60/40 会胜出，mobile 完全不生效。
-     左右边距 24px 与观影板块移动端 px-6 保持一致。 */
+     移动端 padding: 对齐观影板块的电影列表 grid（直接贴屏幕左右边缘，无左右 padding）；
+     仅保留上下 12px 间距让组件之间有呼吸。 */
   body .t-app {
     display: flex;
     flex-direction: column;
     height: auto;
     overflow: visible;
-    padding: 12px 24px; /* 左右 24px（对齐观影 px-6），上下 12px */
+    padding: 12px 0;
     gap: 12px;
   }
   /* 地图区域：固定高度（按宽度等比），保证可读 */
