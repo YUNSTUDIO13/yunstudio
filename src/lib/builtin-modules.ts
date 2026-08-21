@@ -13,6 +13,7 @@ export const BUILTIN_MODULE_IDS = [
   'ui-settings', // UI 设置（指针主题 · 全局视觉）
   'movies', // 观影（个人影视库 / 观影志）
   'books', // 阅读（个人书库 / 阅读志）
+  'travel', // 旅行（个人旅行志 / 中国地图点亮）
 ] as const
 export type BuiltinModuleId = (typeof BUILTIN_MODULE_IDS)[number]
 
@@ -110,6 +111,13 @@ export const BUILTIN_MODULES: Record<BuiltinModuleId, BuiltinModuleMeta> = {
     title: '阅读',
     desc: '个人书库 · 封面/评分/短评 · Google Books 自动补元数据',
     route: '/modules/books',
+    defaultEnabled: true,
+  },
+  'travel': {
+    id: 'travel',
+    title: '旅行',
+    desc: '个人旅行志 · 中国地图点亮 · 行程时间轴 · 图文记录',
+    route: '/modules/travel',
     defaultEnabled: true,
   },
 }

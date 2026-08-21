@@ -347,3 +347,51 @@ export type BookInput = {
   synced?: boolean
   cover_failed?: boolean
 }
+
+// ============================================================
+// 旅行（Travel）—— 个人旅行志
+// 数据：本地 Dexie 优先 + outbox 补传 Supabase（与 movies/books 一致）
+// 地图：province_adcode 反查省级行政区，有该省记录则地图对应省份点亮
+// 封面：用户上传图片，压缩为 WebP data URL 落库（本地优先、离线可用；同步时作为文本列上云）
+// 行程：days 为嵌套 JSON（每天含若干 items），整段作为 JSON 列存储，不拆子表
+// ============================================================
+export interface TravelItem {
+  id: string
+  time: string // 当日时刻 HH:MM
+  type: string // 功能类型键（见页面 MODULE_LABELS）
+  title: string // 自定义标题（缺省兜底为类型名）
+  note: string // 备注
+  img: string | null // 图片（data URL 或 Storage 公链），可空
+}
+
+export interface TravelDay {
+  items: TravelItem[]
+}
+
+export interface Travel {
+  id: string
+  user_id: string
+  title: string // 行程标题（如「长沙 3 天 2 夜」）
+  city: string // 目的地城市名
+  province_adcode: string // 省级行政区 adcode（地图点亮反查键）
+  province_name: string // 省级行政区名称
+  emoji: string // 情绪/主题 emoji
+  start_date: string // 出发日 YYYY-MM-DD
+  end_date: string // 返程日 YYYY-MM-DD
+  cover: string // 封面图（必填：用户上传压缩后的 data URL）
+  days: TravelDay[] // 行程时间轴（嵌套 JSON）
+  created_at: string
+  updated_at: string
+}
+
+export type TravelInput = {
+  title: string
+  city: string
+  province_adcode: string
+  province_name: string
+  emoji: string
+  start_date: string
+  end_date: string
+  cover: string
+  days?: TravelDay[]
+}

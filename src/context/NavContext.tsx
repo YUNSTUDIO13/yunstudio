@@ -158,6 +158,25 @@ function migrateConfig(cfg: NavConfig): NavConfig {
     }
   }
 
+  // 旅行模块（2026-08-21）：向老账户的导航一次性追加「旅行」一级 Tab（含默认 travel 模块）。
+  // 与 ui-settings 同源的一次性前向迁移；用户后续删除该 Tab 不再自动恢复（尊重主动删除）。
+  {
+    const hasTravel = primaries.some((p) => p.groups.some((g) => g.modules.includes('travel')))
+    if (!hasTravel) {
+      const travelPrimary = DEFAULT_NAV_CONFIG.primaries.find((p) => p.id === 'p_travel')
+      if (travelPrimary) {
+        primaries = [
+          ...primaries,
+          {
+            ...travelPrimary,
+            id: 'p_travel',
+            groups: travelPrimary.groups.map((g) => ({ ...g, id: uid('g') })),
+          },
+        ]
+      }
+    }
+  }
+
   return { ...cfg, primaries }
 }
 
