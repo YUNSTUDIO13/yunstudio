@@ -361,7 +361,7 @@ export interface TravelItem {
   type: string // 功能类型键（见页面 MODULE_LABELS）
   title: string // 自定义标题（缺省兜底为类型名）
   note: string // 备注
-  img: string | null // 图片（data URL 或 Storage 公链），可空；第6条迭代升级为多图后改为 string[]
+  img?: string[] // 图片（data URL 或 Storage 公链）；第6条迭代升级为多图（最多5张，正方形圆角缩略图，点击全屏）。旧数据可能为 string|null，运行时统一归一化为 string[]
   // ── 第6条迭代：各类型字段（可选，按 type 使用） ──
   // 交通
   tool?: 'plane' | 'train' | 'drive' // 交通工具
@@ -384,6 +384,8 @@ export interface TravelItem {
   openTime?: string // 营业时间
   // 导航地址（点击复制，除注意事项外均含）
   navAddr?: string
+  // 第7条迭代：经纬度坐标 "lng,lat"（高德 POI/站点选中时回填），供总览轨迹预览绘制
+  location?: string
 }
 
 export interface TravelDay {

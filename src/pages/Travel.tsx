@@ -16,6 +16,8 @@ import {
 } from '../lib/sync'
 import { CHINA_GEO, CHINA_VIEWBOX, type ChinaGeo } from '../lib/china-geo'
 import type { Travel, TravelDay, TravelItem } from '../types'
+import { amapSearchDistrict, amapSearchPoi, type AMapDistrict, type AMapPoi } from '../lib/amap'
+import TrajectoryPreview from '../components/TrajectoryPreview'
 import './travel.css'
 
 // ─── 功能类型（行程时间轴条目的"功能标题" + 内联 SVG 图标） ───────────────
@@ -46,6 +48,8 @@ const OVERVIEW_TYPES = [
   'transport', 'hotel', 'attraction', 'food', 'shopping', 'entertainment', 'checkin', 'note',
 ]
 const MODULE_KEYS = Object.keys(MODULE_LABELS)
+// 第5条：四个独立模块（便签/行李清单/机酒车票/地点）——不进右下角添加菜单，在总览下方独立展示与编辑
+const INDEPENDENT_TYPES = ['memo', 'luggage', 'ticket', 'place'] as const
 
 // ─── 旅行主题类型（决定卡片左上角圆形图标来源） ───────────────
 export const TRAVEL_TYPES: Record<string, { name: string; icon: string }> = {
@@ -112,8 +116,32 @@ const PROVINCES: ChinaGeo[] = CHINA_GEO.filter(
   (g) => g.adcode !== '100000_JD' && g.name,
 )
 
+// 省级行政区 adcode 前缀（前 2 位）→ 省名。用于把高德返回的区/县/市 adcode 归并到所属省份
+// （例：长沙县 adcode=430121 → 前缀 43 → 湖南省），支撑「已造访城市」国内去重与地图点亮。
+const PROVINCE_NAME_BY_PREFIX: Record<string, string> = Object.fromEntries(
+  PROVINCES.map((p) => [p.adcode.slice(0, 2), p.name]),
+)
+// 高德行政区划结果 → 与 CITIES 同构的城市项（自动补全所属省份）
+const amapDistrictToCity = (d: AMapDistrict): (typeof CITIES)[number] => {
+  const prefix = d.adcode.slice(0, 2)
+  const provinceName = PROVINCE_NAME_BY_PREFIX[prefix] ?? ''
+  return {
+    name: d.name,
+    provinceName,
+    country: undefined,
+    provinceAdcode: provinceName ? `${prefix}0000` : '',
+  }
+}
+
 // 全国区县级行政区总数（民政部 2023 区划口径），作为「已造访城市」指标分母
 const CHINA_COUNTY_TOTAL = 2843
+
+// 旧数据 img 可能是 string | null，运行时统一归一化为 string[]
+const normalizeImgs = (v: unknown): string[] => {
+  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string')
+  if (typeof v === 'string' && v) return [v]
+  return []
+}
 
 // ─── 地图装饰层（对齐设计稿 setupMap）：等值波浪线 + 同心椭圆环，营造"科技发光"底纹 ──
 const TOPO_WAVES: { d: string; cls: string }[] = (() => {
@@ -691,6 +719,51 @@ function ChinaMap({
   )
 }
 
+// 第6条：高德 POI 搜索行（交通站 / 酒店 / 景点 复用）。模块级定义，避免 render 内定义导致 remount 失焦。
+function PoiSearchRow({
+  target,
+  placeholder,
+  value,
+  setValue,
+  onTime,
+  timeVal,
+  onSearch,
+}: {
+  target: 'from' | 'to' | 'hotel' | 'poi'
+  placeholder: string
+  value: string
+  setValue: (v: string) => void
+  onTime?: (v: string) => void
+  timeVal?: string
+  onSearch: (kw: string, t: 'from' | 'to' | 'hotel' | 'poi') => void
+}) {
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          className="t-input"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <button type="button" className="t-btn-secondary" onClick={() => onSearch(value, target)}>
+          搜索
+        </button>
+      </div>
+      {onTime && (
+        <input
+          className="t-input"
+          type="time"
+          style={{ marginTop: 6 }}
+          placeholder="出发 / 到达时间"
+          value={timeVal}
+          onChange={(e) => onTime(e.target.value)}
+        />
+      )}
+    </>
+  )
+}
+
 // ─── 主组件 ──────────────────────────────────────────────────────────────
 export default function Travel() {
   const { user } = useAuth()
@@ -704,9 +777,11 @@ export default function Travel() {
   const [filterYear, setFilterYear] = useState('')
   const [sortPop, setSortPop] = useState(false)
   const [filterPop, setFilterPop] = useState(false)
+  const [morePop, setMorePop] = useState(false) // 更多（三个点）弹窗：含刷新/新建，对齐观影模块
   // 各弹窗 ref：用于点击弹窗外任意区域关闭
   const sortPopRef = useRef<HTMLDivElement>(null)
   const filterPopRef = useRef<HTMLDivElement>(null)
+  const morePopRef = useRef<HTMLDivElement>(null)
   const cardPopRef = useRef<HTMLDivElement>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const fabAddRef = useRef<HTMLButtonElement>(null)
@@ -802,6 +877,17 @@ export default function Travel() {
     document.addEventListener('mouseup', handler)
     return () => document.removeEventListener('mouseup', handler)
   }, [filterPop])
+
+  useEffect(() => {
+    if (!morePop) return
+    const handler = (e: MouseEvent) => {
+      if (morePopRef.current && !morePopRef.current.contains(e.target as Node)) {
+        setMorePop(false)
+      }
+    }
+    document.addEventListener('mouseup', handler)
+    return () => document.removeEventListener('mouseup', handler)
+  }, [morePop])
 
   useEffect(() => {
     if (!cardPop) return
@@ -988,14 +1074,28 @@ export default function Travel() {
   // 编辑模式：null = 新建，否则 = 正在编辑的 travel.id
   const [editTravelId, setEditTravelId] = useState<string | null>(null)
 
-  const onCityInput = (v: string) => {
+  // 第1条：城市搜索对接高德行政区 API（支持省/市/区/县）。先即时返回本地种子联想，
+  // 再异步补高德结果（含区县→省归并），未配置 key / 网络失败时静默降级为种子。
+  const cityReqId = useRef(0)
+  const mergeCitySuggest = (q: string, amap: AMapDistrict[]) => {
+    const seeds = CITIES.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8)
+    if (!amap.length) return seeds
+    const mapped = amap.slice(0, 8).map(amapDistrictToCity).filter((c) => c.provinceName)
+    const names = new Set(mapped.map((c) => c.name))
+    return [...mapped, ...seeds.filter((c) => !names.has(c.name))].slice(0, 10)
+  }
+  const onCityInput = async (v: string) => {
     setCityText(v)
-    if (!v.trim()) {
+    const q = v.trim()
+    if (!q) {
       setCitySuggest([])
       return
     }
-    const q = v.trim().toLowerCase()
-    setCitySuggest(CITIES.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8))
+    setCitySuggest(CITIES.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8))
+    const reqId = ++cityReqId.current
+    const districts = await amapSearchDistrict(q)
+    if (reqId !== cityReqId.current) return // 丢弃过期请求
+    setCitySuggest(mergeCitySuggest(q, districts))
   }
   const pickCity = (c: (typeof CITIES)[number]) => {
     setCityText(c.name)
@@ -1005,14 +1105,19 @@ export default function Travel() {
   }
   const pickedProvince = useRef<{ name: string; adcode: string }>({ name: '', adcode: '' })
 
-  const onDepartureInput = (v: string) => {
+  const departureReqId = useRef(0)
+  const onDepartureInput = async (v: string) => {
     setDepartureText(v)
-    if (!v.trim()) {
+    const q = v.trim()
+    if (!q) {
       setDepartureSuggest([])
       return
     }
-    const q = v.trim().toLowerCase()
-    setDepartureSuggest(CITIES.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8))
+    setDepartureSuggest(CITIES.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8))
+    const reqId = ++departureReqId.current
+    const districts = await amapSearchDistrict(q)
+    if (reqId !== departureReqId.current) return
+    setDepartureSuggest(mergeCitySuggest(q, districts))
   }
   const pickDeparture = (c: (typeof CITIES)[number]) => {
     setDepartureText(c.name)
@@ -1129,11 +1234,65 @@ export default function Travel() {
   const [aiTitle, setAiTitle] = useState('')
   const [aiTime, setAiTime] = useState('')
   const [aiNote, setAiNote] = useState('')
-  const [aiImg, setAiImg] = useState('')
-  const [aiImgName, setAiImgName] = useState('')
-  const [aiPreview, setAiPreview] = useState('')
+  const [aiImgs, setAiImgs] = useState<string[]>([]) // 多图（最多 5 张）
+  const [aiImgError, setAiImgError] = useState('')
+  // 第6条：各类型字段（交通 / 住宿 / 景点-POI / 导航）
+  const [aiTool, setAiTool] = useState<'plane' | 'train' | 'drive'>('plane')
+  const [aiDateStart, setAiDateStart] = useState('')
+  const [aiDateEnd, setAiDateEnd] = useState('')
+  const [aiFlightNo, setAiFlightNo] = useState('')
+  const [aiTrainNo, setAiTrainNo] = useState('')
+  const [aiFromStation, setAiFromStation] = useState('')
+  const [aiFromTime, setAiFromTime] = useState('')
+  const [aiToStation, setAiToStation] = useState('')
+  const [aiToTime, setAiToTime] = useState('')
+  const [aiHotel, setAiHotel] = useState('')
+  const [aiAddress, setAiAddress] = useState('')
+  const [aiStar, setAiStar] = useState<number>(0)
+  const [aiPoi, setAiPoi] = useState('')
+  const [aiIntro, setAiIntro] = useState('')
+  const [aiRating, setAiRating] = useState('')
+  const [aiOpenTime, setAiOpenTime] = useState('')
+  const [aiNavAddr, setAiNavAddr] = useState('')
+  const [aiLocation, setAiLocation] = useState('') // 第7条：经纬度 "lng,lat"
+  const [fullImg, setFullImg] = useState<string | null>(null) // 全屏看图
+  // 第6条：高德 POI 搜索（交通站 / 酒店 / 景点 共用，结果下拉选中后回填对应字段）
+  const [poiTarget, setPoiTarget] = useState<'' | 'from' | 'to' | 'hotel' | 'poi'>('')
+  const [poiResults, setPoiResults] = useState<AMapPoi[]>([])
+  const [poiLoading, setPoiLoading] = useState(false)
+  const doPoiSearch = async (kw: string, target: 'from' | 'to' | 'hotel' | 'poi') => {
+    if (!kw.trim()) return
+    setPoiTarget(target)
+    setPoiLoading(true)
+    const r = await amapSearchPoi(kw.trim())
+    setPoiResults(r)
+    setPoiLoading(false)
+  }
+  const pickPoi = (p: AMapPoi) => {
+    if (poiTarget === 'from') {
+      setAiFromStation(p.name)
+      setAiNavAddr(p.address || p.location)
+      setAiLocation(p.location)
+    } else if (poiTarget === 'to') {
+      setAiToStation(p.name)
+      setAiNavAddr(p.address || p.location)
+      setAiLocation(p.location)
+    } else if (poiTarget === 'hotel') {
+      setAiHotel(p.name)
+      setAiAddress(p.address)
+      setAiNavAddr(p.address || p.location)
+      setAiLocation(p.location)
+    } else if (poiTarget === 'poi') {
+      setAiPoi(p.name)
+      setAiAddress(p.address)
+      if (p.rating) setAiRating(p.rating)
+      setAiNavAddr(p.address || p.location)
+      setAiLocation(p.location)
+    }
+    setPoiResults([])
+  }
 
-  const openAddItem = (travelId: string, dayIndex: number, editId?: string) => {
+  const openAddItem = (travelId: string, dayIndex: number, presetType?: string, editId?: string) => {
     if (!detail) return
     const day = detail.days[dayIndex]
     if (!day) return
@@ -1144,34 +1303,93 @@ export default function Travel() {
         setAiTitle(it.title)
         setAiTime(it.time)
         setAiNote(it.note)
-        setAiImg(it.img ?? '')
-        setAiImgName(it.img ? '已附图片' : '')
-        setAiPreview(it.img ?? '')
+        setAiImgs(normalizeImgs(it.img))
+        setAiTool(it.tool ?? 'plane')
+        setAiDateStart(it.dateStart ?? '')
+        setAiDateEnd(it.dateEnd ?? '')
+        setAiFlightNo(it.flightNo ?? '')
+        setAiTrainNo(it.trainNo ?? '')
+        setAiFromStation(it.fromStation ?? '')
+        setAiFromTime(it.fromTime ?? '')
+        setAiToStation(it.toStation ?? '')
+        setAiToTime(it.toTime ?? '')
+        setAiHotel(it.hotel ?? '')
+        setAiAddress(it.address ?? '')
+        setAiStar(it.star ?? 0)
+        setAiPoi(it.poi ?? '')
+        setAiIntro(it.intro ?? '')
+        setAiRating(it.rating ?? '')
+        setAiOpenTime(it.openTime ?? '')
+        setAiNavAddr(it.navAddr ?? '')
+        setAiLocation(it.location ?? '')
       }
     } else {
-      setAiType('attraction')
+      setAiType(presetType ?? 'attraction')
       setAiTitle('')
       setAiTime('')
       setAiNote('')
-      setAiImg('')
-      setAiImgName('')
-      setAiPreview('')
+      setAiImgs([])
+      setAiTool('plane')
+      setAiDateStart('')
+      setAiDateEnd('')
+      setAiFlightNo('')
+      setAiTrainNo('')
+      setAiFromStation('')
+      setAiFromTime('')
+      setAiToStation('')
+      setAiToTime('')
+      setAiHotel('')
+      setAiAddress('')
+      setAiStar(0)
+      setAiPoi('')
+      setAiIntro('')
+      setAiRating('')
+      setAiOpenTime('')
+      setAiNavAddr('')
+      setAiLocation('')
     }
     setAddItem({ open: true, travelId, dayIndex, editId })
     setAddMenuOpen(false)
   }
 
+  // 第5条：四个独立模块的编辑状态与逻辑（便签/行李清单/机酒车票/地点）
+  const [extraEditor, setExtraEditor] = useState<null | 'memo' | 'luggage' | 'ticket' | 'place'>(null)
+  const [extraDraft, setExtraDraft] = useState('') // 便签文本
+  const [extraList, setExtraList] = useState<string[]>([]) // 清单项
+  const [extraInput, setExtraInput] = useState('') // 清单输入
+  const openExtraEditor = (type: 'memo' | 'luggage' | 'ticket' | 'place') => {
+    if (!detail) return
+    const ex = detail.extra ?? {}
+    if (type === 'memo') setExtraDraft(ex.memo ?? '')
+    else setExtraList((ex[type] as string[] | undefined) ?? [])
+    setExtraInput('')
+    setExtraEditor(type)
+  }
+  const saveExtra = async () => {
+    if (!detail || !extraEditor) return
+    const extra = { ...(detail.extra ?? {}) }
+    if (extraEditor === 'memo') extra.memo = extraDraft.trim()
+    else (extra as Record<string, unknown>)[extraEditor] = extraList
+    await persist({ ...detail, extra })
+    setExtraEditor(null)
+    showToast('已保存')
+  }
+
   const onAiImg = async (file?: File) => {
     if (!file) return
+    if (aiImgs.length >= 5) {
+      setAiImgError('最多添加 5 张图片')
+      return
+    }
     try {
       const url = await compressImage(file)
-      setAiImg(url)
-      setAiImgName(file.name)
-      setAiPreview(url)
+      setAiImgs((prev) => [...prev, url])
+      setAiImgError('')
     } catch {
       showToast('图片处理失败')
     }
   }
+  const removeAiImg = (idx: number) => setAiImgs((prev) => prev.filter((_, i) => i !== idx))
 
   const submitAddItem = async () => {
     if (!detail) return
@@ -1182,7 +1400,30 @@ export default function Travel() {
       type: aiType,
       title,
       note: aiNote.trim(),
-      img: aiImg || null,
+      img: aiImgs,
+      // 第6条：各类型字段
+      tool: aiType === 'transport' ? aiTool : undefined,
+      dateStart: aiType === 'transport' ? aiDateStart : undefined,
+      dateEnd: aiType === 'transport' ? aiDateEnd : undefined,
+      flightNo: aiType === 'transport' && aiTool === 'plane' ? aiFlightNo : undefined,
+      trainNo: aiType === 'transport' && aiTool === 'train' ? aiTrainNo : undefined,
+      fromStation: aiType === 'transport' ? aiFromStation : undefined,
+      fromTime: aiType === 'transport' ? aiFromTime : undefined,
+      toStation: aiType === 'transport' ? aiToStation : undefined,
+      toTime: aiType === 'transport' ? aiToTime : undefined,
+      hotel: aiType === 'hotel' ? aiHotel : undefined,
+      address: aiType === 'hotel' ? aiAddress : undefined,
+      star: aiType === 'hotel' ? aiStar : undefined,
+      poi: ['attraction', 'food', 'shopping', 'entertainment', 'checkin'].includes(aiType) ? aiPoi : undefined,
+      intro: aiType === 'attraction' ? aiIntro : undefined,
+      rating: aiType === 'attraction' ? aiRating : undefined,
+      openTime: aiType === 'attraction' ? aiOpenTime : undefined,
+      navAddr:
+        aiType === 'note'
+          ? undefined
+          : aiNavAddr || aiAddress || aiToStation || aiFromStation || aiHotel || aiPoi || '',
+      // 第7条：轨迹坐标（仅 POI/站点选中时有值）
+      location: aiType === 'note' ? undefined : aiLocation || undefined,
     }
     const days = detail.days.map((d, i) => {
       if (i !== addItem.dayIndex) return d
@@ -1435,22 +1676,43 @@ export default function Travel() {
               </svg>
               <span className="badge-tip">筛选</span>
             </div>
-            <div className="icon-btn" title="同步" onClick={() => void syncNow()}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 12a9 9 0 0115-6.7M21 12a9 9 0 01-15 6.7" />
-                <path d="M21 4v5h-5M3 20v-5h5" />
+            <div
+              className="icon-btn"
+              title="更多"
+              onClick={() => {
+                setMorePop((v) => !v)
+                setSortPop(false)
+                setFilterPop(false)
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="1.8" />
+                <circle cx="12" cy="12" r="1.8" />
+                <circle cx="19" cy="12" r="1.8" />
               </svg>
-              <span className="badge-tip">刷新从云端同步</span>
+              <span className="badge-tip">更多</span>
             </div>
-            <button className="new-btn" onClick={() => {
-              setEditTravelId(null)
-              setCreateOpen(true)
-            }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              新建
-            </button>
+            <div ref={morePopRef} className={`t-popover more-menu${morePop ? ' show' : ''}`} style={{ right: '16px' }}>
+              <div
+                className="item"
+                onClick={() => {
+                  setMorePop(false)
+                  void syncNow()
+                }}
+              >
+                <span className="ico">⟳</span> 刷新从云端同步
+              </div>
+              <div
+                className="item"
+                onClick={() => {
+                  setMorePop(false)
+                  setEditTravelId(null)
+                  setCreateOpen(true)
+                }}
+              >
+                <span className="ico">＋</span> 新建旅行记录
+              </div>
+            </div>
 
             {/* 排序弹窗 */}
             <div ref={sortPopRef} className={`t-popover${sortPop ? ' show' : ''}`} style={{ right: '148px' }}>
@@ -1698,6 +1960,36 @@ export default function Travel() {
                       })}
                     </div>
                   )}
+                  {/* 第5条：四个独立模块，独立于右下角添加按钮，点击进入各自编辑 */}
+                  <div className="independent-grid">
+                    {INDEPENDENT_TYPES.map((type) => {
+                      const meta = MODULE_LABELS[type]
+                      const ex = (detail.extra ?? {}) as Record<string, unknown>
+                      let preview = '点击添加'
+                      if (type === 'memo') {
+                        const v = (ex.memo as string | undefined) ?? ''
+                        preview = v ? (v.length > 16 ? v.slice(0, 16) + '…' : v) : '点击添加'
+                      } else {
+                        const arr = (ex[type] as string[] | undefined) ?? []
+                        preview = arr.length ? `已记 ${arr.length} 项` : '点击添加'
+                      }
+                      return (
+                        <div
+                          className="mod-card ind-card"
+                          key={type}
+                          onClick={() => openExtraEditor(type)}
+                        >
+                          <div className="mod-ico">
+                            <img src={meta.icon} alt={meta.name} />
+                          </div>
+                          <div className="mod-name">{meta.name}</div>
+                          <div className="mod-sub">{preview}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {/* 第7条：总览底部轨迹预览（按 Day 切换、当日按时间排序） */}
+                  <TrajectoryPreview days={detail.days} />
                   {activeTab > 0 &&
                     detail.days[activeTab - 1] && (
                       <div className="day-section is-active">
@@ -1736,8 +2028,18 @@ export default function Travel() {
                                     {it.time && <span>· {it.time}</span>}
                                   </div>
                                   {it.note && <div className="tl-note">{it.note}</div>}
-                                  {it.img && (
-                                    <img className="tl-thumb" src={it.img} alt={it.title} />
+                                  {it.img && it.img.length > 0 && (
+                                    <div className="tl-thumbs">
+                                      {it.img.map((src, i) => (
+                                        <img
+                                          className="tl-thumb"
+                                          key={i}
+                                          src={src}
+                                          alt={it.title}
+                                          onClick={() => setFullImg(src)}
+                                        />
+                                      ))}
+                                    </div>
                                   )}
                                   {editing && (
                                     <div className="tl-actions">
@@ -1757,7 +2059,7 @@ export default function Travel() {
                                         className="tl-act-edit"
                                         title="编辑"
                                         onClick={() =>
-                                          openAddItem(detail.id, activeTab - 1, it.id)
+                                          openAddItem(detail.id, activeTab - 1, undefined, it.id)
                                         }
                                       >
                                         ✎
@@ -1789,14 +2091,14 @@ export default function Travel() {
                   </svg>
                 </button>
                 <div ref={addMenuRef} className={`add-menu${addMenuOpen ? ' show' : ''}`}>
-                  {MODULE_KEYS.map((type) => {
+                  {MODULE_KEYS.filter((type) => !(INDEPENDENT_TYPES as readonly string[]).includes(type)).map((type) => {
                     const meta = MODULE_LABELS[type]
                     return (
                       <div
                         className="am"
                         key={type}
                         title={meta.name}
-                        onClick={() => openAddItem(detail.id, Math.max(0, activeTab - 1))}
+                        onClick={() => openAddItem(detail.id, Math.max(0, activeTab - 1), type)}
                       >
                         <div className="am-ico">
                           <img src={meta.icon} alt={meta.name} />
@@ -2148,30 +2450,15 @@ export default function Travel() {
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </div>
-            <h3>{addItem.editId ? '编辑行程模块' : '添加行程模块'}</h3>
+            <h3>{addItem.editId ? '编辑' : '添加'} · {MODULE_LABELS[aiType].name}</h3>
             <div className="t-modal-sub">TYPE · TITLE · TIME · NOTE · IMAGE</div>
 
-            <div className="t-field">
-              <div className="label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 7h16M4 12h16M4 17h10" />
-                </svg>
-                功能标题
-              </div>
-              <div className="desc">选择模块类型（共 13 类）</div>
-              <select
-                className="t-input"
-                value={aiType}
-                onChange={(e) => setAiType(e.target.value)}
-              >
-                {MODULE_KEYS.map((type) => (
-<option key={type} value={type}>
-                  {MODULE_LABELS[type].name}
-                </option>
-                ))}
-              </select>
+            {/* 说在前面：本模块通用规则提示（替代原「功能标题-选择模块类型」段） */}
+            <div className="t-note-tip">
+              添加「{MODULE_LABELS[aiType].name}」：每项最多 5 张图片（正方形缩略图，点击全屏查看）；含地理位置的模块提供「复制地址」导航按钮；注意事项限 100 字。
             </div>
 
+            {/* 自定义标题（通用） */}
             <div className="t-field">
               <div className="label">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2188,98 +2475,223 @@ export default function Travel() {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div className="t-field" style={{ flex: 1, marginBottom: 0 }}>
-                <div className="label">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 2" />
-                  </svg>
-                  时间
+            {/* 交通专用：方式 / 日期 / 航班·车次 / 出发·到达站（高德 POI） */}
+            {aiType === 'transport' && (
+              <>
+                <div className="t-field">
+                  <div className="label">交通方式</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {(['plane', 'train', 'drive'] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        className={aiTool === m ? 't-chip active' : 't-chip'}
+                        onClick={() => setAiTool(m)}
+                      >
+                        {m === 'plane' ? '飞机' : m === 'train' ? '火车' : '自驾'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <input
-                  className="t-input"
-                  type="time"
-                  value={aiTime}
-                  onChange={(e) => setAiTime(e.target.value)}
-                />
-              </div>
-              <div className="t-field" style={{ flex: 1, marginBottom: 0 }}>
-                <div className="label">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="5" width="18" height="14" rx="2" />
-                    <circle cx="9" cy="11" r="2" />
-                    <path d="M3 17l5-5 4 4 3-3 6 6" />
-                  </svg>
-                  图片上传
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div className="t-field" style={{ flex: 1, marginBottom: 0 }}>
+                    <div className="label">出发日期</div>
+                    <input className="t-input" type="date" value={aiDateStart} onChange={(e) => setAiDateStart(e.target.value)} />
+                  </div>
+                  <div className="t-field" style={{ flex: 1, marginBottom: 0 }}>
+                    <div className="label">到达日期</div>
+                    <input className="t-input" type="date" value={aiDateEnd} onChange={(e) => setAiDateEnd(e.target.value)} />
+                  </div>
                 </div>
-                <label
-                  className="t-input"
-                  htmlFor="aiImg"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    cursor: 'pointer',
-                    height: 42,
-                  }}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    style={{ width: 16, height: 16, flexShrink: 0, opacity: 0.7 }}
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>
-                    {aiImgName || '选择图片（可选）'}
-                  </span>
-                </label>
-                <input
-                  id="aiImg"
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) => onAiImg(e.target.files?.[0] ?? undefined)}
-                />
-              </div>
-            </div>
+                {aiTool === 'plane' && (
+                  <div className="t-field">
+                    <div className="label">航班号</div>
+                    <input className="t-input" placeholder="如：CA1234" value={aiFlightNo} onChange={(e) => setAiFlightNo(e.target.value)} />
+                  </div>
+                )}
+                {aiTool === 'train' && (
+                  <div className="t-field">
+                    <div className="label">车次</div>
+                    <input className="t-input" placeholder="如：G102" value={aiTrainNo} onChange={(e) => setAiTrainNo(e.target.value)} />
+                  </div>
+                )}
+                <div className="t-field">
+                  <div className="label">出发站（高德搜索）</div>
+                  <PoiSearchRow target="from" placeholder="如：北京南站" value={aiFromStation} setValue={setAiFromStation} onTime={setAiFromTime} timeVal={aiFromTime} onSearch={doPoiSearch} />
+                </div>
+                <div className="t-field">
+                  <div className="label">到达站（高德搜索）</div>
+                  <PoiSearchRow target="to" placeholder="如：上海虹桥站" value={aiToStation} setValue={setAiToStation} onTime={setAiToTime} timeVal={aiToTime} onSearch={doPoiSearch} />
+                </div>
+              </>
+            )}
 
+            {/* 住宿专用：酒店（高德 POI）/ 地址 / 星级 */}
+            {aiType === 'hotel' && (
+              <>
+                <div className="t-field">
+                  <div className="label">酒店（高德搜索）</div>
+                  <PoiSearchRow target="hotel" placeholder="如：上海外滩华尔道夫" value={aiHotel} setValue={setAiHotel} onSearch={doPoiSearch} />
+                </div>
+                <div className="t-field">
+                  <div className="label">地址</div>
+                  <input className="t-input" placeholder="详细地址" value={aiAddress} onChange={(e) => setAiAddress(e.target.value)} />
+                </div>
+                <div className="t-field">
+                  <div className="label">星级</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        className={aiStar >= s ? 't-chip active' : 't-chip'}
+                        onClick={() => setAiStar(s)}
+                      >
+                        {s}★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 景点 / 吃喝 / 购物 / 娱乐 / 打卡：POI 搜索 + 地址 */}
+            {['attraction', 'food', 'shopping', 'entertainment', 'checkin'].includes(aiType) && (
+              <>
+                <div className="t-field">
+                  <div className="label">{MODULE_LABELS[aiType].name}（高德搜索）</div>
+                  <PoiSearchRow target="poi" placeholder="如：故宫博物院" value={aiPoi} setValue={setAiPoi} onSearch={doPoiSearch} />
+                </div>
+                <div className="t-field">
+                  <div className="label">地址</div>
+                  <input className="t-input" placeholder="详细地址" value={aiAddress} onChange={(e) => setAiAddress(e.target.value)} />
+                </div>
+              </>
+            )}
+
+            {/* 景点专用：简介 / 评分 / 开放时间 */}
+            {aiType === 'attraction' && (
+              <>
+                <div className="t-field">
+                  <div className="label">简介</div>
+                  <textarea className="t-input" rows={3} placeholder="一句话介绍" style={{ resize: 'vertical' }} value={aiIntro} onChange={(e) => setAiIntro(e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div className="t-field" style={{ flex: 1, marginBottom: 0 }}>
+                    <div className="label">评分</div>
+                    <input className="t-input" placeholder="如：4.8" value={aiRating} onChange={(e) => setAiRating(e.target.value)} />
+                  </div>
+                  <div className="t-field" style={{ flex: 1, marginBottom: 0 }}>
+                    <div className="label">开放时间</div>
+                    <input className="t-input" placeholder="如：08:30-17:00" value={aiOpenTime} onChange={(e) => setAiOpenTime(e.target.value)} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 时间（时间轴通用） */}
             <div className="t-field">
               <div className="label">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 4h16v16H4z" />
-                  <path d="M4 8h16M8 4v16" />
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
                 </svg>
-                备注
+                时间
               </div>
+              <input className="t-input" type="time" value={aiTime} onChange={(e) => setAiTime(e.target.value)} />
+            </div>
+
+            {/* 备注 / 注意事项（限 100 字） */}
+            <div className="t-field">
+              <div className="label">{aiType === 'note' ? '注意事项（限 100 字）' : '备注'}</div>
               <textarea
                 className="t-input"
                 rows={3}
-                placeholder="如：豆汁焦圈 / 麻豆腐 / 驴打滚"
+                maxLength={aiType === 'note' ? 100 : undefined}
+                placeholder={aiType === 'note' ? '出行提醒，最多 100 字' : '如：豆汁焦圈 / 麻豆腐 / 驴打滚'}
                 style={{ resize: 'vertical' }}
                 value={aiNote}
                 onChange={(e) => setAiNote(e.target.value)}
               />
+              {aiType === 'note' && (
+                <div className="desc" style={{ textAlign: 'right' }}>{aiNote.length}/100</div>
+              )}
             </div>
 
-            {aiPreview && (
-              <div style={{ margin: '-6px 0 12px' }}>
-                <img
-                  id="aiPreviewImg"
-                  src={aiPreview}
-                  alt="预览"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: 160,
-                    borderRadius: 10,
-                    border: '1px solid var(--line)',
-                  }}
-                />
+            {/* 多图（最多 5 张，点击缩略图全屏查看） */}
+            <div className="t-field">
+              <div className="label">图片（最多 5 张，点击缩略图全屏查看）</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {aiImgs.map((src, idx) => (
+                  <div key={idx} style={{ position: 'relative' }}>
+                    <img
+                      src={src}
+                      alt=""
+                      onClick={() => setFullImg(src)}
+                      style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', cursor: 'pointer', border: '1px solid var(--line)' }}
+                    />
+                    <button
+                      type="button"
+                      className="img-del"
+                      onClick={() => removeAiImg(idx)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {aiImgs.length < 5 && (
+                  <label
+                    htmlFor="aiImg"
+                    style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px dashed var(--line)', borderRadius: 8, color: 'var(--text-dim)', fontSize: 22 }}
+                  >
+                    +
+                    <input
+                      id="aiImg"
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => onAiImg(e.target.files?.[0] ?? undefined)}
+                    />
+                  </label>
+                )}
+              </div>
+              {aiImgError && <div className="desc" style={{ color: '#e5484d' }}>{aiImgError}</div>}
+            </div>
+
+            {/* 导航复制地址（含地理位置的模块） */}
+            {aiType !== 'note' && aiNavAddr && (
+              <div className="t-field">
+                <div className="label">导航地址</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ flex: 1, color: 'var(--text-dim)', fontSize: 12, wordBreak: 'break-all' }}>{aiNavAddr}</span>
+                  <button
+                    type="button"
+                    className="t-btn-secondary"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(aiNavAddr)
+                      showToast('已复制地址')
+                    }}
+                  >
+                    复制
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 高德 POI 搜索结果下拉 */}
+            {poiResults.length > 0 && (
+              <div className="poi-results">
+                {poiResults.map((p) => (
+                  <button key={p.id} type="button" className="poi-item" onClick={() => pickPoi(p)}>
+                    <div className="poi-name">{p.name}</div>
+                    {p.address && <div className="poi-addr">{p.address}</div>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {poiLoading && (
+              <div className="poi-results" style={{ padding: '8px 10px' }}>
+                <div className="desc">高德搜索中…</div>
               </div>
             )}
 
@@ -2295,6 +2707,102 @@ export default function Travel() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ===== 第5条：四个独立模块编辑 dialog ===== */}
+      {extraEditor && detail && (
+        <div
+          className="t-modal-mask show"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setExtraEditor(null)
+          }}
+        >
+          <div className="t-modal">
+            <div className="t-modal-close" onClick={() => setExtraEditor(null)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </div>
+            <h3>{MODULE_LABELS[extraEditor].name}</h3>
+            <div className="t-modal-sub">独立模块 · 单独更新</div>
+
+            {extraEditor === 'memo' ? (
+              <div className="t-field">
+                <div className="label">便签</div>
+                <div className="desc">随手记点什么，与每日时间轴相互独立</div>
+                <textarea
+                  className="t-input"
+                  rows={6}
+                  placeholder="写点什么…"
+                  style={{ resize: 'vertical' }}
+                  value={extraDraft}
+                  onChange={(e) => setExtraDraft(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="t-field">
+                <div className="label">{MODULE_LABELS[extraEditor].name}清单</div>
+                <div className="desc">逐条添加，点击 × 删除</div>
+                <div className="extra-list">
+                  {extraList.map((it, i) => (
+                    <div className="el-item" key={i}>
+                      <span className="el-text">{it}</span>
+                      <button
+                        type="button"
+                        className="el-del"
+                        title="删除"
+                        onClick={() => setExtraList(extraList.filter((_, j) => j !== i))}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {extraList.length === 0 && (
+                    <div className="empty-state" style={{ margin: '4px 0' }}>还没有内容，在下方添加</div>
+                  )}
+                </div>
+                <div className="extra-add-row">
+                  <input
+                    className="t-input"
+                    placeholder="添加一项，回车确认"
+                    value={extraInput}
+                    onChange={(e) => setExtraInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && extraInput.trim()) {
+                        setExtraList([...extraList, extraInput.trim()])
+                        setExtraInput('')
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="t-btn-secondary"
+                    onClick={() => {
+                      if (extraInput.trim()) {
+                        setExtraList([...extraList, extraInput.trim()])
+                        setExtraInput('')
+                      }
+                    }}
+                  >
+                    添加
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="t-btn-secondary" onClick={() => setExtraEditor(null)}>取消</button>
+              <button className="t-btn-primary" onClick={() => void saveExtra()}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 全屏看图（点击缩略图展开，点击任意处关闭） */}
+      {fullImg && (
+        <div className="img-fullscreen" onClick={() => setFullImg(null)}>
+          <img src={fullImg} alt="全屏查看" />
         </div>
       )}
 
