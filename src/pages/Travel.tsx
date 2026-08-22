@@ -24,25 +24,35 @@ interface ModuleMeta {
   icon: string
 }
 export const MODULE_LABELS: Record<string, ModuleMeta> = {
-  transport: { name: '交通', icon: '🚆' },
-  hotel: { name: '住宿', icon: '🏨' },
-  attraction: { name: '景点', icon: '📍' },
-  food: { name: '吃喝', icon: '🍜' },
-  shopping: { name: '购物', icon: '🛍️' },
-  entertainment: { name: '娱乐', icon: '🎡' },
-  checkin: { name: '打卡', icon: '📸' },
-  note: { name: '注意事项', icon: '⚠️' },
-  memo: { name: '便签', icon: '📝' },
-  luggage: { name: '行李清单', icon: '🧳' },
-  ticket: { name: '机酒车票', icon: '🎫' },
-  place: { name: '地点', icon: '🗺️' },
-  custom: { name: '自定义', icon: '✨' },
+  transport: { name: '交通', icon: '/icons/travel/category/transport.png' },
+  hotel: { name: '住宿', icon: '/icons/travel/category/hotel.png' },
+  attraction: { name: '景点', icon: '/icons/travel/category/attraction.png' },
+  food: { name: '吃喝', icon: '/icons/travel/category/food.png' },
+  shopping: { name: '购物', icon: '/icons/travel/category/shopping.png' },
+  entertainment: { name: '娱乐', icon: '/icons/travel/category/entertainment.png' },
+  checkin: { name: '打卡', icon: '/icons/travel/category/checkin.png' },
+  note: { name: '注意事项', icon: '/icons/travel/category/note.png' },
+  memo: { name: '便签', icon: '/icons/travel/category/memo.png' },
+  luggage: { name: '行李清单', icon: '/icons/travel/category/luggage.png' },
+  ticket: { name: '机酒车票', icon: '/icons/travel/category/ticket.png' },
+  place: { name: '地点', icon: '/icons/travel/category/place.png' },
+  custom: { name: '自定义', icon: '/icons/travel/category/custom.png' },
 }
 // 总览卡片展示的 8 个模块（与设计稿一致）
 const OVERVIEW_TYPES = [
   'transport', 'hotel', 'attraction', 'food', 'shopping', 'entertainment', 'checkin', 'note',
 ]
 const MODULE_KEYS = Object.keys(MODULE_LABELS)
+
+// ─── 旅行主题类型（决定卡片左上角圆形图标来源） ───────────────
+export const TRAVEL_TYPES: Record<string, { name: string; icon: string }> = {
+  city: { name: '城市', icon: '/icons/travel/type/city.png' },
+  forest: { name: '森林', icon: '/icons/travel/type/forest.png' },
+  ocean: { name: '海洋', icon: '/icons/travel/type/ocean.png' },
+  lake: { name: '湖泊', icon: '/icons/travel/type/lake.png' },
+  dune: { name: '沙丘', icon: '/icons/travel/type/dune.png' },
+}
+const TRAVEL_TYPE_KEYS = Object.keys(TRAVEL_TYPES) as ('city' | 'forest' | 'ocean' | 'lake' | 'dune')[]
 
 // ─── 城市联想数据源（真实城市 → 省级行政区；海外城市 provinceAdcode 为空不点亮地图） ──
 interface CitySeed {
@@ -894,6 +904,8 @@ export default function Travel() {
   const [createErr, setCreateErr] = useState('')
   // 交通方式：决定轨迹动画类型（plane/train/drive），默认飞机
   const [transportMode, setTransportMode] = useState<'plane' | 'train' | 'drive'>('plane')
+  // 旅行主题类型（决定卡片左上角圆形图标来源），默认城市
+  const [travelType, setTravelType] = useState<'city' | 'forest' | 'ocean' | 'lake' | 'dune'>('city')
 
   const onCityInput = (v: string) => {
     setCityText(v)
@@ -986,6 +998,7 @@ export default function Travel() {
           }
         : {}),
       transport_mode: transportMode,
+      type: travelType,
       created_at: now,
       updated_at: now,
     }
@@ -1005,6 +1018,7 @@ export default function Travel() {
     setCoverPreview('')
     setCreateErr('')
     setTransportMode('plane')
+    setTravelType('city')
     pickedProvince.current = { name: '', adcode: '' }
     departureProvince.current = { name: '', adcode: '' }
     // 直接打开详情，方便继续添加行程
@@ -1441,7 +1455,15 @@ export default function Travel() {
                         />
                       )}
                       <div className="vignette" />
-                      <div className="wf-emoji">{t.emoji || '🌏'}</div>
+                      <div className="wf-emoji">
+                        {t.type && TRAVEL_TYPES[t.type] ? (
+                          <img src={TRAVEL_TYPES[t.type].icon} alt={TRAVEL_TYPES[t.type].name} />
+                        ) : t.emoji ? (
+                          <span>{t.emoji}</span>
+                        ) : (
+                          <img src={TRAVEL_TYPES.city.icon} alt="城市" />
+                        )}
+                      </div>
                     </div>
                     <div
                       className="wf-more"
@@ -1561,7 +1583,9 @@ export default function Travel() {
                             }}
                             style={{ cursor: firstDay >= 0 ? 'pointer' : 'default' }}
                           >
-                            <div className="mod-ico">{meta.icon}</div>
+                            <div className="mod-ico">
+                              <img src={meta.icon} alt={meta.name} />
+                            </div>
                             <div className="mod-name">{meta.name}</div>
                             <div className="mod-meta">
                               {cnt > 0 ? `${cnt} 条记录` : '暂无'}
@@ -1597,12 +1621,14 @@ export default function Travel() {
                               <div className="tl-item">
                                 <div className="tl-time">{it.time || '—'}</div>
                                 <div className="tl-axis">
-                                  <div className="tl-dot">{meta.icon}</div>
+                                  <div className="tl-dot">
+                                    <img src={meta.icon} alt={meta.name} />
+                                  </div>
                                   <div className="tl-line" />
                                 </div>
                                 <div className="tl-content">
                                   <div className="tl-title">
-                                    {meta.icon} {it.title}
+                                    <img className="tl-title-ico" src={meta.icon} alt="" /> {it.title}
                                   </div>
                                   <div className="tl-meta">
                                     <span className="tl-pill">{meta.name}</span>
@@ -1670,7 +1696,9 @@ export default function Travel() {
                         title={meta.name}
                         onClick={() => openAddItem(detail.id, Math.max(0, activeTab - 1))}
                       >
-                        <div className="am-ico">{meta.icon}</div>
+                        <div className="am-ico">
+                          <img src={meta.icon} alt={meta.name} />
+                        </div>
                         <div>{meta.name}</div>
                       </div>
                     )
@@ -1845,9 +1873,9 @@ export default function Travel() {
               <div className="desc">决定地图上的轨迹动画样式（飞机最亮 / 高铁中等 / 自驾最暗）</div>
               <div className="t-transport-row">
                 {([
-                  { k: 'plane' as const, label: '飞机', icon: '✈' },
-                  { k: 'train' as const, label: '高铁', icon: '🚄' },
-                  { k: 'drive' as const, label: '自驾', icon: '🚗' },
+                  { k: 'plane' as const, label: '飞机', icon: '/icons/travel/transport/plane.png' },
+                  { k: 'train' as const, label: '高铁', icon: '/icons/travel/transport/train.png' },
+                  { k: 'drive' as const, label: '自驾', icon: '/icons/travel/transport/drive.png' },
                 ]).map((opt) => (
                   <button
                     key={opt.k}
@@ -1855,8 +1883,33 @@ export default function Travel() {
                     className={`t-transport-opt${transportMode === opt.k ? ' active' : ''}`}
                     onClick={() => setTransportMode(opt.k)}
                   >
-                    <span className="ico">{opt.icon}</span>
+                    <img className="ico" src={opt.icon} alt={opt.label} />
                     <span className="lbl">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="t-field">
+              <div className="label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 12l10 5 10-5" />
+                </svg>
+                旅行主题
+              </div>
+              <div className="desc">决定卡片左上角圆形图标，可选城市/森林/海洋/湖泊/沙丘</div>
+              <div className="t-transport-row">
+                {TRAVEL_TYPE_KEYS.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className={`t-transport-opt${travelType === k ? ' active' : ''}`}
+                    onClick={() => setTravelType(k)}
+                  >
+                    <img className="ico" src={TRAVEL_TYPES[k].icon} alt={TRAVEL_TYPES[k].name} />
+                    <span className="lbl">{TRAVEL_TYPES[k].name}</span>
                   </button>
                 ))}
               </div>
@@ -1969,9 +2022,9 @@ export default function Travel() {
                 onChange={(e) => setAiType(e.target.value)}
               >
                 {MODULE_KEYS.map((type) => (
-                  <option key={type} value={type}>
-                    {MODULE_LABELS[type].icon} {MODULE_LABELS[type].name}
-                  </option>
+<option key={type} value={type}>
+                  {MODULE_LABELS[type].name}
+                </option>
                 ))}
               </select>
             </div>

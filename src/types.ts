@@ -389,6 +389,9 @@ export interface Travel {
   departure_province_name?: string
   // 交通方式（决定轨迹动画类型：飞机/高铁/自驾）
   transport_mode?: 'plane' | 'train' | 'drive'
+  // 旅行类型（旅行主题：城市/森林/海洋/湖泊/沙丘），决定卡片左上角圆形图标来源。
+  // 用户在新建表单选择类型；老数据无则回退到 emoji 字段，再无则用 type=city 图标。
+  type?: 'city' | 'forest' | 'ocean' | 'lake' | 'dune'
 }
 
 export type TravelInput = {
