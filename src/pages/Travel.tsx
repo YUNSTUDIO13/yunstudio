@@ -1547,7 +1547,7 @@ export default function Travel() {
           <div className="left-header">
             <div className="brand">
               <div className="logo">
-                <img src="/时光迹.png" alt="时光迹" />
+                <img src="/时光迹.png" width="36" height="36" draggable="false" alt="时光迹" />
               </div>
               <div className="title">
                 <h1>时光迹</h1>
