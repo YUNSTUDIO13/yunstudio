@@ -71,7 +71,7 @@
   .scroll-area { flex: none; height: auto; min-height: 200px; overflow: visible; }
   /* 移动端瀑布流：单列（窄屏单列更易阅读）；提升 specificity（body .waterfall），
         否则 PC 端后定义的 column-count: 2 会胜出。 */
-  body .waterfall { column-count: 1; padding: 4px 8px 8px 4px; }
+  body .waterfall { column-count: 1; padding: 4px 12px 8px 12px; }
   /* 移动端卡片底部元信息（日期+省）：flex-wrap 让日期自动换行两行，避免被挤断字 */
   .wf-sub { flex-wrap: wrap; gap: 4px 6px; }
   /* 移动端弹窗 mask：底部加 70px padding 避开 dock，flex center 让 modal 自动上移 */
