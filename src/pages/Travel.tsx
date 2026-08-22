@@ -145,6 +145,17 @@ function dayCount(s: string, e: string): number {
 function nightCount(s: string, e: string): number {
   return Math.max(0, dayCount(s, e) - 1)
 }
+// 日期范围智能缩写（卡片展示）：
+// 同月「2026-6-15～20」/ 跨月「2026-6-15～7-20」/ 跨年「2026-12-30～2027-1-1」
+function formatDateRange(s: string, e: string): string {
+  if (!s || !e) return `${s || ''}～${e || ''}`
+  const [sy, sm, sd] = s.split('-')
+  const [ey, em, ed] = e.split('-')
+  const num = (v?: string) => (v ? String(Number(v)) : '')
+  if (sy === ey && sm === em) return `${sy}-${num(sm)}-${num(sd)}～${num(ed)}`
+  if (sy === ey) return `${sy}-${num(sm)}-${num(sd)}～${num(em)}-${num(ed)}`
+  return `${sy}-${num(sm)}-${num(sd)}～${ey}-${num(em)}-${num(ed)}`
+}
 function dayDate(start: string, idx: number): string {
   const d = new Date(start + 'T00:00:00')
   d.setDate(d.getDate() + idx)
@@ -1555,9 +1566,7 @@ export default function Travel() {
                         {t.city} · {dc}天{nc}夜
                       </div>
                       <div className="wf-sub">
-                        {t.start_date}
-                        <span className="pip" />
-                        {t.end_date}
+                        {formatDateRange(t.start_date, t.end_date)}
                         <span className="pip" />
                         {t.province_name}
                       </div>
