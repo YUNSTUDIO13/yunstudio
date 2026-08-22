@@ -1555,7 +1555,7 @@ export default function Travel() {
           <div className="left-header">
             <div className="brand">
               <div className="logo">
-                <img src="/时光迹.png" width="36" height="36" draggable="false" alt="时光迹" />
+                <img src={`${import.meta.env.BASE_URL}时光迹.png`} width="36" height="36" draggable="false" alt="时光迹" />
               </div>
               <div className="title">
                 <h1>时光迹</h1>
@@ -1699,7 +1699,7 @@ export default function Travel() {
                 </svg>
               </button>
               {sortPop && (
-                <div className="t-popover">
+                <div className="t-popover show">
                   <div className="head">排序方式</div>
                   <div
                     className={`item${sort === 'desc' ? ' active' : ''}`}
@@ -1742,7 +1742,7 @@ export default function Travel() {
                 )}
               </button>
               {filterPop && (
-                <div className="t-popover">
+                <div className="t-popover show">
                   <div className="head">地区</div>
                   <select
                     className="t-input"
@@ -1805,7 +1805,7 @@ export default function Travel() {
                 </svg>
               </button>
               {morePop && (
-                <div className="t-popover more-menu">
+                <div className="t-popover more-menu show">
                   <div
                     className="item"
                     onClick={() => {
