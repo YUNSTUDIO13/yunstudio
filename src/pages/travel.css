@@ -101,18 +101,18 @@
   .toolbar { flex-wrap: wrap; gap: 8px; padding: 4px 4px 12px 4px; }
   .t-search { flex: 1; min-width: 200px; }
   /* 移动端 fab 缩小，避开内容 */
-  /* 移动端 fab：fixed 视口右下角；bottom 抬升 safe-area-inset-bottom（避开 iOS dock/手势条，
-     否则被底部栏挡住看不到/点不到）；z-index 70 > detail-panel(60)，详情面板全屏时仍可见可点 */
+  /* 移动端 fab：fixed 视口右下角；bottom 保底 70px（max 兜底，兼容 safe-area 不生效的浏览器），
+     确保不被 iOS dock/浏览器底部栏/手势条挡住；z-index 70 > detail-panel(60) */
   body .fab-add {
     position: fixed; right: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    bottom: max(70px, calc(16px + env(safe-area-inset-bottom, 0px)));
     width: 44px; height: 44px; z-index: 70;
   }
   .fab-add svg { width: 20px; height: 20px; }
-  /* 移动端 add-menu：fixed 视口右下角上方弹出（同样避开 dock） */
+  /* 移动端 add-menu：fixed 视口右下角上方弹出（fab 上方 70px，同样避开 dock） */
   body .add-menu {
     position: fixed; right: 16px;
-    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    bottom: max(140px, calc(86px + env(safe-area-inset-bottom, 0px)));
   }
   /* detail panel 移动端全屏：left/right/top/bottom=0 完全覆盖（不再留底，避免露出底层一级页卡片）；
      底部 dock 安全区由 .dp-body 的 padding + env(safe-area-inset-bottom) 消化 */
