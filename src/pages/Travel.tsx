@@ -922,8 +922,16 @@ export default function Travel() {
         setCardPop(null)
       }
     }
+    // 滚动（含内部滚动容器，capture 捕获）立即关闭，避免弹窗悬浮在固定位置不消失
+    const onScroll = () => setCardPop(null)
     document.addEventListener('mouseup', handler)
-    return () => document.removeEventListener('mouseup', handler)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('wheel', onScroll, { passive: true })
+    return () => {
+      document.removeEventListener('mouseup', handler)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('wheel', onScroll)
+    }
   }, [cardPop])
 
   useEffect(() => {
@@ -1673,144 +1681,152 @@ export default function Travel() {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="排序"
-              onClick={() => {
-                setSortPop((v) => !v)
-                setFilterPop(false)
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                <path d="M7 4v16" />
-                <path d="M3 8l4-4 4 4" />
-                <path d="M17 20V4" />
-                <path d="M13 16l4 4 4-4" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="筛选"
-              onClick={() => {
-                setFilterPop((v) => !v)
-                setSortPop(false)
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-              {(filterRegion || filterYear) && (
-                <span className="badge-dot">
-                  {(filterRegion ? 1 : 0) + (filterYear ? 1 : 0)}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="更多"
-              onClick={() => {
-                setMorePop((v) => !v)
-                setSortPop(false)
-                setFilterPop(false)
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                <circle cx="12" cy="5" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="12" cy="19" r="1.6" />
-              </svg>
-            </button>
-            <div ref={morePopRef} className={`t-popover more-menu${morePop ? ' show' : ''}`} style={{ right: '16px' }}>
-              <div
-                className="item"
+            <div className="t-btn-wrap" ref={sortPopRef}>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="排序"
                 onClick={() => {
-                  setMorePop(false)
-                  void syncNow()
-                }}
-              >
-                <span className="ico">⟳</span> 刷新从云端同步
-              </div>
-              <div
-                className="item"
-                onClick={() => {
-                  setMorePop(false)
-                  setEditTravelId(null)
-                  setCreateOpen(true)
-                }}
-              >
-                <span className="ico">＋</span> 新建旅行记录
-              </div>
-            </div>
-
-            {/* 排序弹窗 */}
-            <div ref={sortPopRef} className={`t-popover${sortPop ? ' show' : ''}`} style={{ right: '148px' }}>
-              <div className="head">排序方式</div>
-              <div
-                className={`item${sort === 'desc' ? ' active' : ''}`}
-                onClick={() => {
-                  setSort('desc')
-                  setSortPop(false)
-                }}
-              >
-                <span className="ico">⏱</span> 按行程时间倒序 <span className="check">✓</span>
-              </div>
-              <div
-                className={`item${sort === 'asc' ? ' active' : ''}`}
-                onClick={() => {
-                  setSort('asc')
-                  setSortPop(false)
-                }}
-              >
-                <span className="ico">⏱</span> 按行程时间正序 <span className="check">✓</span>
-              </div>
-            </div>
-
-            {/* 筛选弹窗 */}
-            <div ref={filterPopRef} className={`t-popover${filterPop ? ' show' : ''}`} style={{ right: '96px' }}>
-              <div className="head">地区</div>
-              <select
-                className="t-input"
-                value={filterRegion}
-                onChange={(e) => setFilterRegion(e.target.value)}
-                style={{ width: '100%', padding: '7px 8px', borderRadius: '8px' }}
-              >
-                <option value="">全部地区</option>
-                {PROVINCES.map((p) => (
-                  <option key={p.adcode} value={p.name}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <div className="sep" />
-              <div className="head">行程时间</div>
-              <select
-                className="t-input"
-                value={filterYear}
-                onChange={(e) => setFilterYear(e.target.value)}
-                style={{ width: '100%', padding: '7px 8px', borderRadius: '8px' }}
-              >
-                <option value="">全部</option>
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y} 年
-                  </option>
-                ))}
-              </select>
-              <div className="sep" />
-              <div
-                className="item"
-                style={{ color: 'var(--text-dim)' }}
-                onClick={() => {
-                  setFilterRegion('')
-                  setFilterYear('')
+                  setSortPop((v) => !v)
                   setFilterPop(false)
                 }}
               >
-                清除筛选
-              </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                  <path d="M7 4v16" />
+                  <path d="M3 8l4-4 4 4" />
+                  <path d="M17 20V4" />
+                  <path d="M13 16l4 4 4-4" />
+                </svg>
+              </button>
+              {sortPop && (
+                <div className="t-popover">
+                  <div className="head">排序方式</div>
+                  <div
+                    className={`item${sort === 'desc' ? ' active' : ''}`}
+                    onClick={() => {
+                      setSort('desc')
+                      setSortPop(false)
+                    }}
+                  >
+                    <span className="ico">⏱</span> 按行程时间倒序 <span className="check">✓</span>
+                  </div>
+                  <div
+                    className={`item${sort === 'asc' ? ' active' : ''}`}
+                    onClick={() => {
+                      setSort('asc')
+                      setSortPop(false)
+                    }}
+                  >
+                    <span className="ico">⏱</span> 按行程时间正序 <span className="check">✓</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="t-btn-wrap" ref={filterPopRef}>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="筛选"
+                onClick={() => {
+                  setFilterPop((v) => !v)
+                  setSortPop(false)
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                {(filterRegion || filterYear) && (
+                  <span className="badge-dot">
+                    {(filterRegion ? 1 : 0) + (filterYear ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+              {filterPop && (
+                <div className="t-popover">
+                  <div className="head">地区</div>
+                  <select
+                    className="t-input"
+                    value={filterRegion}
+                    onChange={(e) => setFilterRegion(e.target.value)}
+                    style={{ width: '100%', padding: '7px 8px', borderRadius: '8px' }}
+                  >
+                    <option value="">全部地区</option>
+                    {PROVINCES.map((p) => (
+                      <option key={p.adcode} value={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="sep" />
+                  <div className="head">行程时间</div>
+                  <select
+                    className="t-input"
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value)}
+                    style={{ width: '100%', padding: '7px 8px', borderRadius: '8px' }}
+                  >
+                    <option value="">全部</option>
+                    {years.map((y) => (
+                      <option key={y} value={y}>
+                        {y} 年
+                      </option>
+                    ))}
+                  </select>
+                  <div className="sep" />
+                  <div
+                    className="item"
+                    style={{ color: 'var(--text-dim)' }}
+                    onClick={() => {
+                      setFilterRegion('')
+                      setFilterYear('')
+                      setFilterPop(false)
+                    }}
+                  >
+                    清除筛选
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="t-btn-wrap" ref={morePopRef}>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="更多"
+                onClick={() => {
+                  setMorePop((v) => !v)
+                  setSortPop(false)
+                  setFilterPop(false)
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                  <circle cx="12" cy="5" r="1.6" />
+                  <circle cx="12" cy="12" r="1.6" />
+                  <circle cx="12" cy="19" r="1.6" />
+                </svg>
+              </button>
+              {morePop && (
+                <div className="t-popover more-menu">
+                  <div
+                    className="item"
+                    onClick={() => {
+                      setMorePop(false)
+                      void syncNow()
+                    }}
+                  >
+                    <span className="ico">⟳</span> 刷新从云端同步
+                  </div>
+                  <div
+                    className="item"
+                    onClick={() => {
+                      setMorePop(false)
+                      setEditTravelId(null)
+                      setCreateOpen(true)
+                    }}
+                  >
+                    <span className="ico">＋</span> 新建旅行记录
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

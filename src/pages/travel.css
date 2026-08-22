@@ -74,8 +74,11 @@
   body .waterfall { column-count: 1; padding: 4px 4px 8px 4px; }
   /* 移动端卡片底部元信息（日期+省）：flex-wrap 让日期自动换行两行，避免被挤断字 */
   .wf-sub { flex-wrap: wrap; gap: 4px 6px; }
-  /* 移动端弹窗 mask：底部加 70px padding 避开 dock，flex center 让 modal 自动上移 */
-  .t-modal-mask { padding-bottom: 70px; }
+  /* 移动端弹窗 mask：底部加 70px padding 避开 dock，flex center 让 modal 自动上移。
+     用 body 提升 specificity，否则会被下方全局 .t-modal-mask 覆盖（同 specificity 后定义胜出）。 */
+  body .t-modal-mask { padding-bottom: 70px; }
+  /* 移动端新建/编辑弹窗：底部多留空间，避免内容被 dock/安全区遮住 */
+  body .t-modal { max-height: calc(100vh - 120px); }
   /* 移动端 empty-state 更显眼（避免"完全空白"看起来像页面坏掉） */
   .empty-state {
     border: 1px dashed var(--c-accent-border);
@@ -138,7 +141,8 @@
     border: none;
     box-shadow: none;
   }
-  .brand .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* 与总览下方独立模块图标一致：显式宽高 + object-fit: contain（不裁切图片内容） */
+  .brand .logo img { width: 36px; height: 36px; object-fit: contain; display: block; }
   .title h1 {
     margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;
     background: linear-gradient(90deg, var(--c-ink-strong), var(--c-ink-soft));
@@ -412,6 +416,14 @@
     display: none;
   }
   .t-popover.show { display: block; }
+  /* 功能按钮（排序/筛选/更多）弹窗：相对各自按钮定位，右缘对齐按钮右缘（与阅读模块一致） */
+  .t-btn-wrap { position: relative; }
+  .t-btn-wrap .t-popover {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    min-width: 220px;
+    z-index: 80;
+  }
+  .t-btn-wrap .t-popover.show { display: block; }
   .t-popover .item {
     padding: 8px 10px; border-radius: 8px;
     font-size: 13px; color: var(--text); cursor: pointer;
