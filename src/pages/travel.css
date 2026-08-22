@@ -132,14 +132,13 @@
   .brand { display: flex; align-items: center; gap: 12px; }
   .brand .logo {
     width: 36px; height: 36px; border-radius: 10px;
-    /* 跟 .new-btn 一致：深色玻璃底 + 白字 + accent 边 + 深色投影（不再是浅灰白"发光"样式） */
-    background: linear-gradient(180deg, var(--c-modal), var(--c-card));
-    color: #fff;
-    border: 1px solid rgba(var(--c-accent-rgb), 0.35);
-    display: grid; place-items: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    overflow: hidden;
+    display: block;
+    background: transparent;
+    border: none;
+    box-shadow: none;
   }
-  .brand .logo svg { width: 20px; height: 20px; }
+  .brand .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .title h1 {
     margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;
     background: linear-gradient(90deg, var(--c-ink-strong), var(--c-ink-soft));

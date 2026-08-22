@@ -1547,10 +1547,7 @@ export default function Travel() {
           <div className="left-header">
             <div className="brand">
               <div className="logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
-                </svg>
+                <img src="/时光迹.png" alt="时光迹" />
               </div>
               <div className="title">
                 <h1>时光迹</h1>
