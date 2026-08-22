@@ -19,24 +19,27 @@ import type { Travel, TravelDay, TravelItem } from '../types'
 import './travel.css'
 
 // ─── 功能类型（行程时间轴条目的"功能标题" + 内联 SVG 图标） ───────────────
+// ★ 图标路径必须用 import.meta.env.BASE_URL（vite base:'./'）相对拼接：
+//   绝对路径 /icons/... 在 GitHub Pages 子路径(/yunstudio/)部署下会 404 → 图标裂开
+const ICON_BASE = import.meta.env.BASE_URL
 interface ModuleMeta {
   name: string
   icon: string
 }
 export const MODULE_LABELS: Record<string, ModuleMeta> = {
-  transport: { name: '交通', icon: '/icons/travel/category/transport.png' },
-  hotel: { name: '住宿', icon: '/icons/travel/category/hotel.png' },
-  attraction: { name: '景点', icon: '/icons/travel/category/attraction.png' },
-  food: { name: '吃喝', icon: '/icons/travel/category/food.png' },
-  shopping: { name: '购物', icon: '/icons/travel/category/shopping.png' },
-  entertainment: { name: '娱乐', icon: '/icons/travel/category/entertainment.png' },
-  checkin: { name: '打卡', icon: '/icons/travel/category/checkin.png' },
-  note: { name: '注意事项', icon: '/icons/travel/category/note.png' },
-  memo: { name: '便签', icon: '/icons/travel/category/memo.png' },
-  luggage: { name: '行李清单', icon: '/icons/travel/category/luggage.png' },
-  ticket: { name: '机酒车票', icon: '/icons/travel/category/ticket.png' },
-  place: { name: '地点', icon: '/icons/travel/category/place.png' },
-  custom: { name: '自定义', icon: '/icons/travel/category/custom.png' },
+  transport: { name: '交通', icon: `${ICON_BASE}icons/travel/category/transport.png` },
+  hotel: { name: '住宿', icon: `${ICON_BASE}icons/travel/category/hotel.png` },
+  attraction: { name: '景点', icon: `${ICON_BASE}icons/travel/category/attraction.png` },
+  food: { name: '吃喝', icon: `${ICON_BASE}icons/travel/category/food.png` },
+  shopping: { name: '购物', icon: `${ICON_BASE}icons/travel/category/shopping.png` },
+  entertainment: { name: '娱乐', icon: `${ICON_BASE}icons/travel/category/entertainment.png` },
+  checkin: { name: '打卡', icon: `${ICON_BASE}icons/travel/category/checkin.png` },
+  note: { name: '注意事项', icon: `${ICON_BASE}icons/travel/category/note.png` },
+  memo: { name: '便签', icon: `${ICON_BASE}icons/travel/category/memo.png` },
+  luggage: { name: '行李清单', icon: `${ICON_BASE}icons/travel/category/luggage.png` },
+  ticket: { name: '机酒车票', icon: `${ICON_BASE}icons/travel/category/ticket.png` },
+  place: { name: '地点', icon: `${ICON_BASE}icons/travel/category/place.png` },
+  custom: { name: '自定义', icon: `${ICON_BASE}icons/travel/category/custom.png` },
 }
 // 总览卡片展示的 8 个模块（与设计稿一致）
 const OVERVIEW_TYPES = [
@@ -46,11 +49,11 @@ const MODULE_KEYS = Object.keys(MODULE_LABELS)
 
 // ─── 旅行主题类型（决定卡片左上角圆形图标来源） ───────────────
 export const TRAVEL_TYPES: Record<string, { name: string; icon: string }> = {
-  city: { name: '城市', icon: '/icons/travel/type/city.png' },
-  forest: { name: '森林', icon: '/icons/travel/type/forest.png' },
-  ocean: { name: '海洋', icon: '/icons/travel/type/ocean.png' },
-  lake: { name: '湖泊', icon: '/icons/travel/type/lake.png' },
-  dune: { name: '沙丘', icon: '/icons/travel/type/dune.png' },
+  city: { name: '城市', icon: `${ICON_BASE}icons/travel/type/city.png` },
+  forest: { name: '森林', icon: `${ICON_BASE}icons/travel/type/forest.png` },
+  ocean: { name: '海洋', icon: `${ICON_BASE}icons/travel/type/ocean.png` },
+  lake: { name: '湖泊', icon: `${ICON_BASE}icons/travel/type/lake.png` },
+  dune: { name: '沙丘', icon: `${ICON_BASE}icons/travel/type/dune.png` },
 }
 const TRAVEL_TYPE_KEYS = Object.keys(TRAVEL_TYPES) as ('city' | 'forest' | 'ocean' | 'lake' | 'dune')[]
 
@@ -1694,9 +1697,7 @@ export default function Travel() {
                               <div className="tl-item">
                                 <div className="tl-time">{it.time || '—'}</div>
                                 <div className="tl-axis">
-                                  <div className="tl-dot">
-                                    <img src={meta.icon} alt={meta.name} />
-                                  </div>
+                                  <div className="tl-dot" />
                                   <div className="tl-line" />
                                 </div>
                                 <div className="tl-content">
@@ -1988,9 +1989,9 @@ export default function Travel() {
               <div className="desc">决定地图上的轨迹动画样式（飞机最亮 / 高铁中等 / 自驾最暗）</div>
               <div className="t-transport-row">
                 {([
-                  { k: 'plane' as const, label: '飞机', icon: '/icons/travel/transport/plane.png' },
-                  { k: 'train' as const, label: '高铁', icon: '/icons/travel/transport/train.png' },
-                  { k: 'drive' as const, label: '自驾', icon: '/icons/travel/transport/drive.png' },
+                  { k: 'plane' as const, label: '飞机', icon: `${ICON_BASE}icons/travel/transport/plane.png` },
+                  { k: 'train' as const, label: '高铁', icon: `${ICON_BASE}icons/travel/transport/train.png` },
+                  { k: 'drive' as const, label: '自驾', icon: `${ICON_BASE}icons/travel/transport/drive.png` },
                 ]).map((opt) => (
                   <button
                     key={opt.k}
