@@ -746,8 +746,16 @@ function PoiSearchRow({
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
-        <button type="button" className="t-btn-secondary" onClick={() => onSearch(value, target)}>
-          搜索
+        <button
+          type="button"
+          className="t-btn-secondary t-btn-icon"
+          title="搜索"
+          onClick={() => onSearch(value, target)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
         </button>
       </div>
       {onTime && (
@@ -2453,11 +2461,6 @@ export default function Travel() {
             </div>
             <h3>{addItem.editId ? '编辑' : '添加'} · {MODULE_LABELS[aiType].name}</h3>
             <div className="t-modal-sub">TYPE · TITLE · TIME · NOTE · IMAGE</div>
-
-            {/* 说在前面：本模块通用规则提示（替代原「功能标题-选择模块类型」段） */}
-            <div className="t-note-tip">
-              添加「{MODULE_LABELS[aiType].name}」：每项最多 5 张图片（正方形缩略图，点击全屏查看）；含地理位置的模块提供「复制地址」导航按钮；注意事项限 100 字。
-            </div>
 
             {/* 自定义标题（通用） */}
             <div className="t-field">

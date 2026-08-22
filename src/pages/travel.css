@@ -853,10 +853,10 @@
   .fab-add:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 8px 20px rgba(0,0,0,0.45), 0 0 10px rgba(var(--c-accent-rgb),0.18); }
   .fab-add svg { width: 22px; height: 22px; }
 
-  /* 模块添加弹出菜单（半全屏） */
+  /* 模块添加弹出菜单（高度随内容自适应，避免9宫格下方大片空白） */
   .add-menu {
     position: absolute; right: 22px; bottom: 86px;
-    width: 460px; max-width: calc(100% - 44px); height: 620px; max-height: calc(100% - 110px);
+    width: 460px; max-width: calc(100% - 44px); height: auto; max-height: calc(100% - 110px);
     background: rgba(7,11,22,0.96);
     border: 1px solid var(--line);
     border-radius: 16px;
@@ -990,6 +990,8 @@
     transition: all .2s ease;
   }
   .t-btn-secondary:hover { color: var(--text); border-color: var(--line); }
+  .t-btn-secondary.t-btn-icon { padding: 0; width: 42px; height: 42px; display: grid; place-items: center; flex-shrink: 0; }
+  .t-btn-secondary.t-btn-icon svg { width: 18px; height: 18px; }
   .t-btn-primary {
     padding: 10px 22px;
     /* 跟 .new-btn 一致：深色玻璃底 + 白字 + 深色投影 */
