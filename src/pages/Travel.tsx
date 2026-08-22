@@ -687,6 +687,12 @@ export default function Travel() {
   const [filterYear, setFilterYear] = useState('')
   const [sortPop, setSortPop] = useState(false)
   const [filterPop, setFilterPop] = useState(false)
+  // 各弹窗 ref：用于点击弹窗外任意区域关闭
+  const sortPopRef = useRef<HTMLDivElement>(null)
+  const filterPopRef = useRef<HTMLDivElement>(null)
+  const cardPopRef = useRef<HTMLDivElement>(null)
+  const addMenuRef = useRef<HTMLDivElement>(null)
+  const fabAddRef = useRef<HTMLButtonElement>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState(0) // 0 = 总览，1..N = Day
   const [editing, setEditing] = useState(false)
@@ -755,6 +761,53 @@ export default function Travel() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // ── 一级页面所有弹窗：点组件外任意区域关闭 ──
+  // 用 mouseup（早于 click 触发；fab-add 是 toggle 按钮需用 ref 豁免，否则会立刻被关）
+  useEffect(() => {
+    if (!sortPop) return
+    const handler = (e: MouseEvent) => {
+      if (sortPopRef.current && !sortPopRef.current.contains(e.target as Node)) {
+        setSortPop(false)
+      }
+    }
+    document.addEventListener('mouseup', handler)
+    return () => document.removeEventListener('mouseup', handler)
+  }, [sortPop])
+
+  useEffect(() => {
+    if (!filterPop) return
+    const handler = (e: MouseEvent) => {
+      if (filterPopRef.current && !filterPopRef.current.contains(e.target as Node)) {
+        setFilterPop(false)
+      }
+    }
+    document.addEventListener('mouseup', handler)
+    return () => document.removeEventListener('mouseup', handler)
+  }, [filterPop])
+
+  useEffect(() => {
+    if (!cardPop) return
+    const handler = (e: MouseEvent) => {
+      if (cardPopRef.current && !cardPopRef.current.contains(e.target as Node)) {
+        setCardPop(null)
+      }
+    }
+    document.addEventListener('mouseup', handler)
+    return () => document.removeEventListener('mouseup', handler)
+  }, [cardPop])
+
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      // fab-add 是 toggle 按钮——豁免（不豁免会让 toggle 按钮点不开/关不掉）
+      if (fabAddRef.current?.contains(e.target as Node)) return
+      if (addMenuRef.current?.contains(e.target as Node)) return
+      setAddMenuOpen(false)
+    }
+    document.addEventListener('mouseup', handler)
+    return () => document.removeEventListener('mouseup', handler)
+  }, [addMenuOpen])
 
   // 同步状态错误提示
   useEffect(() => {
@@ -906,6 +959,8 @@ export default function Travel() {
   const [transportMode, setTransportMode] = useState<'plane' | 'train' | 'drive'>('plane')
   // 旅行主题类型（决定卡片左上角圆形图标来源），默认城市
   const [travelType, setTravelType] = useState<'city' | 'forest' | 'ocean' | 'lake' | 'dune'>('city')
+  // 编辑模式：null = 新建，否则 = 正在编辑的 travel.id
+  const [editTravelId, setEditTravelId] = useState<string | null>(null)
 
   const onCityInput = (v: string) => {
     setCityText(v)
@@ -975,20 +1030,21 @@ export default function Travel() {
     }
     const dc = dayCount(startDate, endDate)
     const nc = nightCount(startDate, endDate)
-    const emoji = EMOJI_POOL[Math.floor(Math.random() * EMOJI_POOL.length)]
     const now = new Date().toISOString()
+    const isEdit = !!editTravelId
+    const existing = isEdit ? travels.find((t) => t.id === editTravelId) : null
     const rec: Travel = {
-      id: uid(),
-      user_id: userId,
+      id: existing?.id ?? uid(),
+      user_id: existing?.user_id ?? userId,
       title: `${city} ${dc}天${nc}夜行程`,
       city,
       province_adcode: prov.adcode,
       province_name: prov.name,
-      emoji,
+      emoji: existing?.emoji ?? EMOJI_POOL[Math.floor(Math.random() * EMOJI_POOL.length)],
       start_date: startDate,
       end_date: endDate,
       cover: coverPreview,
-      days: createDays(startDate, endDate),
+      days: existing?.days ?? createDays(startDate, endDate), // 编辑时保留已有时间轴
       // 出发地：未填则不写字段（undefined），老数据无此字段保持兼容
       ...(depText
         ? {
@@ -999,15 +1055,20 @@ export default function Travel() {
         : {}),
       transport_mode: transportMode,
       type: travelType,
-      created_at: now,
+      created_at: existing?.created_at ?? now,
       updated_at: now,
     }
     await localPut('travels', rec)
-    await enqueueAndMaybeFlush('travels', 'insert', rec.id, rec)
-    setTravels((prev) => [rec, ...prev])
-    showToast(prov.adcode ? `已生成旅行规划 · 点亮${prov.name}` : '已生成旅行规划')
+    await enqueueAndMaybeFlush('travels', isEdit ? 'update' : 'insert', rec.id, rec)
+    setTravels((prev) =>
+      isEdit
+        ? prev.map((t) => (t.id === rec.id ? rec : t)).sort((a, b) => b.created_at.localeCompare(a.created_at))
+        : [rec, ...prev],
+    )
+    showToast(isEdit ? `已更新 · ${rec.title}` : prov.adcode ? `已生成旅行规划 · 点亮${prov.name}` : '已生成旅行规划')
     // 重置 + 关闭
     setCreateOpen(false)
+    setEditTravelId(null)
     setCityText('')
     setCitySuggest([])
     setDepartureText('')
@@ -1340,7 +1401,10 @@ export default function Travel() {
               </svg>
               <span className="badge-tip">刷新从云端同步</span>
             </div>
-            <button className="new-btn" onClick={() => setCreateOpen(true)}>
+            <button className="new-btn" onClick={() => {
+              setEditTravelId(null)
+              setCreateOpen(true)
+            }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M12 5v14M5 12h14" />
               </svg>
@@ -1348,7 +1412,7 @@ export default function Travel() {
             </button>
 
             {/* 排序弹窗 */}
-            <div className={`t-popover${sortPop ? ' show' : ''}`} style={{ right: '148px' }}>
+            <div ref={sortPopRef} className={`t-popover${sortPop ? ' show' : ''}`} style={{ right: '148px' }}>
               <div className="head">排序方式</div>
               <div
                 className={`item${sort === 'desc' ? ' active' : ''}`}
@@ -1371,7 +1435,7 @@ export default function Travel() {
             </div>
 
             {/* 筛选弹窗 */}
-            <div className={`t-popover${filterPop ? ' show' : ''}`} style={{ right: '96px' }}>
+            <div ref={filterPopRef} className={`t-popover${filterPop ? ' show' : ''}`} style={{ right: '96px' }}>
               <div className="head">地区</div>
               <select
                 className="t-input"
@@ -1678,6 +1742,7 @@ export default function Travel() {
                     )}
                 </div>
                 <button
+                  ref={fabAddRef}
                   className="fab-add"
                   title="添加"
                   onClick={() => setAddMenuOpen((v) => !v)}
@@ -1686,7 +1751,7 @@ export default function Travel() {
                     <path d="M12 5v14M5 12h14" />
                   </svg>
                 </button>
-                <div className={`add-menu${addMenuOpen ? ' show' : ''}`}>
+                <div ref={addMenuRef} className={`add-menu${addMenuOpen ? ' show' : ''}`}>
                   {MODULE_KEYS.map((type) => {
                     const meta = MODULE_LABELS[type]
                     return (
@@ -1713,9 +1778,44 @@ export default function Travel() {
       {/* ===== 卡片"更多"弹出（fixed 定位，避开 overflow） ===== */}
       {cardPop && (
         <div
+          ref={cardPopRef}
           className="wf-popover"
           style={{ position: 'fixed', left: cardPop.x, top: cardPop.y }}
         >
+          <button
+            className="wf-pop-item"
+            onClick={() => {
+              const t = travels.find((x) => x.id === cardPop.id)
+              if (t) {
+                // 编辑模式：把当前 travel 的所有字段灌入表单 state
+                setEditTravelId(t.id)
+                setCityText(t.city)
+                setCitySuggest([])
+                pickedProvince.current = { name: t.province_name, adcode: t.province_adcode }
+                setDepartureText(t.departure_city ?? '')
+                setDepartureSuggest([])
+                departureProvince.current = {
+                  name: t.departure_province_name ?? '',
+                  adcode: t.departure_province_adcode ?? '',
+                }
+                setStartDate(t.start_date)
+                setEndDate(t.end_date)
+                setCoverPreview(t.cover)
+                setCoverText('当前封面（可重新上传）')
+                setTransportMode(t.transport_mode ?? 'plane')
+                setTravelType(t.type ?? 'city')
+                setCreateErr('')
+                setCreateOpen(true)
+              }
+              setCardPop(null)
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            编辑卡片
+          </button>
           <button
             className="wf-pop-item"
             onClick={() => {
@@ -1751,15 +1851,21 @@ export default function Travel() {
       {/* ===== 创建旅行 dialog ===== */}
       {createOpen && (
         <div className="t-modal-mask show" onClick={(e) => {
-          if (e.target === e.currentTarget) setCreateOpen(false)
+          if (e.target === e.currentTarget) {
+            setCreateOpen(false)
+            setEditTravelId(null)
+          }
         }}>
           <div className="t-modal">
-            <div className="t-modal-close" onClick={() => setCreateOpen(false)}>
+            <div className="t-modal-close" onClick={() => {
+              setCreateOpen(false)
+              setEditTravelId(null)
+            }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </div>
-            <h3>新建旅行记录</h3>
+            <h3>{editTravelId ? '编辑旅行记录' : '新建旅行记录'}</h3>
             <div className="t-modal-sub">WHERE · WHEN · INFO</div>
 
             {/* 出发地：可选，与"你想去哪里"同套城市联想逻辑 */}
@@ -1984,7 +2090,7 @@ export default function Travel() {
                 取消
               </button>
               <button className="t-btn-primary" onClick={() => void submitCreate()}>
-                生成规划
+                {editTravelId ? '保存修改' : '生成规划'}
               </button>
             </div>
           </div>
