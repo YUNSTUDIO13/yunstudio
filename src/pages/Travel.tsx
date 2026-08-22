@@ -1673,48 +1673,56 @@ export default function Travel() {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <div
+            <button
+              type="button"
               className="icon-btn"
-              title="排序"
+              aria-label="排序"
               onClick={() => {
                 setSortPop((v) => !v)
                 setFilterPop(false)
               }}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                <path d="M7 4v16" />
+                <path d="M3 8l4-4 4 4" />
+                <path d="M17 20V4" />
+                <path d="M13 16l4 4 4-4" />
               </svg>
-              <span className="badge-tip">{sort === 'desc' ? '行程时间倒序' : '行程时间正序'}</span>
-            </div>
-            <div
+            </button>
+            <button
+              type="button"
               className="icon-btn"
-              title="筛选"
+              aria-label="筛选"
               onClick={() => {
                 setFilterPop((v) => !v)
                 setSortPop(false)
               }}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 5h18M6 12h12M10 19h4" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
               </svg>
-              <span className="badge-tip">筛选</span>
-            </div>
-            <div
+              {(filterRegion || filterYear) && (
+                <span className="badge-dot">
+                  {(filterRegion ? 1 : 0) + (filterYear ? 1 : 0)}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
               className="icon-btn"
-              title="更多"
+              aria-label="更多"
               onClick={() => {
                 setMorePop((v) => !v)
                 setSortPop(false)
                 setFilterPop(false)
               }}
             >
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="5" cy="12" r="1.8" />
-                <circle cx="12" cy="12" r="1.8" />
-                <circle cx="19" cy="12" r="1.8" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                <circle cx="12" cy="5" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="12" cy="19" r="1.6" />
               </svg>
-              <span className="badge-tip">更多</span>
-            </div>
+            </button>
             <div ref={morePopRef} className={`t-popover more-menu${morePop ? ' show' : ''}`} style={{ right: '16px' }}>
               <div
                 className="item"
