@@ -1533,15 +1533,6 @@ export default function Travel() {
                         />
                       )}
                       <div className="vignette" />
-                      <div className="wf-emoji">
-                        {t.type && TRAVEL_TYPES[t.type] ? (
-                          <img src={TRAVEL_TYPES[t.type].icon} alt={TRAVEL_TYPES[t.type].name} />
-                        ) : t.emoji ? (
-                          <span>{t.emoji}</span>
-                        ) : (
-                          <img src={TRAVEL_TYPES.city.icon} alt="城市" />
-                        )}
-                      </div>
                     </div>
                     <div
                       className="wf-more"
@@ -1564,14 +1555,25 @@ export default function Travel() {
                         <circle cx="12" cy="19" r="1.6" />
                       </svg>
                     </div>
-                    <div className="wf-info">
-                      <div className="wf-title">
-                        {t.city} · {dc}天{nc}夜
+                    <div className="wf-meta-row">
+                      <div className="wf-emoji">
+                        {t.type && TRAVEL_TYPES[t.type] ? (
+                          <img src={TRAVEL_TYPES[t.type].icon} alt={TRAVEL_TYPES[t.type].name} />
+                        ) : t.emoji ? (
+                          <span>{t.emoji}</span>
+                        ) : (
+                          <img src={TRAVEL_TYPES.city.icon} alt="城市" />
+                        )}
                       </div>
-                      <div className="wf-sub">
-                        {formatDateRange(t.start_date, t.end_date)}
-                        <span className="pip" />
-                        {t.province_name}
+                      <div className="wf-info">
+                        <div className="wf-title">
+                          {t.city} · {dc}天{nc}夜
+                        </div>
+                        <div className="wf-sub">
+                          {formatDateRange(t.start_date, t.end_date)}
+                          <span className="pip" />
+                          {t.province_name}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -477,14 +477,18 @@
     position: absolute; inset: 0;
     background: radial-gradient(120% 60% at 50% 0%, rgba(255,255,255,0.10), transparent 70%);
   }
+  /* 主题类型图标 + 标题/日期同行（垂直居中，图标在左侧） */
+  .wf-meta-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px;
+  }
   .wf-emoji {
-    position: absolute; left: 10px; bottom: -14px;
-    width: 36px; height: 36px;
+    width: 40px; height: 40px;
     display: grid; place-items: center;
-    font-size: 18px; z-index: 2;
+    font-size: 18px; flex-shrink: 0;
   }
   /* 图标为透明背景不规则 PNG，直接显示本体：不加背景/边框/圆形裁剪，保持透明 */
-  .wf-emoji img { width: 34px; height: 34px; object-fit: contain; }
+  .wf-emoji img { width: 38px; height: 38px; object-fit: contain; }
   .wf-emoji span { font-size: 18px; }
   /* 卡片右下角"更多"三点按钮（对齐观影 Movies.tsx 的圆形功能按钮） */
   .wf-more {
@@ -544,7 +548,7 @@
   .wf-pop-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: 0.72; }
   .wf-pop-item.pop-del { color: rgba(255,255,255,0.78); }
 
-  .wf-info { padding: 18px 12px 12px 12px; }
+  .wf-info { padding: 0; flex: 1; min-width: 0; }
   .wf-title {
     font-size: 14px; color: var(--ink-strong); font-weight: 700;
     letter-spacing: 0.4px;
@@ -689,17 +693,16 @@
     box-shadow: 0 6px 18px rgba(0,0,0,0.35), 0 0 16px rgba(var(--c-accent-rgb), 0.14);
   }
   .mod-card .mod-ico {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: rgba(var(--c-accent-rgb),0.10); color: rgb(var(--c-accent-rgb));
+    /* 去掉方形底图：透明直接显示图标本体 */
     display: grid; place-items: center;
     margin-bottom: 8px;
   }
-  .mod-card .mod-ico img { width: 36px; height: 36px; object-fit: contain; }
+  .mod-card .mod-ico img { width: 40px; height: 40px; object-fit: contain; }
   .mod-card .mod-name { font-size: 12px; color: var(--ink-strong); font-weight: 600; }
   .mod-card .mod-meta { margin-top: 2px; font-size: 10px; color: var(--text-dim); }
   .mod-card .mod-num { position: absolute; right: 10px; top: 10px; font-size: 18px; font-weight: 800; color: rgb(var(--c-accent-rgb)); }
   /* 模块卡统一中性灰白（去掉 purple/pink/orange/green 彩色变体） */
-  .mod-card.purple .mod-ico, .mod-card.pink .mod-ico, .mod-card.orange .mod-ico, .mod-card.green .mod-ico { background: rgba(var(--c-accent-rgb),0.10); color: rgb(var(--c-accent-rgb)); }
+  .mod-card.purple .mod-ico, .mod-card.pink .mod-ico, .mod-card.orange .mod-ico, .mod-card.green .mod-ico { color: rgb(var(--c-accent-rgb)); }
   .mod-card.purple .mod-num, .mod-card.pink .mod-num, .mod-card.orange .mod-num, .mod-card.green .mod-num { color: rgb(var(--c-accent-rgb)); }
 
   /* Day 时间轴 */
