@@ -416,14 +416,15 @@
     display: none;
   }
   .t-popover.show { display: block; }
-  /* 功能按钮（排序/筛选/更多）弹窗：相对各自按钮定位，右缘对齐按钮右缘（与阅读模块一致） */
+  /* 功能按钮（排序/筛选/更多）弹窗：相对各自按钮定位，右缘对齐按钮右缘（与阅读模块一致）。
+     条件渲染已控制显隐，故强制 display:block（不依赖 show 类，防回归） */
   .t-btn-wrap { position: relative; }
   .t-btn-wrap .t-popover {
     position: absolute; top: calc(100% + 6px); right: 0;
     min-width: 220px;
     z-index: 80;
+    display: block;
   }
-  .t-btn-wrap .t-popover.show { display: block; }
   .t-popover .item {
     padding: 8px 10px; border-radius: 8px;
     font-size: 13px; color: var(--text); cursor: pointer;
