@@ -1547,6 +1547,26 @@ export default function Travel() {
     setAddMenuOpen(false)
   }
 
+  // 移动端滚动穿透锁定：详情面板 / 添加菜单 / 弹窗打开时锁 body 滚动，
+  // 并在锁定层之外的 touchmove preventDefault，避免底层一级页瀑布流跟着滑动/还能看到底层滚动
+  useEffect(() => {
+    const anyOpen = !!detail || addMenuOpen || !!addItem?.open || !!extraEditor || !!fullImg
+    if (!anyOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const lockedSel = ['.detail-panel', '.add-menu', '.t-modal-mask', '.img-fullscreen']
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.target as HTMLElement
+      const inside = lockedSel.some((sel) => t.closest(sel))
+      if (!inside) e.preventDefault()
+    }
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => {
+      document.body.style.overflow = prevOverflow
+      document.removeEventListener('touchmove', onTouchMove)
+    }
+  }, [detail, addMenuOpen, addItem?.open, extraEditor, fullImg])
+
   return (
     <div className="travel-page" style={{ height: 'calc(100vh - 48px)' }}>
       <div className="t-app">
@@ -1554,9 +1574,6 @@ export default function Travel() {
         <div className="t-left">
           <div className="left-header">
             <div className="brand">
-              <div className="logo">
-                <img src={`${import.meta.env.BASE_URL}时光迹.png`} width="36" height="36" draggable="false" alt="时光迹" />
-              </div>
               <div className="title">
                 <h1>时光迹</h1>
               </div>

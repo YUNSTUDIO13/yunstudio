@@ -103,9 +103,11 @@
   /* 移动端 fab 缩小，避开内容 */
   .fab-add { right: 16px; bottom: 16px; width: 44px; height: 44px; }
   .fab-add svg { width: 20px; height: 20px; }
-  /* detail panel 移动端全屏 */
-  /* detail panel 移动端全屏：left/right/top=0 + bottom 留 70px 避开底部 dock */
-  body .detail-panel { left: 0; right: 0; top: 0; bottom: 70px; width: 100%; border-radius: 16px 16px 0 0; }
+  /* detail panel 移动端全屏：left/right/top/bottom=0 完全覆盖（不再留底，避免露出底层一级页卡片）；
+     底部 dock 安全区由 .dp-body 的 padding + env(safe-area-inset-bottom) 消化 */
+  body .detail-panel { left: 0; right: 0; top: 0; bottom: 0; width: 100%; border-radius: 0; }
+  /* 详情滚动区底部 padding 含安全区（避开 iOS 底部条/dock），内容不再被截断 */
+  body .dp-body { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
   /* 图例：移动端仅图标（隐藏文字），与旅行轨迹 toggle 同行不换行 */
   .t-legend { flex-wrap: nowrap; gap: 6px; }
   .t-legend .t-legend-text { display: none; }
@@ -133,16 +135,6 @@
     padding: 0 4px 14px 4px;
   }
   .brand { display: flex; align-items: center; gap: 12px; }
-  .brand .logo {
-    width: 36px; height: 36px; border-radius: 10px;
-    overflow: hidden;
-    display: block;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-  }
-  /* 与总览下方独立模块图标一致：显式宽高 + object-fit: contain（不裁切图片内容） */
-  .brand .logo img { width: 36px; height: 36px; object-fit: contain; display: block; }
   .title h1 {
     margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;
     background: linear-gradient(90deg, var(--c-ink-strong), var(--c-ink-soft));
