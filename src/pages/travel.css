@@ -86,10 +86,14 @@
   }
   .empty-state .arrow { color: rgb(var(--c-accent-rgb)); }
   /* 左 header / 统计 / 工具栏：紧凑 */
-  .left-header { flex-wrap: wrap; gap: 8px; padding: 0 4px 10px 4px; }
-  /* 移动端统计卡：一排展示不换行（nowrap），两个各 flex:1 平分宽度 */
+  .left-header { flex-wrap: wrap; gap: 8px; padding: 0 0 10px 0; }
+  /* 移动端统计卡：一排展示不换行（nowrap），三等分平分宽度，左右严格对齐下方地图卡片 */
   .t-stats { flex-wrap: nowrap; gap: 8px; padding-bottom: 10px; }
-  .t-stat { min-width: 0; flex: 1; padding: 8px 10px; }
+  /* ★ 关键：用 body .t-stat 提升 specificity（0,2,0），否则会被 PC 端 .t-stat 的 min-width:150px
+     覆盖，导致窄屏三卡 min-width:150 仍生效而溢出、超出下方卡片左右边。 */
+  body .t-stat { min-width: 0; flex: 1 1 0; padding: 8px 10px; overflow: hidden; }
+  /* 手机版：隐藏定位等图标，仅保留文字指标 */
+  .t-stat .ico { display: none; }
   .t-stat .val { font-size: 15px; }
   .t-stat .lbl { font-size: 10px; }
   .toolbar { flex-wrap: wrap; gap: 8px; padding: 4px 4px 12px 4px; }
