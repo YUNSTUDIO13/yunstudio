@@ -112,6 +112,9 @@ const PROVINCES: ChinaGeo[] = CHINA_GEO.filter(
   (g) => g.adcode !== '100000_JD' && g.name,
 )
 
+// 全国区县级行政区总数（民政部 2023 区划口径），作为「已造访城市」指标分母
+const CHINA_COUNTY_TOTAL = 2843
+
 // ─── 地图装饰层（对齐设计稿 setupMap）：等值波浪线 + 同心椭圆环，营造"科技发光"底纹 ──
 const TOPO_WAVES: { d: string; cls: string }[] = (() => {
   const W = 1000
@@ -883,6 +886,15 @@ export default function Travel() {
     return s
   }, [travels, resolveAdcode])
 
+  // 已造访城市（国内指标）：按最小粒度目的地城市名去重，2 个「长沙县」= 1 次；海外不计入
+  const visitedCities = useMemo(() => {
+    const s = new Set<string>()
+    travels.forEach((t) => {
+      if (t.province_adcode && t.city) s.add(t.city)
+    })
+    return s
+  }, [travels])
+
   // 轨迹动画 routes：从 travels 提取（每条 travel = 1 条轨迹，从出发地 → 目的地）
   // 起点 / 终点都允许是未点亮的省份（用户要求"轨迹链接的地方不一定是点亮的地图区域"）
   const trajectoryRoutes = useMemo(() => {
@@ -1274,7 +1286,7 @@ export default function Travel() {
                 </svg>
               </div>
               <div className="title">
-                <h1>我的旅行时光地图</h1>
+                <h1>时光迹</h1>
               </div>
             </div>
             <div className="t-stats">
@@ -1304,6 +1316,21 @@ export default function Travel() {
                   <div className="val">
                     {visitedKm}
                     <em> km</em>
+                  </div>
+                </div>
+              </div>
+              <div className="t-stat">
+                <div className="ico">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z" />
+                    <circle cx="12" cy="10" r="2.5" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="lbl">已造访城市</div>
+                  <div className="val">
+                    {visitedCities.size}
+                    <em>/{CHINA_COUNTY_TOTAL}</em>
                   </div>
                 </div>
               </div>

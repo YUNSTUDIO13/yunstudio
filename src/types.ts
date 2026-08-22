@@ -361,7 +361,29 @@ export interface TravelItem {
   type: string // 功能类型键（见页面 MODULE_LABELS）
   title: string // 自定义标题（缺省兜底为类型名）
   note: string // 备注
-  img: string | null // 图片（data URL 或 Storage 公链），可空
+  img: string | null // 图片（data URL 或 Storage 公链），可空；第6条迭代升级为多图后改为 string[]
+  // ── 第6条迭代：各类型字段（可选，按 type 使用） ──
+  // 交通
+  tool?: 'plane' | 'train' | 'drive' // 交通工具
+  dateStart?: string // 出发日期
+  dateEnd?: string // 到达日期
+  flightNo?: string // 航班号（tool=plane）
+  trainNo?: string // 车次号（tool=train）
+  fromStation?: string // 出发站（高德机场/车站，失败手动）
+  fromTime?: string // 出发时间
+  toStation?: string // 到达站
+  toTime?: string // 到达时间
+  // 住宿
+  hotel?: string // 酒店名（高德搜索）
+  address?: string // 地址（高德返回，失败手动）
+  star?: number // 星级（高德返回，失败手动）
+  // 景点 / POI（吃喝/购物/娱乐/打卡复用景点字段）
+  poi?: string // POI 名称（高德搜索）
+  intro?: string // 地点介绍
+  rating?: string // 真实评价
+  openTime?: string // 营业时间
+  // 导航地址（点击复制，除注意事项外均含）
+  navAddr?: string
 }
 
 export interface TravelDay {
@@ -392,6 +414,14 @@ export interface Travel {
   // 旅行类型（旅行主题：城市/森林/海洋/湖泊/沙丘），决定卡片左上角圆形图标来源。
   // 用户在新建表单选择类型；老数据无则回退到 emoji 字段，再无则用 type=city 图标。
   type?: 'city' | 'forest' | 'ocean' | 'lake' | 'dune'
+  // 第5条迭代：四个独立模块（便签/行李清单/机酒车票/地点），不受右下角添加按钮控制，
+  // 在总览卡片下方独立展示、独立更新。后续单独迭代其模块能力。
+  extra?: {
+    memo?: string // 便签（纯文本）
+    luggage?: string[] // 行李清单（清单项）
+    ticket?: string[] // 机酒车票（清单项）
+    place?: string[] // 地点（清单项）
+  }
 }
 
 export type TravelInput = {

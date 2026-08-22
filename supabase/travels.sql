@@ -23,6 +23,16 @@ create table if not exists public.travels (
   updated_at       timestamptz not null default now()
 );
 
+-- 补齐字段（幂等：首次建表后补充不会报错；新库也会执行一次）
+--   transport_mode/type/departure_*：前端早有写入，但旧 DDL 未含，导致云端 upsert 丢字段，此处补齐
+--   extra：第5条迭代「四个独立模块」（便签/行李清单/机酒车票/地点）的容器，jsonb 存储
+alter table public.travels add column if not exists transport_mode text;
+alter table public.travels add column if not exists type text;
+alter table public.travels add column if not exists departure_city text not null default '';
+alter table public.travels add column if not exists departure_province_adcode text not null default '';
+alter table public.travels add column if not exists departure_province_name text not null default '';
+alter table public.travels add column if not exists extra jsonb not null default '{}'::jsonb;
+
 create index if not exists travels_user_id_idx on public.travels(user_id);
 create index if not exists travels_updated_at_idx on public.travels(updated_at desc);
 create index if not exists travels_province_idx on public.travels(province_adcode);
