@@ -2010,6 +2010,7 @@ export default function Travel() {
                         )}
                         {detail.days[activeTab - 1].items.map((it) => {
                           const meta = MODULE_LABELS[it.type] ?? MODULE_LABELS.custom
+                          const imgs = normalizeImgs(it.img)
                           return (
                             <div className="timeline" key={it.id}>
                               <div className="tl-item">
@@ -2028,9 +2029,9 @@ export default function Travel() {
                                     {it.time && <span>· {it.time}</span>}
                                   </div>
                                   {it.note && <div className="tl-note">{it.note}</div>}
-                                  {it.img && it.img.length > 0 && (
+                                  {imgs.length > 0 && (
                                     <div className="tl-thumbs">
-                                      {it.img.map((src, i) => (
+                                      {imgs.map((src, i) => (
                                         <img
                                           className="tl-thumb"
                                           key={i}

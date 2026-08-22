@@ -88,7 +88,8 @@
   /* 左 header / 统计 / 工具栏：紧凑 */
   .left-header { flex-wrap: wrap; gap: 8px; padding: 0 0 10px 0; }
   /* 移动端统计卡：一排展示不换行（nowrap），三等分平分宽度，左右严格对齐下方地图卡片 */
-  .t-stats { flex-wrap: nowrap; gap: 8px; padding-bottom: 10px; }
+  /* 占满整行，使三指标与下方地图卡片左右对齐；隐藏图标后内容变窄也不会右留白 */
+  body .t-stats { flex-wrap: nowrap; gap: 8px; padding-bottom: 10px; width: 100%; }
   /* ★ 关键：用 body .t-stat 提升 specificity（0,2,0），否则会被 PC 端 .t-stat 的 min-width:150px
      覆盖，导致窄屏三卡 min-width:150 仍生效而溢出、超出下方卡片左右边。 */
   body .t-stat { min-width: 0; flex: 1 1 0; padding: 8px 10px; overflow: hidden; }
