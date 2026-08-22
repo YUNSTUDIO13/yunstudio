@@ -728,6 +728,9 @@ function PoiSearchRow({
   onTime,
   timeVal,
   onSearch,
+  results,
+  loading,
+  onPick,
 }: {
   target: 'from' | 'to' | 'hotel' | 'poi'
   placeholder: string
@@ -736,9 +739,13 @@ function PoiSearchRow({
   onTime?: (v: string) => void
   timeVal?: string
   onSearch: (kw: string, t: 'from' | 'to' | 'hotel' | 'poi') => void
+  results?: AMapPoi[]
+  loading?: boolean
+  onPick?: (p: AMapPoi, target: 'from' | 'to' | 'hotel' | 'poi') => void
 }) {
+  const showResults = results && results.length > 0
   return (
-    <>
+    <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <input
           className="t-input"
@@ -768,7 +775,18 @@ function PoiSearchRow({
           onChange={(e) => onTime(e.target.value)}
         />
       )}
-    </>
+      {loading && <div className="poi-loading">搜索中…</div>}
+      {showResults && (
+        <div className="poi-results">
+          {results.map((p) => (
+            <button key={p.id} type="button" className="poi-item" onClick={() => onPick?.(p, target)}>
+              <div className="poi-name">{p.name}</div>
+              {p.address && <div className="poi-addr">{p.address}</div>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1264,40 +1282,40 @@ export default function Travel() {
   const [aiNavAddr, setAiNavAddr] = useState('')
   const [aiLocation, setAiLocation] = useState('') // 第7条：经纬度 "lng,lat"
   const [fullImg, setFullImg] = useState<string | null>(null) // 全屏看图
-  // 第6条：高德 POI 搜索（交通站 / 酒店 / 景点 共用，结果下拉选中后回填对应字段）
-  const [poiTarget, setPoiTarget] = useState<'' | 'from' | 'to' | 'hotel' | 'poi'>('')
-  const [poiResults, setPoiResults] = useState<AMapPoi[]>([])
-  const [poiLoading, setPoiLoading] = useState(false)
+  // 第6条：高德 POI 搜索（结果绑定到对应 target，紧跟输入框下方展示）
+  const [poiState, setPoiState] = useState<{
+    target: 'from' | 'to' | 'hotel' | 'poi'
+    list: AMapPoi[]
+    loading: boolean
+  } | null>(null)
   const doPoiSearch = async (kw: string, target: 'from' | 'to' | 'hotel' | 'poi') => {
     if (!kw.trim()) return
-    setPoiTarget(target)
-    setPoiLoading(true)
+    setPoiState({ target, list: [], loading: true })
     const r = await amapSearchPoi(kw.trim())
-    setPoiResults(r)
-    setPoiLoading(false)
+    setPoiState({ target, list: r, loading: false })
   }
-  const pickPoi = (p: AMapPoi) => {
-    if (poiTarget === 'from') {
+  const pickPoi = (p: AMapPoi, target: 'from' | 'to' | 'hotel' | 'poi') => {
+    if (target === 'from') {
       setAiFromStation(p.name)
       setAiNavAddr(p.address || p.location)
       setAiLocation(p.location)
-    } else if (poiTarget === 'to') {
+    } else if (target === 'to') {
       setAiToStation(p.name)
       setAiNavAddr(p.address || p.location)
       setAiLocation(p.location)
-    } else if (poiTarget === 'hotel') {
+    } else if (target === 'hotel') {
       setAiHotel(p.name)
       setAiAddress(p.address)
       setAiNavAddr(p.address || p.location)
       setAiLocation(p.location)
-    } else if (poiTarget === 'poi') {
+    } else if (target === 'poi') {
       setAiPoi(p.name)
       setAiAddress(p.address)
       if (p.rating) setAiRating(p.rating)
       setAiNavAddr(p.address || p.location)
       setAiLocation(p.location)
     }
-    setPoiResults([])
+    setPoiState(null)
   }
 
   const openAddItem = (travelId: string, dayIndex: number, presetType?: string, editId?: string) => {
@@ -2521,11 +2539,33 @@ export default function Travel() {
                 )}
                 <div className="t-field">
                   <div className="label">出发站（高德搜索）</div>
-                  <PoiSearchRow target="from" placeholder="如：北京南站" value={aiFromStation} setValue={setAiFromStation} onTime={setAiFromTime} timeVal={aiFromTime} onSearch={doPoiSearch} />
+                  <PoiSearchRow
+                    target="from"
+                    placeholder="如：北京南站"
+                    value={aiFromStation}
+                    setValue={setAiFromStation}
+                    onTime={setAiFromTime}
+                    timeVal={aiFromTime}
+                    onSearch={doPoiSearch}
+                    results={poiState?.target === 'from' ? poiState.list : undefined}
+                    loading={poiState?.target === 'from' ? poiState.loading : false}
+                    onPick={pickPoi}
+                  />
                 </div>
                 <div className="t-field">
                   <div className="label">到达站（高德搜索）</div>
-                  <PoiSearchRow target="to" placeholder="如：上海虹桥站" value={aiToStation} setValue={setAiToStation} onTime={setAiToTime} timeVal={aiToTime} onSearch={doPoiSearch} />
+                  <PoiSearchRow
+                    target="to"
+                    placeholder="如：上海虹桥站"
+                    value={aiToStation}
+                    setValue={setAiToStation}
+                    onTime={setAiToTime}
+                    timeVal={aiToTime}
+                    onSearch={doPoiSearch}
+                    results={poiState?.target === 'to' ? poiState.list : undefined}
+                    loading={poiState?.target === 'to' ? poiState.loading : false}
+                    onPick={pickPoi}
+                  />
                 </div>
               </>
             )}
@@ -2535,7 +2575,16 @@ export default function Travel() {
               <>
                 <div className="t-field">
                   <div className="label">酒店（高德搜索）</div>
-                  <PoiSearchRow target="hotel" placeholder="如：上海外滩华尔道夫" value={aiHotel} setValue={setAiHotel} onSearch={doPoiSearch} />
+                  <PoiSearchRow
+                    target="hotel"
+                    placeholder="如：上海外滩华尔道夫"
+                    value={aiHotel}
+                    setValue={setAiHotel}
+                    onSearch={doPoiSearch}
+                    results={poiState?.target === 'hotel' ? poiState.list : undefined}
+                    loading={poiState?.target === 'hotel' ? poiState.loading : false}
+                    onPick={pickPoi}
+                  />
                 </div>
                 <div className="t-field">
                   <div className="label">地址</div>
@@ -2564,7 +2613,16 @@ export default function Travel() {
               <>
                 <div className="t-field">
                   <div className="label">{MODULE_LABELS[aiType].name}（高德搜索）</div>
-                  <PoiSearchRow target="poi" placeholder="如：故宫博物院" value={aiPoi} setValue={setAiPoi} onSearch={doPoiSearch} />
+                  <PoiSearchRow
+                    target="poi"
+                    placeholder="如：故宫博物院"
+                    value={aiPoi}
+                    setValue={setAiPoi}
+                    onSearch={doPoiSearch}
+                    results={poiState?.target === 'poi' ? poiState.list : undefined}
+                    loading={poiState?.target === 'poi' ? poiState.loading : false}
+                    onPick={pickPoi}
+                  />
                 </div>
                 <div className="t-field">
                   <div className="label">地址</div>
@@ -2679,23 +2737,6 @@ export default function Travel() {
                     复制
                   </button>
                 </div>
-              </div>
-            )}
-
-            {/* 高德 POI 搜索结果下拉 */}
-            {poiResults.length > 0 && (
-              <div className="poi-results">
-                {poiResults.map((p) => (
-                  <button key={p.id} type="button" className="poi-item" onClick={() => pickPoi(p)}>
-                    <div className="poi-name">{p.name}</div>
-                    {p.address && <div className="poi-addr">{p.address}</div>}
-                  </button>
-                ))}
-              </div>
-            )}
-            {poiLoading && (
-              <div className="poi-results" style={{ padding: '8px 10px' }}>
-                <div className="desc">高德搜索中…</div>
               </div>
             )}
 

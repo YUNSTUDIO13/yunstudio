@@ -1161,6 +1161,7 @@
 .poi-item:hover { background: rgba(var(--c-accent-rgb), 0.12); }
 .poi-name { font-size: 13px; font-weight: 600; }
 .poi-addr { font-size: 11px; color: var(--text-mute); margin-top: 2px; word-break: break-all; }
+.poi-loading { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
 
 /* ── 第7条：总览底部轨迹预览 ── */
 .traj-preview {
