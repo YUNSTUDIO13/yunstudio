@@ -846,7 +846,8 @@
     display: grid; place-items: center;
     cursor: pointer;
     box-shadow: 0 6px 16px rgba(0,0,0,0.4);
-    z-index: 6;
+    /* 高于 .detail-panel(60)，保证详情面板全屏覆盖时右下角添加按钮仍可见可点 */
+    z-index: 70;
     transition: transform .2s ease, box-shadow .2s ease;
   }
   .fab-add:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 8px 20px rgba(0,0,0,0.45), 0 0 10px rgba(var(--c-accent-rgb),0.18); }
@@ -860,7 +861,8 @@
     border: 1px solid var(--line);
     border-radius: 16px;
     padding: 16px;
-    z-index: 7;
+    /* 高于 .detail-panel(60) 与 .fab-add(70)，详情面板内弹出菜单不被遮挡 */
+    z-index: 75;
     box-shadow: 0 24px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(var(--c-accent-rgb),0.10);
     backdrop-filter: blur(24px);
     display: none;
