@@ -700,7 +700,7 @@
     margin-bottom: 8px;
   }
   .mod-card .mod-ico img { width: 40px; height: 40px; object-fit: contain; }
-  .mod-card .mod-name { font-size: 12px; color: var(--ink-strong); font-weight: 600; text-align: center; }
+  .mod-card .mod-name { font-size: 12px; color: var(--ink-strong); font-weight: 600; text-align: left; }
   .mod-card .mod-meta { margin-top: 2px; font-size: 10px; color: var(--text-dim); }
   .mod-card .mod-num { position: absolute; right: 10px; top: 10px; font-size: 18px; font-weight: 800; color: rgb(var(--c-accent-rgb)); }
   /* 模块卡统一中性灰白（去掉 purple/pink/orange/green 彩色变体） */
