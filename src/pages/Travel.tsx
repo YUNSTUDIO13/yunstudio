@@ -1663,9 +1663,6 @@ export default function Travel() {
                               <img src={meta.icon} alt={meta.name} />
                             </div>
                             <div className="mod-name">{meta.name}</div>
-                            <div className="mod-meta">
-                              {cnt > 0 ? `${cnt} 条记录` : '暂无'}
-                            </div>
                             <div className="mod-num">{cnt}</div>
                           </div>
                         )
@@ -1702,7 +1699,8 @@ export default function Travel() {
                                 </div>
                                 <div className="tl-content">
                                   <div className="tl-title">
-                                    <img className="tl-title-ico" src={meta.icon} alt="" /> {it.title}
+                                    <span className="tl-title-text">{it.title}</span>
+                                    <img className="tl-title-ico" src={meta.icon} alt={meta.name} />
                                   </div>
                                   <div className="tl-meta">
                                     <span className="tl-pill">{meta.name}</span>
