@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { forceUnlockBodyScroll } from '../components/ui'
-import { db, localPut, localDelete } from '../lib/localDb'
+import { db, localPut, localDelete, pendingRowIds } from '../lib/localDb'
 import { supabase } from '../lib/supabase'
 import {
   seedFromServer,
@@ -925,6 +925,24 @@ export default function Travel() {
     }
   }, [])
 
+  // 安全孤儿清理：本地有、云端无、且无待同步 op 的记录 → 视为「其他端已删除」，本地删除。
+  // 与观影机制一致（云端为准 + Realtime DELETE 兜底），并补上「离线窗口错过 DELETE 事件」
+  // 的刷新兜底——防止 PC 残留孤儿导致删除的数据被下次强制 upsert 复活。
+  // 有 pending op 的行（刚新增/刚改未同步）绝不误删。
+  const pruneOrphans = useCallback(async (uid: string) => {
+    if (uid === 'anonymous') return
+    const { data, error } = await supabase.from('travels').select('id').eq('user_id', uid)
+    if (error || !data) return
+    const serverIds = new Set(data.map((r) => String(r.id)))
+    const pending = await pendingRowIds('travels')
+    const locals = (await db.travels.where('user_id').equals(uid).toArray()) as Travel[]
+    for (const t of locals) {
+      if (!serverIds.has(t.id) && !pending.has(t.id)) {
+        await db.travels.delete(t.id)
+      }
+    }
+  }, [])
+
   const load = useCallback(async () => {
     if (!user) {
       // preview=1 匿名态：user=null 不进异步加载，直接关掉 loading 显示空态，避免「正在载入…」占位一直挂在那
@@ -936,13 +954,16 @@ export default function Travel() {
       // 迁移旧匿名数据：登录后把本地 user_id='anonymous' 的记录归入当前账号并入 outbox 上云，
       // 解决「登录前手机里建的记录同步不上去、列表还看不到」的历史问题
       await migrateAnonymous(userId)
+      // 安全孤儿清理：其他端已删除的本地记录在此移除（与云端对齐）
+      await pruneOrphans(userId)
       await reload(userId)
       await seedFromServer('travels', userId)
+      await pruneOrphans(userId)
       await reload(userId)
     } finally {
       setLoading(false)
     }
-  }, [user, userId, reload, migrateAnonymous])
+  }, [user, userId, reload, migrateAnonymous, pruneOrphans])
 
   useEffect(() => {
     void load()
@@ -1591,18 +1612,13 @@ export default function Travel() {
     showToast('已添加新的一天')
   }
 
-  // 同步按钮：拉云端合并 → 迁移匿名数据 → 本地全部记录强制补传（upsert 幂等）→ 重读本地
-  // （不用空操作入队；本地上有记录就一定逐条 upsert 上云，outbox 旧 op 一并清掉）
+  // 同步按钮：拉云端合并 → 迁移匿名数据 → 安全孤儿清理 → 只补传 outbox → 重读本地。
+  // 绝不「强制全部 upsert」：否则会把其他端已删除的记录从本地复活上云（如手机删、PC 又传回）。
   const syncNow = async () => {
     showToast('正在同步云端…')
     await seedFromServer('travels', userId)
-    // 1) 登录后把本地 anonymous 归属记录迁移到当前账号
     await migrateAnonymous(userId)
-    // 2) 兜底：本地当前用户的所有记录重新入队补传（幂等，不管 outbox 之前状态）
-    const rows = (await db.travels.where('user_id').equals(userId).toArray()) as Travel[]
-    for (const r of rows) {
-      await enqueueAndMaybeFlush('travels', 'update', r.id, r)
-    }
+    await pruneOrphans(userId)
     await flushOutbox()
     await reload(userId)
     showToast('同步完成')
