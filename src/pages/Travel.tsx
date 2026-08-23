@@ -1176,6 +1176,9 @@ export default function Travel() {
   const [mileageMap, setMileageMap] = useState<Record<string, number>>(() =>
     readJsonCache<Record<string, number>>(MILEAGE_CACHE_KEY),
   )
+  // 里程结果用 ref 同步，effect 不依赖 mileageMap（避免每算一张卡就重启整个循环）
+  const mileageRef = useRef(mileageMap)
+  mileageRef.current = mileageMap
   const cityCoordCache = useRef<Record<string, string>>(
     readJsonCache<Record<string, string>>(CITY_COORD_CACHE_KEY),
   )
@@ -1203,6 +1206,7 @@ export default function Travel() {
       return next
     })
     let cancelled = false
+    const computed = new Set<string>()
     ;(async () => {
       for (const t of travels) {
         if (cancelled) return
@@ -1211,7 +1215,8 @@ export default function Travel() {
         const to = t.city
         if (!from || !to || from === to) continue
         const key = `${t.id}:${mode}:${from}:${to}`
-        if (mileageMap[key] !== undefined) continue
+        if (mileageRef.current[key] !== undefined || computed.has(key)) continue
+        computed.add(key)
         const c1 = await getCityCoord(from)
         const c2 = await getCityCoord(to)
         if (!c1 || !c2) continue
@@ -1227,7 +1232,7 @@ export default function Travel() {
     return () => {
       cancelled = true
     }
-  }, [travels, getCityCoord, mileageMap])
+  }, [travels, getCityCoord])
 
   const filtered = useMemo(() => {
     let list = travels.slice()

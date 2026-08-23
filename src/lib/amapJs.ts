@@ -7,18 +7,27 @@ let cfgPromise: Promise<{ key: string; security: string }> | null = null
 const EMPTY = { key: '', security: '' }
 
 async function fetchConfig(): Promise<{ key: string; security: string }> {
-  if (!cfgPromise) {
-    cfgPromise = (async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('amap-js-config')
-        if (error) return EMPTY
-        return { key: data?.key ?? '', security: data?.security ?? '' }
-      } catch {
-        return EMPTY
-      }
-    })()
-  }
-  return cfgPromise
+  if (cfgPromise) return cfgPromise
+  const p = (async () => {
+    try {
+      // 超时控制：大陆网络下 supabase 慢，10s 快速失败，绝不让轨迹永远挂起
+      const ctrl = new AbortController()
+      const timer = window.setTimeout(() => ctrl.abort(), 10000)
+      const { data, error } = await supabase.functions.invoke('amap-js-config', {
+        signal: ctrl.signal,
+      })
+      window.clearTimeout(timer)
+      if (error) return EMPTY
+      return { key: data?.key ?? '', security: data?.security ?? '' }
+    } catch {
+      return EMPTY
+    }
+  })()
+  cfgPromise = p
+  const r = await p
+  // 关键修复：失败不永久缓存——下次调用重试，避免首次网络失败后轨迹永远占位
+  if (!r.key || !r.security) cfgPromise = null
+  return r
 }
 
 export async function isAmapJsReady(): Promise<boolean> {
@@ -41,7 +50,10 @@ export async function loadAMap(): Promise<any> {
     const s = document.createElement('script')
     s.src = `https://webapi.amap.com/maps?v=2.0&key=${c.key}&callback=${cb}`
     s.async = true
-    s.onerror = () => reject(new Error('Amap script load failed'))
+    s.onerror = () => {
+      amapPromise = null // 加载失败不缓存，允许重试
+      reject(new Error('Amap script load failed'))
+    }
     document.head.appendChild(s)
   })
   return amapPromise
