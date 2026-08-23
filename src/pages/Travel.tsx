@@ -2409,7 +2409,11 @@ export default function Travel() {
                                             key={i}
                                             src={src}
                                             alt={it.title}
+                                            loading="lazy"
                                             onClick={() => setFullImg(src)}
+                                            onLoad={(e) => {
+                                              e.currentTarget.style.opacity = '1'
+                                            }}
                                           />
                                         ))}
                                       </div>

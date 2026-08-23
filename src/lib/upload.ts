@@ -44,8 +44,28 @@ export async function uploadTravelImage(file: File, userId: string): Promise<str
   const path = `${userId}/${crypto.randomUUID()}.webp`
   const { error } = await supabase.storage
     .from(TRAVEL_BUCKET)
-    .upload(path, blob, { upsert: false, contentType: 'image/webp' })
+    .upload(path, blob, {
+      upsert: false,
+      contentType: 'image/webp',
+      // 长缓存：图片 URL 含 uuid 永久不变，浏览器缓存后二次秒开
+      cacheControl: '31536000',
+    })
   if (error) throw error
   const { data } = supabase.storage.from(TRAVEL_BUCKET).getPublicUrl(path)
   return data.publicUrl
+}
+
+/**
+ * 把 base64 data URL 上传 Storage 换短 URL（历史数据瘦身）。失败返回 null，保留原样幂等重试。
+ */
+export async function uploadDataUrl(dataUrl: string, userId: string): Promise<string | null> {
+  try {
+    const res = await fetch(dataUrl)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    const file = new File([blob], 'img', { type: blob.type || 'image/jpeg' })
+    return await uploadTravelImage(file, userId)
+  } catch {
+    return null
+  }
 }

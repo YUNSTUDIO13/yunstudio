@@ -796,6 +796,10 @@
     border-radius: 8px;
     border: 1px solid var(--line);
     object-fit: cover;
+    /* 占位灰底 + 加载完淡入（图片慢时不空白，体感不卡） */
+    background: var(--line-soft);
+    opacity: 0;
+    transition: opacity .35s ease;
   }
   .tl-content .tl-pill {
     display: inline-block; font-size: 10px;
