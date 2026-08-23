@@ -11,9 +11,10 @@ interface Stop {
 }
 
 // 第7条：总览底部轨迹预览。按 Day1/Day2… 切换，当日站点按时间排序后在地图上连成轨迹。
-// 依赖高德 JS API（amapJs.ts 配置 Key 后生效）；未配置或当日无坐标点时显示占位说明。
+// Key 由 Supabase Edge Function（amap-js-config）下发，登录后自动加载；未配置/未登录显示占位。
 export default function TrajectoryPreview({ days }: { days: TravelDay[] }) {
   const [active, setActive] = useState(0)
+  const [ready, setReady] = useState(false)
   const mapEl = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
 
@@ -30,8 +31,19 @@ export default function TrajectoryPreview({ days }: { days: TravelDay[] }) {
       .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0))
   }, [days, active])
 
+  // 异步探测高德配置是否就绪
   useEffect(() => {
-    if (!isAmapJsReady() || !mapEl.current) return
+    let mounted = true
+    isAmapJsReady().then((r) => {
+      if (mounted) setReady(r)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !mapEl.current) return
     let mounted = true
     loadAMap()
       .then((AMap) => {
@@ -69,7 +81,7 @@ export default function TrajectoryPreview({ days }: { days: TravelDay[] }) {
     return () => {
       mounted = false
     }
-  }, [stops, active])
+  }, [stops, active, ready])
 
   if (!days.length) return null
 
@@ -91,10 +103,10 @@ export default function TrajectoryPreview({ days }: { days: TravelDay[] }) {
         </div>
       </div>
       <div className="traj-map" ref={mapEl}>
-        {!isAmapJsReady() && (
-          <div className="traj-empty">配置高德 JS API Key 后显示每日轨迹（src/lib/amapJs.ts）</div>
+        {!ready && (
+          <div className="traj-empty">配置高德 JS API 后显示每日轨迹（登录 + 服务端下发 Key）</div>
         )}
-        {isAmapJsReady() && !stops.length && (
+        {ready && !stops.length && (
           <div className="traj-empty">当日暂无带坐标的地点（用「高德搜索」添加地点即可生成轨迹）</div>
         )}
       </div>
