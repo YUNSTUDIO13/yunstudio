@@ -20,20 +20,8 @@ const corsHeaders = {
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  // 鉴权：要求登录态，匿名无法调用（防盗刷）
-  const authHeader = req.headers.get('Authorization') ?? ''
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    { global: { headers: { Authorization: authHeader } } },
-  )
-  const { data: authData, error: authErr } = await supabaseClient.auth.getUser()
-  if (authErr || !authData.user) {
-    return new Response(JSON.stringify({ error: 'unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+  // 说明：district / poi / route 均为读取高德公开数据（行政区/POI/里程），无用户隐私，
+  //   不做登录校验，未登录（预览模式）也可用，与轨迹一致。防刷依赖高德配额与 Key 白名单。
 
   if (!AMAP_WEB_KEY) {
     return new Response(JSON.stringify({ error: 'AMAP_WEB_KEY not configured' }), {
