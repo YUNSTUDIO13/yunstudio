@@ -13,6 +13,7 @@ import {
   seedFromServer,
   enqueueAndMaybeFlush,
   setSyncStatusHandler,
+  flushOutbox,
 } from '../lib/sync'
 import { CHINA_GEO, CHINA_VIEWBOX, type ChinaGeo } from '../lib/china-geo'
 import type { Travel, TravelDay, TravelItem } from '../types'
@@ -815,6 +816,7 @@ export default function Travel() {
   const cardPopRef = useRef<HTMLDivElement>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const fabAddRef = useRef<HTMLButtonElement>(null)
+  const dpBodyRef = useRef<HTMLDivElement>(null) // 详情滚动容器（滑到底自动切下一天）
   const [detailId, setDetailId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState(0) // 0 = 总览，1..N = Day
   const [editing, setEditing] = useState(false)
@@ -899,8 +901,13 @@ export default function Travel() {
   // ── 数据加载：本地优先 + 云端注水 + Realtime ──
   const reload = useCallback(async (uid: string) => {
     const rows = (await db.travels.where('user_id').equals(uid).toArray()) as Travel[]
-    rows.sort((a, b) => b.created_at.localeCompare(a.created_at))
-    setTravels(rows)
+    // 防御：过滤「幽灵记录」（title/city/日期全空）——此前 syncNow 误 enqueue 空操作
+    // 曾在云端 upsert 出空记录，此处保证不展示不干扰正常数据
+    const clean = rows.filter(
+      (t) => (t.title || '').trim() || (t.city || '').trim() || (t.start_date || '').trim(),
+    )
+    clean.sort((a, b) => b.created_at.localeCompare(a.created_at))
+    setTravels(clean)
   }, [])
 
   const load = useCallback(async () => {
@@ -1561,12 +1568,14 @@ export default function Travel() {
     showToast('已添加新的一天')
   }
 
-  // 同步按钮
+  // 同步按钮：先拉云端合并 → 再把本地 outbox 补传 → 重读本地
+  // （注意：只 flush 现有 outbox，绝不 enqueue 空操作——否则会向云端 upsert 一条
+  //   title/city 全空的「幽灵记录」，如之前出现过的「1天0夜无封面」）
   const syncNow = async () => {
     showToast('正在同步云端…')
     await seedFromServer('travels', userId)
+    await flushOutbox()
     await reload(userId)
-    await enqueueAndMaybeFlush('travels', 'update', '', undefined)
     showToast('同步完成')
   }
 
@@ -1604,6 +1613,20 @@ export default function Travel() {
     setDetailId(null)
     setEditing(false)
     setAddMenuOpen(false)
+  }
+
+  // 详情滚动区：滑到底部自动切换到下一天（day1 → day2 → …），并回到新的一天顶部
+  const onDpScroll = () => {
+    const el = dpBodyRef.current
+    if (!el || !detail) return
+    if (activeTab <= 0 || activeTab >= detail.days.length) return
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 32) {
+      const next = activeTab + 1
+      setActiveTab(next)
+      requestAnimationFrame(() => {
+        if (dpBodyRef.current) dpBodyRef.current.scrollTop = 0
+      })
+    }
   }
 
   // 移动端滚动穿透锁定：详情面板 / 添加菜单 / 弹窗打开时锁 body 滚动，
@@ -2054,7 +2077,11 @@ export default function Travel() {
                     + 添加日期
                   </div>
                 </div>
-                <div className={`dp-body${editing ? ' editing' : ''}`}>
+                <div
+                  ref={dpBodyRef}
+                  className={`dp-body${editing ? ' editing' : ''}`}
+                  onScroll={onDpScroll}
+                >
                   {activeTab === 0 && (
                     <div className="overview-grid">
                       {OVERVIEW_TYPES.map((type) => {

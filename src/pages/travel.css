@@ -764,19 +764,11 @@
     position: relative; padding-top: 8px;
     display: flex; flex-direction: column; align-items: center;
   }
-  .tl-dot {
-    width: 14px; height: 14px; border-radius: 999px;
-    background: rgba(var(--c-accent-rgb),0.10); color: rgb(var(--c-accent-rgb));
-    border: 2px solid rgb(var(--c-accent-rgb));
-    display: grid; place-items: center;
-    z-index: 1;
-    box-shadow: 0 0 8px var(--c-accent-soft);
-  }
-  .tl-dot svg { width: 8px; height: 8px; }
-  .tl-dot img { width: 9px; height: 9px; object-fit: contain; }
+  /* 时间轴圆圈剔除（皇上要求）：只保留竖向轴线 */
+  .tl-dot { display: none; }
   .tl-title-ico { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
   .tl-line {
-    position: absolute; left: 50%; top: 22px; bottom: -22px;
+    position: absolute; left: 50%; top: 4px; bottom: -22px;
     width: 1px; background: var(--line-soft);
     transform: translateX(-50%);
   }
