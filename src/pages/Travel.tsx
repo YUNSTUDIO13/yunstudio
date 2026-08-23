@@ -816,7 +816,8 @@ export default function Travel() {
   const cardPopRef = useRef<HTMLDivElement>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const fabAddRef = useRef<HTMLButtonElement>(null)
-  const dpBodyRef = useRef<HTMLDivElement>(null) // 详情滚动容器（滑到底自动切下一天）
+  const dpBodyRef = useRef<HTMLDivElement>(null) // 详情滚动容器
+  const daySecRefs = useRef<(HTMLDivElement | null)[]>([]) // 各 day-section 元素（连续滚动定位用）
   const [detailId, setDetailId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState(0) // 0 = 总览，1..N = Day
   const [editing, setEditing] = useState(false)
@@ -910,6 +911,17 @@ export default function Travel() {
     setTravels(clean)
   }, [])
 
+  // 登录后把本地匿名(user_id='anonymous')记录迁移到当前账号并补传云端
+  const migrateAnonymous = useCallback(async (uid: string) => {
+    if (uid === 'anonymous') return
+    const anon = (await db.travels.where('user_id').equals('anonymous').toArray()) as Travel[]
+    for (const t of anon) {
+      const rec = { ...t, user_id: uid }
+      await localPut('travels', rec)
+      await enqueueAndMaybeFlush('travels', 'update', t.id, rec)
+    }
+  }, [])
+
   const load = useCallback(async () => {
     if (!user) {
       // preview=1 匿名态：user=null 不进异步加载，直接关掉 loading 显示空态，避免「正在载入…」占位一直挂在那
@@ -918,13 +930,16 @@ export default function Travel() {
     }
     setLoading(true)
     try {
+      // 迁移旧匿名数据：登录后把本地 user_id='anonymous' 的记录归入当前账号并入 outbox 上云，
+      // 解决「登录前手机里建的记录同步不上去、列表还看不到」的历史问题
+      await migrateAnonymous(userId)
       await reload(userId)
       await seedFromServer('travels', userId)
       await reload(userId)
     } finally {
       setLoading(false)
     }
-  }, [user, userId, reload])
+  }, [user, userId, reload, migrateAnonymous])
 
   useEffect(() => {
     void load()
@@ -1615,18 +1630,29 @@ export default function Travel() {
     setAddMenuOpen(false)
   }
 
-  // 详情滚动区：滑到底部自动切换到下一天（day1 → day2 → …），并回到新的一天顶部
+  // 详情滚动区：day1..N 连续渲染，滚动时按各 day-section 位置同步高亮上方 tab（不强制切换）
   const onDpScroll = () => {
     const el = dpBodyRef.current
-    if (!el || !detail) return
-    if (activeTab <= 0 || activeTab >= detail.days.length) return
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 32) {
-      const next = activeTab + 1
-      setActiveTab(next)
-      requestAnimationFrame(() => {
-        if (dpBodyRef.current) dpBodyRef.current.scrollTop = 0
-      })
+    if (!el || !detail || activeTab === 0) return
+    const elTop = el.getBoundingClientRect().top
+    let cur = 0
+    for (let i = 0; i < detail.days.length; i++) {
+      const sec = daySecRefs.current[i]
+      if (sec && sec.getBoundingClientRect().top - elTop - 60 <= 0) cur = i + 1
     }
+    if (cur > 0 && cur !== activeTab) setActiveTab(cur)
+  }
+
+  // 点击上方 day tab：平滑滚动到对应 day-section 顶部
+  const scrollToDay = (idx: number) => {
+    setActiveTab(idx)
+    requestAnimationFrame(() => {
+      const sec = daySecRefs.current[idx - 1]
+      const el = dpBodyRef.current
+      if (sec && el) {
+        el.scrollTo({ top: sec.offsetTop - 6, behavior: 'smooth' })
+      }
+    })
   }
 
   // 移动端滚动穿透锁定：详情面板 / 添加菜单 / 弹窗打开时锁 body 滚动，
@@ -2062,7 +2088,7 @@ export default function Travel() {
                     <div
                       key={i}
                       className={`dp-tab${activeTab === i + 1 ? ' active' : ''}`}
-                      onClick={() => setActiveTab(i + 1)}
+                      onClick={() => scrollToDay(i + 1)}
                     >
                       DAY {i + 1}
                     </div>
@@ -2070,7 +2096,6 @@ export default function Travel() {
                   <div
                     className="dp-tab add"
                     onClick={() => {
-                      setActiveTab(detail.days.length)
                       void addDay()
                     }}
                   >
@@ -2096,7 +2121,7 @@ export default function Travel() {
                             className={`mod-card${cnt > 0 ? ' purple' : ''}`}
                             key={type}
                             onClick={() => {
-                              if (firstDay >= 0) setActiveTab(firstDay + 1)
+                              if (firstDay >= 0) scrollToDay(firstDay + 1)
                             }}
                             style={{ cursor: firstDay >= 0 ? 'pointer' : 'default' }}
                           >
@@ -2141,130 +2166,139 @@ export default function Travel() {
                   {/* 第7条：总览底部轨迹预览（按 Day 切换、当日按时间排序） */}
                   <TrajectoryPreview days={detail.days} />
                   {activeTab > 0 &&
-                    detail.days[activeTab - 1] && (
-                      <div className="day-section is-active">
-                        <div className="day-header">
-                          <span className="day-tag">DAY {activeTab}</span>
-                          <span className="day-title">
-                            {detail.city} · 第 {activeTab} 天
-                          </span>
-                          <span className="day-line" />
-                          <span className="day-date">
-                            {dayDate(detail.start_date, activeTab - 1)}
-                          </span>
-                        </div>
-                        {detail.days[activeTab - 1].items.length === 0 && (
-                          <div className="empty-state" style={{ margin: '10px 0' }}>
-                            这一天还没有安排，点右下角 + 添加行程
+                    detail.days.map((d, di) => {
+                      const dayNo = di + 1
+                      return (
+                        <div
+                          key={di}
+                          ref={(el) => {
+                            daySecRefs.current[di] = el
+                          }}
+                          className={`day-section${activeTab === dayNo ? ' is-active' : ''}`}
+                        >
+                          <div className="day-header">
+                            <span className="day-tag">DAY {dayNo}</span>
+                            <span className="day-title">
+                              {detail.city} · 第 {dayNo} 天
+                            </span>
+                            <span className="day-line" />
+                            <span className="day-date">
+                              {dayDate(detail.start_date, di)}
+                            </span>
                           </div>
-                        )}
-                        {detail.days[activeTab - 1].items
-                          // 第4条：便签/行李清单等独立模块不进入 day 时间轴，只在总览展示
-                          .filter((it) => !(INDEPENDENT_TYPES as readonly string[]).includes(it.type))
-                          .map((it) => {
-                          const meta = MODULE_LABELS[it.type] ?? MODULE_LABELS.custom
-                          const imgs = normalizeImgs(it.img)
-                          // 第8条：展示字段值，不展示字段名
-                          // 主标题：交通=交通工具（飞机/火车/自驾）；住宿=酒店名；景点类=自定义标题
-                          const mainTitle =
-                            it.type === 'transport'
-                              ? it.tool === 'train'
-                                ? '火车'
-                                : it.tool === 'drive'
-                                  ? '自驾'
-                                  : '飞机'
-                              : it.type === 'hotel'
-                                ? it.hotel || it.title
-                                : it.title || it.poi || meta.name
-                          // 第二行：交通=出发地-到达地；住宿=星级（★×N）；景点类=名称（POI）
-                          const line2 =
-                            it.type === 'transport'
-                              ? [it.fromStation, it.toStation].filter(Boolean).join('-')
-                              : it.type === 'hotel'
-                                ? it.star
-                                  ? '★'.repeat(it.star)
-                                  : ''
-                                : ['attraction', 'food', 'shopping', 'entertainment', 'checkin'].includes(
-                                      it.type,
-                                    )
-                                  ? it.poi && it.poi !== it.title
-                                    ? it.poi
+                          {d.items.length === 0 && (
+                            <div className="empty-state" style={{ margin: '10px 0' }}>
+                              这一天还没有安排，点右下角 + 添加行程
+                            </div>
+                          )}
+                          {d.items
+                            // 第4条：便签/行李清单等独立模块不进入 day 时间轴，只在总览展示
+                            .filter((it) => !(INDEPENDENT_TYPES as readonly string[]).includes(it.type))
+                            .map((it) => {
+                            const meta = MODULE_LABELS[it.type] ?? MODULE_LABELS.custom
+                            const imgs = normalizeImgs(it.img)
+                            // 第8条：展示字段值，不展示字段名
+                            // 主标题：交通=交通工具（飞机/火车/自驾）；住宿=酒店名；景点类=自定义标题
+                            const mainTitle =
+                              it.type === 'transport'
+                                ? it.tool === 'train'
+                                  ? '火车'
+                                  : it.tool === 'drive'
+                                    ? '自驾'
+                                    : '飞机'
+                                : it.type === 'hotel'
+                                  ? it.hotel || it.title
+                                  : it.title || it.poi || meta.name
+                            // 第二行：交通=出发地-到达地；住宿=星级（★×N）；景点类=名称（POI）
+                            const line2 =
+                              it.type === 'transport'
+                                ? [it.fromStation, it.toStation].filter(Boolean).join('-')
+                                : it.type === 'hotel'
+                                  ? it.star
+                                    ? '★'.repeat(it.star)
                                     : ''
-                                  : ''
-                          // 第三行：交通=出发时间-到达时间；其他=时间 · 地址
-                          const line3 =
-                            it.type === 'transport'
-                              ? [it.fromTime, it.toTime].filter(Boolean).join('-')
-                              : [it.time, it.address].filter(Boolean).join(' · ')
-                          const leftTime =
-                            it.type === 'transport' ? it.fromTime || it.time || '—' : it.time || '—'
-                          return (
-                            <div className="timeline" key={it.id}>
-                              <div className="tl-item">
-                                <div className="tl-time">{leftTime}</div>
-                                <div className="tl-axis">
-                                  <div className="tl-dot" />
-                                  <div className="tl-line" />
-                                </div>
-                                <div className="tl-content">
-                                  <div className="tl-title">
-                                    <span className="tl-title-text">{mainTitle}</span>
-                                    <img className="tl-title-ico" src={meta.icon} alt={meta.name} />
+                                  : ['attraction', 'food', 'shopping', 'entertainment', 'checkin'].includes(
+                                        it.type,
+                                      )
+                                    ? it.poi && it.poi !== it.title
+                                      ? it.poi
+                                      : ''
+                                    : ''
+                            // 第三行：交通=出发时间-到达时间；其他=时间 · 地址
+                            const line3 =
+                              it.type === 'transport'
+                                ? [it.fromTime, it.toTime].filter(Boolean).join('-')
+                                : [it.time, it.address].filter(Boolean).join(' · ')
+                            const leftTime =
+                              it.type === 'transport' ? it.fromTime || it.time || '—' : it.time || '—'
+                            return (
+                              <div className="timeline" key={it.id}>
+                                <div className="tl-item">
+                                  <div className="tl-time">{leftTime}</div>
+                                  <div className="tl-axis">
+                                    <div className="tl-dot" />
+                                    <div className="tl-line" />
                                   </div>
-                                  {line2 && <div className="tl-line2">{line2}</div>}
-                                  {line3 && <div className="tl-line3">{line3}</div>}
-                                  {it.note && <div className="tl-note">{it.note}</div>}
-                                  {imgs.length > 0 && (
-                                    <div className="tl-thumbs">
-                                      {imgs.map((src, i) => (
-                                        <img
-                                          className="tl-thumb"
-                                          key={i}
-                                          src={src}
-                                          alt={it.title}
-                                          onClick={() => setFullImg(src)}
-                                        />
-                                      ))}
+                                  <div className="tl-content">
+                                    <div className="tl-title">
+                                      <span className="tl-title-text">{mainTitle}</span>
+                                      <img className="tl-title-ico" src={meta.icon} alt={meta.name} />
                                     </div>
-                                  )}
-                                  {editing && (
-                                    <div className="tl-actions">
-                                      <button
-                                        title="上移"
-                                        onClick={() => moveItem(activeTab - 1, it.id, -1)}
-                                      >
-                                        ↑
-                                      </button>
-                                      <button
-                                        title="下移"
-                                        onClick={() => moveItem(activeTab - 1, it.id, 1)}
-                                      >
-                                        ↓
-                                      </button>
-                                      <button
-                                        className="tl-act-edit"
-                                        title="编辑"
-                                        onClick={() =>
-                                          openAddItem(detail.id, activeTab - 1, undefined, it.id)
-                                        }
-                                      >
-                                        ✎
-                                      </button>
-                                      <button
-                                        title="删除"
-                                        onClick={() => deleteItem(activeTab - 1, it.id)}
-                                      >
-                                        🗑
-                                      </button>
-                                    </div>
-                                  )}
+                                    {line2 && <div className="tl-line2">{line2}</div>}
+                                    {line3 && <div className="tl-line3">{line3}</div>}
+                                    {it.note && <div className="tl-note">{it.note}</div>}
+                                    {imgs.length > 0 && (
+                                      <div className="tl-thumbs">
+                                        {imgs.map((src, i) => (
+                                          <img
+                                            className="tl-thumb"
+                                            key={i}
+                                            src={src}
+                                            alt={it.title}
+                                            onClick={() => setFullImg(src)}
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                    {editing && (
+                                      <div className="tl-actions">
+                                        <button
+                                          title="上移"
+                                          onClick={() => moveItem(di, it.id, -1)}
+                                        >
+                                          ↑
+                                        </button>
+                                        <button
+                                          title="下移"
+                                          onClick={() => moveItem(di, it.id, 1)}
+                                        >
+                                          ↓
+                                        </button>
+                                        <button
+                                          className="tl-act-edit"
+                                          title="编辑"
+                                          onClick={() =>
+                                            openAddItem(detail.id, di, undefined, it.id)
+                                          }
+                                        >
+                                          ✎
+                                        </button>
+                                        <button
+                                          title="删除"
+                                          onClick={() => deleteItem(di, it.id)}
+                                        >
+                                          🗑
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
                 </div>
                 <button
                   ref={fabAddRef}

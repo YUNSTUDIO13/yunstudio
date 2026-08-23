@@ -751,6 +751,12 @@
 
   /* Day 时间轴 */
   .timeline { position: relative; padding-left: 0; }
+  /* 竖向轴线改为整条贯穿（::before 覆盖条目间 margin 间隙，不再逐条断线） */
+  .timeline::before {
+    content: '';
+    position: absolute; left: 66px; top: 0; bottom: 0;
+    width: 1px; background: var(--line-soft);
+  }
   .tl-item {
     display: grid; grid-template-columns: 48px 28px 1fr; gap: 4px;
     margin-bottom: 14px;
@@ -764,15 +770,11 @@
     position: relative; padding-top: 8px;
     display: flex; flex-direction: column; align-items: center;
   }
-  /* 时间轴圆圈剔除（皇上要求）：只保留竖向轴线 */
+  /* 时间轴圆圈剔除（皇上要求）：只保留竖向贯穿线 */
   .tl-dot { display: none; }
+  .tl-line { display: none; }
   .tl-title-ico { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
-  .tl-line {
-    position: absolute; left: 50%; top: 4px; bottom: -22px;
-    width: 1px; background: var(--line-soft);
-    transform: translateX(-50%);
-  }
-  .tl-item:last-child .tl-line { display: none; }
+  .tl-item:last-child { margin-bottom: 2px; }
   .tl-content {
     background: linear-gradient(180deg, var(--card-2), var(--card));
     border: 1px solid var(--line-soft);
