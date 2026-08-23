@@ -1997,8 +1997,10 @@ export default function Travel() {
                 <div className="empty-state">正在载入旅行地图…</div>
               )}
               {filtered.map((t) => {
-                const dc = dayCount(t.start_date, t.end_date)
-                const nc = nightCount(t.start_date, t.end_date)
+                // 天数以实际 days 数量为准（addDay 后自动 +1，如 4天3夜→5天4夜）；
+                // 旧数据无 days 字段时兜底用起止日期计算
+                const dc = (t.days?.length ?? dayCount(t.start_date, t.end_date)) || 1
+                const nc = Math.max(0, dc - 1)
                 return (
                   <div
                     className="wf-item"
