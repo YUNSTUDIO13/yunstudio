@@ -793,7 +793,7 @@
     /* 功能标题与类型图标同排：标题左、图标右 */
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
   }
-  .tl-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl-title-text { min-width: 0; word-break: break-all; line-height: 1.4; }
   .tl-content .tl-meta {
     margin-top: 4px; font-size: 11px; color: var(--text-dim);
     display: inline-flex; align-items: center; gap: 6px;
@@ -1238,3 +1238,33 @@
   font-size: 12px;
   line-height: 1.6;
 }
+
+/* ── 全屏看图（点击缩略图展开，点击任意处关闭） ── */
+.img-fullscreen {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(7,11,22,0.92);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+.img-fullscreen img {
+  max-width: 96vw; max-height: 92vh;
+  object-fit: contain;
+  cursor: default;
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+}
+.img-fullscreen-download {
+  position: fixed; top: 20px; right: 20px;
+  width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(7,11,22,0.6);
+  border: 1px solid var(--line);
+  color: #fff;
+  cursor: pointer;
+  z-index: 201;
+  backdrop-filter: blur(8px);
+  transition: background .2s ease, transform .15s ease;
+}
+.img-fullscreen-download:hover { background: rgba(var(--c-accent-rgb),0.25); transform: scale(1.05); }
+.img-fullscreen-download svg { width: 18px; height: 18px; }

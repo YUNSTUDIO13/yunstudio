@@ -1,10 +1,12 @@
 -- 旅行模块（个人旅行志 / 中国地图点亮 / 行程时间轴）
--- 表 travels + RLS + updated_at 触发器 + Realtime 发布
+-- 表 travels + RLS + updated_at 触发器 + Realtime 发布 + Storage bucket(travel-images 封面/行程图)
 -- 与 movies/books 的差异：
---   1) 封面 cover 为「用户上传后压缩的内联 data URL」，直接以 text 列落库，**不依赖 Storage bucket**；
+--   1) 封面 cover 与行程 items.img 统一上传到 Storage `travel-images` bucket（路径首层 = user_id），
+--      数据库只存公开 URL（不再内联 base64 data URL，参考观影模块 movie-covers 模式）；
 --   2) 行程 days 为嵌套 JSON（每天含若干 items），整段以 jsonb 列存储，不拆子表；
 --   3) start_date / end_date 以 text(YYYY-MM-DD) 存储，前端做字符串比对与 JS 日期运算，避免时区歧义；
 --   4) id 由前端 crypto.randomUUID() 生成（uuid v4 字符串），与 movies/books 同款。
+-- 兼容：旧数据中 items.img 可能是 base64 data URL（被 renderImg 兼容），新数据走 Storage URL。
 -- 幂等：可重复执行（首次建表后再次执行仅补缺失对象，不报错）。
 
 create table if not exists public.travels (
@@ -79,3 +81,25 @@ begin
     execute 'alter publication supabase_realtime add table public.travels';
   end if;
 end $$;
+
+-- Storage bucket：旅行封面/行程图（公开读，仅本人可写/删，路径首层 = user_id，5MB 上限，
+--   WebP 压缩后体积小但保留 image/png/jpeg/webp 入站以兼容老图）
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('travel-images', 'travel-images', true, 5242880, '{image/png,image/jpeg,image/webp,image/gif}')
+on conflict (id) do nothing;
+
+drop policy if exists travel_images_insert on storage.objects;
+create policy travel_images_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'travel-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists travel_images_update on storage.objects;
+create policy travel_images_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'travel-images' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'travel-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists travel_images_delete on storage.objects;
+create policy travel_images_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'travel-images' and (storage.foldername(name))[1] = auth.uid()::text);

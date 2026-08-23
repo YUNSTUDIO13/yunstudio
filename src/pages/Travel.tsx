@@ -17,6 +17,7 @@ import {
 import { CHINA_GEO, CHINA_VIEWBOX, type ChinaGeo } from '../lib/china-geo'
 import type { Travel, TravelDay, TravelItem } from '../types'
 import { amapSearchDistrict, amapSearchPoi, type AMapDistrict, type AMapPoi } from '../lib/amap'
+import { uploadTravelImage } from '../lib/upload'
 import TrajectoryPreview from '../components/TrajectoryPreview'
 import './travel.css'
 
@@ -856,6 +857,45 @@ export default function Travel() {
     toastTimer.current = window.setTimeout(() => setToastMsg(''), 1800)
   }, [])
 
+  // 跨域图片下载：fetch→blob→objectURL→a.download；失败回退新标签打开
+  // 兼容 data URL（封面/旧数据 base64）和 http URL（Storage 公网图）
+  const downloadImage = useCallback(async (url: string) => {
+    try {
+      // data URL：直接解码为 blob，避免 fetch 对 data URL 报错
+      let blob: Blob
+      if (url.startsWith('data:')) {
+        const r = await fetch(url)
+        blob = await r.blob()
+      } else {
+        const r = await fetch(url, { mode: 'cors' })
+        if (!r.ok) throw new Error(`fetch ${r.status}`)
+        blob = await r.blob()
+      }
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      const ext = blob.type.includes('png')
+        ? 'png'
+        : blob.type.includes('webp')
+          ? 'webp'
+          : blob.type.includes('gif')
+            ? 'gif'
+            : 'jpg'
+      a.download = `travel_${Date.now()}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objUrl)
+      showToast('已下载')
+    } catch {
+      // 跨域失败回退：直接打开
+      try {
+        window.open(url, '_blank', 'noopener')
+      } catch {}
+      showToast('下载失败，已在新标签打开')
+    }
+  }, [showToast])
+
   // ── 数据加载：本地优先 + 云端注水 + Realtime ──
   const reload = useCallback(async (uid: string) => {
     const rows = (await db.travels.where('user_id').equals(uid).toArray()) as Travel[]
@@ -1164,13 +1204,21 @@ export default function Travel() {
 
   const onCoverPick = async (file?: File) => {
     if (!file) return
+    setCreateErr('')
+    setCoverText(file.name)
     try {
-      const url = await compressImage(file)
-      setCoverText(file.name)
+      // 优先：压缩 + 上传 Storage → 存 publicUrl（与 movies 一致，避免 base64 膨胀）
+      const url = await uploadTravelImage(file, userId)
       setCoverPreview(url)
-      setCreateErr('')
     } catch {
-      setCreateErr('图片处理失败，请换一张')
+      // 上传失败降级：本地 data URL 预览（不阻塞添加，但云端会丢此图）
+      try {
+        const fallback = await compressImage(file)
+        setCoverPreview(fallback)
+        showToast('封面上传失败，已用本地预览')
+      } catch {
+        setCreateErr('图片处理失败，请换一张')
+      }
     }
   }
 
@@ -1418,12 +1466,20 @@ export default function Travel() {
       setAiImgError('最多添加 5 张图片')
       return
     }
+    setAiImgError('')
     try {
-      const url = await compressImage(file)
+      // 优先：压缩 + 上传 Storage → 存 publicUrl
+      const url = await uploadTravelImage(file, userId)
       setAiImgs((prev) => [...prev, url])
-      setAiImgError('')
     } catch {
-      showToast('图片处理失败')
+      // 上传失败降级：本地 data URL（云端丢图但 UI 仍可添加）
+      try {
+        const fallback = await compressImage(file)
+        setAiImgs((prev) => [...prev, fallback])
+        showToast('图片上传失败，已用本地预览')
+      } catch {
+        showToast('图片处理失败')
+      }
     }
   }
   const removeAiImg = (idx: number) => setAiImgs((prev) => prev.filter((_, i) => i !== idx))
@@ -2925,10 +2981,25 @@ export default function Travel() {
         </div>
       )}
 
-      {/* 全屏看图（点击缩略图展开，点击任意处关闭） */}
+      {/* 全屏看图（点击缩略图展开，点击任意处关闭；右上角下载按钮支持跨域 fetch→blob→a.download） */}
       {fullImg && (
         <div className="img-fullscreen" onClick={() => setFullImg(null)}>
-          <img src={fullImg} alt="全屏查看" />
+          <img src={fullImg} alt="全屏查看" onClick={(e) => e.stopPropagation()} />
+          <button
+            type="button"
+            className="img-fullscreen-download"
+            title="下载"
+            onClick={(e) => {
+              e.stopPropagation()
+              void downloadImage(fullImg)
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </button>
         </div>
       )}
 
