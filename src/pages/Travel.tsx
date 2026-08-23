@@ -1300,6 +1300,31 @@ export default function Travel() {
     const now = new Date().toISOString()
     const isEdit = !!editTravelId
     const existing = isEdit ? travels.find((t) => t.id === editTravelId) : null
+    // 天数与「你想去多久」双向联动：
+    //  - 编辑时：延长日期 → 补空 day；缩短日期 → 若被裁剪的 day 已有内容则拦截报错，否则裁剪
+    //  - 新建时：按起止日期生成
+    let days: TravelDay[]
+    if (existing?.days?.length) {
+      const oldCount = existing.days.length
+      if (dc < oldCount) {
+        const busyIdx = existing.days.slice(dc).findIndex((d) => d.items.length > 0)
+        if (busyIdx >= 0) {
+          return setCreateErr(
+            `无法缩短到 ${dc} 天：第 ${dc + busyIdx + 1} 天已有行程内容，请先删除该天内容再缩短`,
+          )
+        }
+        days = existing.days.slice(0, dc)
+      } else if (dc > oldCount) {
+        days = [
+          ...existing.days,
+          ...Array.from({ length: dc - oldCount }, () => ({ items: [] })),
+        ]
+      } else {
+        days = existing.days
+      }
+    } else {
+      days = createDays(startDate, endDate)
+    }
     const rec: Travel = {
       id: existing?.id ?? uid(),
       user_id: existing?.user_id ?? userId,
@@ -1311,7 +1336,7 @@ export default function Travel() {
       start_date: startDate,
       end_date: endDate,
       cover: coverPreview,
-      days: existing?.days ?? createDays(startDate, endDate), // 编辑时保留已有时间轴
+      days,
       // 出发地：未填则不写字段（undefined），老数据无此字段保持兼容
       ...(depText
         ? {
@@ -1604,10 +1629,22 @@ export default function Travel() {
     await persist({ ...detail, days })
   }
 
-  // 新增一天
+  // 新增一天：days +1，且结束日期自动顺延一天（保持「你想去多久」与天数联动）
   const addDay = async () => {
     if (!detail) return
-    await persist({ ...detail, days: [...detail.days, { items: [] }] })
+    const nextDays = [...detail.days, { items: [] }]
+    let nextEnd = detail.end_date
+    if (nextEnd) {
+      const d = new Date(nextEnd + 'T00:00:00')
+      if (!Number.isNaN(d.getTime())) {
+        d.setDate(d.getDate() + 1)
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        nextEnd = `${y}-${m}-${day}`
+      }
+    }
+    await persist({ ...detail, days: nextDays, end_date: nextEnd })
     setActiveTab(detail.days.length + 1)
     showToast('已添加新的一天')
   }
