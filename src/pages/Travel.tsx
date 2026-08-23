@@ -48,8 +48,9 @@ const OVERVIEW_TYPES = [
   'transport', 'hotel', 'attraction', 'food', 'shopping', 'entertainment', 'checkin', 'note',
 ]
 const MODULE_KEYS = Object.keys(MODULE_LABELS)
-// 第5条：四个独立模块（便签/行李清单/机酒车票/地点）——不进右下角添加菜单，在总览下方独立展示与编辑
-const INDEPENDENT_TYPES = ['memo', 'luggage', 'ticket', 'place'] as const
+// 第5条：两个独立模块（便签/行李清单）——不进右下角添加菜单，在总览下方独立展示与编辑
+// （机酒车票/地点模块已按需求删除；MODULE_LABELS 中仍保留定义以兼容旧数据渲染）
+const INDEPENDENT_TYPES = ['memo', 'luggage'] as const
 
 // ─── 旅行主题类型（决定卡片左上角圆形图标来源） ───────────────
 export const TRAVEL_TYPES: Record<string, { name: string; icon: string }> = {
@@ -727,6 +728,7 @@ function PoiSearchRow({
   setValue,
   onTime,
   timeVal,
+  timePlaceholder,
   onSearch,
   results,
   loading,
@@ -738,6 +740,7 @@ function PoiSearchRow({
   setValue: (v: string) => void
   onTime?: (v: string) => void
   timeVal?: string
+  timePlaceholder?: string
   onSearch: (kw: string, t: 'from' | 'to' | 'hotel' | 'poi') => void
   results?: AMapPoi[]
   loading?: boolean
@@ -770,7 +773,7 @@ function PoiSearchRow({
           className="t-input"
           type="time"
           style={{ marginTop: 6 }}
-          placeholder="出发 / 到达时间"
+          placeholder={timePlaceholder ?? '请选择时间'}
           value={timeVal}
           onChange={(e) => onTime(e.target.value)}
         />
@@ -2072,26 +2075,61 @@ export default function Travel() {
                             这一天还没有安排，点右下角 + 添加行程
                           </div>
                         )}
-                        {detail.days[activeTab - 1].items.map((it) => {
+                        {detail.days[activeTab - 1].items
+                          // 第4条：便签/行李清单等独立模块不进入 day 时间轴，只在总览展示
+                          .filter((it) => !(INDEPENDENT_TYPES as readonly string[]).includes(it.type))
+                          .map((it) => {
                           const meta = MODULE_LABELS[it.type] ?? MODULE_LABELS.custom
                           const imgs = normalizeImgs(it.img)
+                          // 第8条：展示字段值，不展示字段名
+                          // 主标题：交通=交通工具（飞机/火车/自驾）；住宿=酒店名；景点类=自定义标题
+                          const mainTitle =
+                            it.type === 'transport'
+                              ? it.tool === 'train'
+                                ? '火车'
+                                : it.tool === 'drive'
+                                  ? '自驾'
+                                  : '飞机'
+                              : it.type === 'hotel'
+                                ? it.hotel || it.title
+                                : it.title || it.poi || meta.name
+                          // 第二行：交通=出发地-到达地；住宿=星级（★×N）；景点类=名称（POI）
+                          const line2 =
+                            it.type === 'transport'
+                              ? [it.fromStation, it.toStation].filter(Boolean).join('-')
+                              : it.type === 'hotel'
+                                ? it.star
+                                  ? '★'.repeat(it.star)
+                                  : ''
+                                : ['attraction', 'food', 'shopping', 'entertainment', 'checkin'].includes(
+                                      it.type,
+                                    )
+                                  ? it.poi && it.poi !== it.title
+                                    ? it.poi
+                                    : ''
+                                  : ''
+                          // 第三行：交通=出发时间-到达时间；其他=时间 · 地址
+                          const line3 =
+                            it.type === 'transport'
+                              ? [it.fromTime, it.toTime].filter(Boolean).join('-')
+                              : [it.time, it.address].filter(Boolean).join(' · ')
+                          const leftTime =
+                            it.type === 'transport' ? it.fromTime || it.time || '—' : it.time || '—'
                           return (
                             <div className="timeline" key={it.id}>
                               <div className="tl-item">
-                                <div className="tl-time">{it.time || '—'}</div>
+                                <div className="tl-time">{leftTime}</div>
                                 <div className="tl-axis">
                                   <div className="tl-dot" />
                                   <div className="tl-line" />
                                 </div>
                                 <div className="tl-content">
                                   <div className="tl-title">
-                                    <span className="tl-title-text">{it.title}</span>
+                                    <span className="tl-title-text">{mainTitle}</span>
                                     <img className="tl-title-ico" src={meta.icon} alt={meta.name} />
                                   </div>
-                                  <div className="tl-meta">
-                                    <span className="tl-pill">{meta.name}</span>
-                                    {it.time && <span>· {it.time}</span>}
-                                  </div>
+                                  {line2 && <div className="tl-line2">{line2}</div>}
+                                  {line3 && <div className="tl-line3">{line3}</div>}
                                   {it.note && <div className="tl-note">{it.note}</div>}
                                   {imgs.length > 0 && (
                                     <div className="tl-thumbs">
@@ -2156,7 +2194,13 @@ export default function Travel() {
                   </svg>
                 </button>
                 <div ref={addMenuRef} className={`add-menu${addMenuOpen ? ' show' : ''}`}>
-                  {MODULE_KEYS.filter((type) => !(INDEPENDENT_TYPES as readonly string[]).includes(type)).map((type) => {
+                  {MODULE_KEYS.filter(
+                    (type) =>
+                      !(INDEPENDENT_TYPES as readonly string[]).includes(type) &&
+                      // 第3条：机酒车票/地点模块已删除，不再出现在添加菜单
+                      type !== 'ticket' &&
+                      type !== 'place',
+                  ).map((type) => {
                     const meta = MODULE_LABELS[type]
                     return (
                       <div
@@ -2270,7 +2314,6 @@ export default function Travel() {
               </svg>
             </div>
             <h3>{editTravelId ? '编辑旅行记录' : '新建旅行记录'}</h3>
-            <div className="t-modal-sub">WHERE · WHEN · INFO</div>
 
             {/* 出发地：可选，与"你想去哪里"同套城市联想逻辑 */}
             <div className="t-field">
@@ -2516,24 +2559,25 @@ export default function Travel() {
               </svg>
             </div>
             <h3>{addItem.editId ? '编辑' : '添加'} · {MODULE_LABELS[aiType].name}</h3>
-            <div className="t-modal-sub">TYPE · TITLE · TIME · NOTE · IMAGE</div>
 
-            {/* 自定义标题（通用） */}
-            <div className="t-field">
-              <div className="label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 20h4l11-11-4-4L4 16v4z" />
-                </svg>
-                自定义标题
+            {/* 自定义标题（通用；交通/住宿除外，按需求去除） */}
+            {aiType !== 'transport' && aiType !== 'hotel' && (
+              <div className="t-field">
+                <div className="label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 20h4l11-11-4-4L4 16v4z" />
+                  </svg>
+                  自定义标题
+                </div>
+                <div className="desc">给这条记录起个名字（如：护国寺小吃）</div>
+                <input
+                  className="t-input"
+                  placeholder="如：护国寺小吃"
+                  value={aiTitle}
+                  onChange={(e) => setAiTitle(e.target.value)}
+                />
               </div>
-              <div className="desc">给这条记录起个名字（如：护国寺小吃）</div>
-              <input
-                className="t-input"
-                placeholder="如：护国寺小吃"
-                value={aiTitle}
-                onChange={(e) => setAiTitle(e.target.value)}
-              />
-            </div>
+            )}
 
             {/* 交通专用：方式 / 日期 / 航班·车次 / 出发·到达站（高德 POI） */}
             {aiType === 'transport' && (
@@ -2584,6 +2628,7 @@ export default function Travel() {
                     setValue={setAiFromStation}
                     onTime={setAiFromTime}
                     timeVal={aiFromTime}
+                    timePlaceholder="请选择出发时间"
                     onSearch={doPoiSearch}
                     results={poiState?.target === 'from' ? poiState.list : undefined}
                     loading={poiState?.target === 'from' ? poiState.loading : false}
@@ -2599,6 +2644,7 @@ export default function Travel() {
                     setValue={setAiToStation}
                     onTime={setAiToTime}
                     timeVal={aiToTime}
+                    timePlaceholder="请选择到达时间"
                     onSearch={doPoiSearch}
                     results={poiState?.target === 'to' ? poiState.list : undefined}
                     loading={poiState?.target === 'to' ? poiState.loading : false}
@@ -2689,17 +2735,19 @@ export default function Travel() {
               </>
             )}
 
-            {/* 时间（时间轴通用） */}
-            <div className="t-field">
-              <div className="label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 7v5l3 2" />
-                </svg>
-                时间
+            {/* 时间（时间轴通用；交通除外，用出发/到达时间框） */}
+            {aiType !== 'transport' && (
+              <div className="t-field">
+                <div className="label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
+                  时间
+                </div>
+                <input className="t-input" type="time" value={aiTime} onChange={(e) => setAiTime(e.target.value)} />
               </div>
-              <input className="t-input" type="time" value={aiTime} onChange={(e) => setAiTime(e.target.value)} />
-            </div>
+            )}
 
             {/* 备注 / 注意事项（限 100 字） */}
             <div className="t-field">
@@ -2808,12 +2856,9 @@ export default function Travel() {
               </svg>
             </div>
             <h3>{MODULE_LABELS[extraEditor].name}</h3>
-            <div className="t-modal-sub">独立模块 · 单独更新</div>
 
             {extraEditor === 'memo' ? (
               <div className="t-field">
-                <div className="label">便签</div>
-                <div className="desc">随手记点什么，与每日时间轴相互独立</div>
                 <textarea
                   className="t-input"
                   rows={6}
@@ -2825,8 +2870,6 @@ export default function Travel() {
               </div>
             ) : (
               <div className="t-field">
-                <div className="label">{MODULE_LABELS[extraEditor].name}清单</div>
-                <div className="desc">逐条添加，点击 × 删除</div>
                 <div className="extra-list">
                   {extraList.map((it, i) => (
                     <div className="el-item" key={i}>
