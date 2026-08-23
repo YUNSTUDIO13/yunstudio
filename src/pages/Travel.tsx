@@ -831,6 +831,7 @@ export default function Travel() {
   }>({ open: false, travelId: '', dayIndex: 0 })
   const [cardPop, setCardPop] = useState<{ id: string; x: number; y: number } | null>(null)
   const [toastMsg, setToastMsg] = useState('')
+  const [syncErr, setSyncErr] = useState('') // 云端同步失败持久横幅（手机无需控制台即可见）
   // 轨迹动画显隐：开启后展示出发地→目的地的航线/铁路/自驾线，关闭后隐藏
   // 持久化到 localStorage（"重新打开网页也保持开启状态"）
   const [showTrajectory, setShowTrajectoryState] = useState(() => {
@@ -1011,10 +1012,15 @@ export default function Travel() {
     return () => document.removeEventListener('mouseup', handler)
   }, [addMenuOpen])
 
-  // 同步状态错误提示
+  // 同步状态提示：失败显示持久横幅（不自动消失，手机端可见），成功清横幅 + Toast
   useEffect(() => {
     setSyncStatusHandler?.((s) => {
-      if (!s.ok && s.msg) showToast(s.msg)
+      if (!s.ok && s.msg) {
+        setSyncErr(s.msg)
+      } else if (s.ok) {
+        setSyncErr('')
+        showToast('云端同步成功')
+      }
     })
     return () => setSyncStatusHandler?.(null)
   }, [showToast])
@@ -3066,6 +3072,22 @@ export default function Travel() {
 
       {/* ===== 全局 toast ===== */}
       <div className={`t-toast${toastMsg ? ' show' : ''}`}>{toastMsg || '同步完成'}</div>
+
+      {/* ===== 云端同步失败横幅（持久显示，手机端无需控制台即可见；点 × 关闭） ===== */}
+      {syncErr && (
+        <div className="sync-error-bar">
+          <span className="sync-error-ico">⚠</span>
+          <span className="sync-error-msg">{syncErr}</span>
+          <button
+            type="button"
+            className="sync-error-close"
+            title="关闭"
+            onClick={() => setSyncErr('')}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }

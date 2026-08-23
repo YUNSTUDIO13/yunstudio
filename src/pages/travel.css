@@ -749,17 +749,11 @@
   .extra-add-row { display: flex; gap: 8px; }
   .extra-add-row .t-input { flex: 1; }
 
-  /* Day 时间轴 */
+  /* Day 时间轴（皇上要求：去掉圆圈/轴线/间距，两列紧凑，卡片整体变宽） */
   .timeline { position: relative; padding-left: 0; }
-  /* 竖向轴线改为整条贯穿（::before 覆盖条目间 margin 间隙，不再逐条断线） */
-  .timeline::before {
-    content: '';
-    position: absolute; left: 66px; top: 0; bottom: 0;
-    width: 1px; background: var(--line-soft);
-  }
   .tl-item {
-    display: grid; grid-template-columns: 48px 28px 1fr; gap: 4px;
-    margin-bottom: 14px;
+    display: grid; grid-template-columns: 48px 1fr; gap: 8px;
+    margin-bottom: 10px;
   }
   .tl-time {
     font-size: 11px; color: var(--text-dim);
@@ -770,7 +764,7 @@
     position: relative; padding-top: 8px;
     display: flex; flex-direction: column; align-items: center;
   }
-  /* 时间轴圆圈剔除（皇上要求）：只保留竖向贯穿线 */
+  .tl-axis { display: none; }  /* 轴线列完全去掉 */
   .tl-dot { display: none; }
   .tl-line { display: none; }
   .tl-title-ico { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
@@ -1262,3 +1256,29 @@
 }
 .img-fullscreen-download:hover { background: rgba(var(--c-accent-rgb),0.25); transform: scale(1.05); }
 .img-fullscreen-download svg { width: 18px; height: 18px; }
+
+/* ── 云端同步失败横幅（手机端可见，持久不消失） ── */
+.sync-error-bar {
+  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex; align-items: center; gap: 8px;
+  max-width: min(92vw, 420px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(190, 45, 48, 0.95);
+  border: 1px solid rgba(255, 140, 140, 0.35);
+  color: #fff;
+  font-size: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+}
+.sync-error-ico { font-size: 14px; flex-shrink: 0; }
+.sync-error-msg { flex: 1; min-width: 0; word-break: break-all; line-height: 1.5; }
+.sync-error-close {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.15); border: none;
+  color: #fff; font-size: 14px; cursor: pointer;
+}
+.sync-error-close:hover { background: rgba(255,255,255,0.28); }
