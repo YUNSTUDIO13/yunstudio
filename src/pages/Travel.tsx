@@ -858,6 +858,7 @@ export default function Travel() {
   const [cardPop, setCardPop] = useState<{ id: string; x: number; y: number } | null>(null)
   const [toastMsg, setToastMsg] = useState('')
   const [syncErr, setSyncErr] = useState('') // 云端同步失败持久横幅（手机无需控制台即可见）
+  const [loginPrompt, setLoginPrompt] = useState(false) // 未登录 → 登录引导横幅
   // 轨迹动画显隐：开启后展示出发地→目的地的航线/铁路/自驾线，关闭后隐藏
   // 持久化到 localStorage（"重新打开网页也保持开启状态"）
   const [showTrajectory, setShowTrajectoryState] = useState(() => {
@@ -1065,9 +1066,16 @@ export default function Travel() {
   useEffect(() => {
     setSyncStatusHandler?.((s) => {
       if (!s.ok && s.msg) {
+        // 「未登录」类错误 → 显示登录引导横幅（点击去登录），而不是一直报同步失败
+        if (s.msg.includes('未登录')) {
+          setSyncErr('')
+          setLoginPrompt(true)
+          return
+        }
         setSyncErr(s.msg)
       } else if (s.ok) {
         setSyncErr('')
+        setLoginPrompt(false)
         showToast('云端同步成功')
       }
     })
@@ -3229,6 +3237,27 @@ export default function Travel() {
             onClick={() => setSyncErr('')}
           >
             ×
+          </button>
+        </div>
+      )}
+
+      {/* ===== 未登录 → 登录引导横幅（点击去登录，替代反复报同步失败） ===== */}
+      {loginPrompt && (
+        <div className="sync-error-bar login-prompt">
+          <span className="sync-error-ico">🔑</span>
+          <span className="sync-error-msg">
+            未登录：同步 / 里程 / 轨迹需要登录后才能使用
+          </span>
+          <button
+            type="button"
+            className="sync-error-close login-prompt-btn"
+            onClick={() => {
+              const u = new URL(window.location.href)
+              u.searchParams.delete('preview')
+              window.location.href = u.toString()
+            }}
+          >
+            去登录
           </button>
         </div>
       )}
