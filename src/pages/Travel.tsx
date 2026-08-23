@@ -912,12 +912,14 @@ export default function Travel() {
     setTravels(clean)
   }, [])
 
-  // 登录后把本地匿名(user_id='anonymous')记录迁移到当前账号并补传云端
+  // 登录后把本地匿名(user_id='anonymous')记录迁移到当前账号并补传云端，迁移完删除旧匿名副本
   const migrateAnonymous = useCallback(async (uid: string) => {
     if (uid === 'anonymous') return
     const anon = (await db.travels.where('user_id').equals('anonymous').toArray()) as Travel[]
     for (const t of anon) {
       const rec = { ...t, user_id: uid }
+      // 同 id：先删旧匿名副本，再写当前账号副本，避免主键冲突
+      await localDelete('travels', t.id)
       await localPut('travels', rec)
       await enqueueAndMaybeFlush('travels', 'update', t.id, rec)
     }
@@ -1589,12 +1591,18 @@ export default function Travel() {
     showToast('已添加新的一天')
   }
 
-  // 同步按钮：先拉云端合并 → 再把本地 outbox 补传 → 重读本地
-  // （注意：只 flush 现有 outbox，绝不 enqueue 空操作——否则会向云端 upsert 一条
-  //   title/city 全空的「幽灵记录」，如之前出现过的「1天0夜无封面」）
+  // 同步按钮：拉云端合并 → 迁移匿名数据 → 本地全部记录强制补传（upsert 幂等）→ 重读本地
+  // （不用空操作入队；本地上有记录就一定逐条 upsert 上云，outbox 旧 op 一并清掉）
   const syncNow = async () => {
     showToast('正在同步云端…')
     await seedFromServer('travels', userId)
+    // 1) 登录后把本地 anonymous 归属记录迁移到当前账号
+    await migrateAnonymous(userId)
+    // 2) 兜底：本地当前用户的所有记录重新入队补传（幂等，不管 outbox 之前状态）
+    const rows = (await db.travels.where('user_id').equals(userId).toArray()) as Travel[]
+    for (const r of rows) {
+      await enqueueAndMaybeFlush('travels', 'update', r.id, r)
+    }
     await flushOutbox()
     await reload(userId)
     showToast('同步完成')
