@@ -975,20 +975,22 @@ export default function Travel() {
       setLoading(false)
       return
     }
+    // 本地数据到位即关闭 loading（快），云端合并/孤儿清理放后台（不阻塞展示，杜绝「正在载入」卡死）
     setLoading(true)
     try {
-      // 迁移旧匿名数据：登录后把本地 user_id='anonymous' 的记录归入当前账号并入 outbox 上云，
-      // 解决「登录前手机里建的记录同步不上去、列表还看不到」的历史问题
+      // 迁移旧匿名数据：登录后把本地 user_id='anonymous' 的记录归入当前账号并入 outbox 上云
       await migrateAnonymous(userId)
-      // 安全孤儿清理：其他端已删除的本地记录在此移除（与云端对齐）
-      await pruneOrphans(userId)
-      await reload(userId)
-      await seedFromServer('travels', userId)
-      await pruneOrphans(userId)
       await reload(userId)
     } finally {
       setLoading(false)
     }
+    // 云端合并与清理：后台执行，失败/慢也不影响页面展示
+    void (async () => {
+      await pruneOrphans(userId)
+      await seedFromServer('travels', userId)
+      await pruneOrphans(userId)
+      await reload(userId)
+    })()
   }, [user, userId, reload, migrateAnonymous, pruneOrphans])
 
   useEffect(() => {

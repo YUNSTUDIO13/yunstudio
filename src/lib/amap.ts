@@ -22,7 +22,14 @@ export interface AMapPoi {
 
 async function invokeAmap(body: Record<string, unknown>): Promise<any | null> {
   try {
-    const { data, error } = await supabase.functions.invoke('amap-proxy', { body })
+    // 超时控制：网络慢时 10s 快速失败，绝不阻塞 UI（首页「正在载入」卡死就是网络请求等太久）
+    const ctrl = new AbortController()
+    const timer = window.setTimeout(() => ctrl.abort(), 10000)
+    const { data, error } = await supabase.functions.invoke('amap-proxy', {
+      body,
+      signal: ctrl.signal,
+    })
+    window.clearTimeout(timer)
     if (error) {
       console.warn('[amap] invoke error:', error.message)
       return null
