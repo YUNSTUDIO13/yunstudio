@@ -49,7 +49,8 @@ serve(async (req: Request) => {
 
   const action = body.action ?? ''
   const keywords = (body.keywords ?? '').toString().trim()
-  if (!keywords) {
+  // route（里程）不需要 keywords，仅 district/poi 需要
+  if (!keywords && action !== 'route') {
     return new Response(JSON.stringify({ error: 'keywords required' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
