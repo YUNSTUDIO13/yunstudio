@@ -42,7 +42,14 @@ serve(async (req: Request) => {
     })
   }
 
-  let body: { action?: string; keywords?: string; city?: string }
+  let body: {
+    action?: string
+    keywords?: string
+    city?: string
+    mode?: string
+    origin?: string
+    destination?: string
+  }
   try {
     body = await req.json()
   } catch {
@@ -98,6 +105,68 @@ serve(async (req: Request) => {
           }))
         : []
       return new Response(JSON.stringify({ pois }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 里程计算：mode=driving(自驾·高德驾车) / transit(高铁·高德公交) / straight(飞机·大圆直线)
+    // 输入 origin / destination 均为 "lng,lat"；返回 { km }
+    if (action === 'route') {
+      const mode = String(body.mode ?? 'straight')
+      const origin = String(body.origin ?? '').trim()
+      const destination = String(body.destination ?? '').trim()
+      if (!origin || !destination) {
+        return new Response(JSON.stringify({ error: 'origin/destination required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const [olng, olat] = origin.split(',').map(Number)
+      const [dlng, dlat] = destination.split(',').map(Number)
+      if ([olng, olat, dlng, dlat].some((n) => Number.isNaN(n))) {
+        return new Response(JSON.stringify({ error: 'invalid coordinate' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      // 飞机：大圆距离（haversine）直线公里
+      if (mode === 'straight') {
+        const R = 6371.0088
+        const toRad = (x: number) => (x * Math.PI) / 180
+        const dLat = toRad(dlat - olat)
+        const dLng = toRad(dlng - olng)
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(olat)) * Math.cos(toRad(dlat)) * Math.sin(dLng / 2) ** 2
+        const km = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+        return new Response(JSON.stringify({ km }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      // 自驾：高德驾车路径规划 → distance(米)
+      if (mode === 'driving') {
+        const url = `${AMAP_BASE}/v3/direction/driving?origin=${origin}&destination=${destination}&strategy=0&extensions=base&key=${AMAP_WEB_KEY}`
+        const res = await fetch(url)
+        const json = await res.json()
+        const meters = Number(json?.route?.paths?.[0]?.distance ?? 0)
+        const km = Math.max(0, Math.round(meters / 1000))
+        return new Response(JSON.stringify({ km }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      // 高铁：高德公交路线规划 → 取首方案 distance(米)（含铁路/大巴，贴合城际出行）
+      if (mode === 'transit') {
+        const url = `${AMAP_BASE}/v3/direction/transit?origin=${origin}&destination=${destination}&city1=&city2=&extensions=base&strategy=0&key=${AMAP_WEB_KEY}`
+        const res = await fetch(url)
+        const json = await res.json()
+        const meters = Number(json?.route?.transits?.[0]?.distance ?? 0)
+        const km = Math.max(0, Math.round(meters / 1000))
+        return new Response(JSON.stringify({ km }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ error: 'unknown route mode' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

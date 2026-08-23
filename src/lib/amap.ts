@@ -45,3 +45,17 @@ export async function amapSearchPoi(keywords: string, city?: string): Promise<AM
   const d = await invokeAmap({ action: 'poi', keywords, city })
   return d && Array.isArray(d.pois) ? (d.pois as AMapPoi[]) : []
 }
+
+/**
+ * 里程计算：mode=driving(自驾·高德驾车) / transit(高铁·高德公交) / straight(飞机·大圆直线)
+ * origin / destination 为 "lng,lat"；返回公里数（失败返回 null，调用方降级）
+ */
+export async function amapCalcRoute(
+  mode: 'driving' | 'transit' | 'straight',
+  origin: string,
+  destination: string,
+): Promise<number | null> {
+  const d = await invokeAmap({ action: 'route', mode, origin, destination })
+  const km = d && typeof d.km === 'number' ? d.km : null
+  return km
+}

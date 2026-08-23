@@ -17,7 +17,7 @@ import {
 } from '../lib/sync'
 import { CHINA_GEO, CHINA_VIEWBOX, type ChinaGeo } from '../lib/china-geo'
 import type { Travel, TravelDay, TravelItem } from '../types'
-import { amapSearchDistrict, amapSearchPoi, type AMapDistrict, type AMapPoi } from '../lib/amap'
+import { amapSearchDistrict, amapSearchPoi, amapCalcRoute, type AMapDistrict, type AMapPoi } from '../lib/amap'
 import { uploadTravelImage } from '../lib/upload'
 import TrajectoryPreview from '../components/TrajectoryPreview'
 import './travel.css'
@@ -205,6 +205,32 @@ function uid(): string {
   return crypto.randomUUID()
 }
 const EMOJI_POOL = ['🌏', '✈️', '🗺️', '🧳', '🏝️', '⛰️', '🏙️', '🌆', '🚞']
+
+// 交通方式 → 里程算法：自驾走高德驾车 / 高铁走高德公交 / 飞机走大圆直线
+const ROUTE_MODE_BY_TRANSPORT: Record<string, 'driving' | 'transit' | 'straight'> = {
+  drive: 'driving',
+  train: 'transit',
+  plane: 'straight',
+}
+
+const MILEAGE_CACHE_KEY = 'pw.travel.mileage.v1'
+const CITY_COORD_CACHE_KEY = 'pw.travel.citycoord.v1'
+
+function readJsonCache<T>(key: string): T {
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : ({} as T)
+  } catch {
+    return {} as T
+  }
+}
+function writeJsonCache(key: string, val: unknown): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(val))
+  } catch {
+    /* localStorage 不可用时静默 */
+  }
+}
 
 // 压缩上传图片为 data URL（WebP 优先，不支持则回退 JPEG）
 async function compressImage(file: File, maxDim = 1280, quality = 0.82): Promise<string> {
@@ -1134,8 +1160,6 @@ export default function Travel() {
     return c
   }, [travels, resolveAdcode])
 
-  const visitedKm = visitedSet.size * 800 // 衍生展示指标：累计足迹（省×800km）
-
   const years = useMemo(() => {
     const ys = new Set<string>()
     travels.forEach((t) => {
@@ -1143,6 +1167,63 @@ export default function Travel() {
     })
     return Array.from(ys).sort().reverse()
   }, [travels])
+
+  // ── 旅行里程（按高德接口按类型计算：自驾/高铁/飞机），缓存到 localStorage ──
+  const [mileageMap, setMileageMap] = useState<Record<string, number>>(() =>
+    readJsonCache<Record<string, number>>(MILEAGE_CACHE_KEY),
+  )
+  const cityCoordCache = useRef<Record<string, string>>(
+    readJsonCache<Record<string, string>>(CITY_COORD_CACHE_KEY),
+  )
+  const getCityCoord = useCallback(async (name: string): Promise<string | null> => {
+    if (cityCoordCache.current[name]) return cityCoordCache.current[name]
+    const ds = await amapSearchDistrict(name)
+    const d = ds.find((x) => x.center && x.center.includes(',')) ?? ds[0]
+    if (d?.center) {
+      cityCoordCache.current[name] = d.center
+      writeJsonCache(CITY_COORD_CACHE_KEY, cityCoordCache.current)
+      return d.center
+    }
+    return null
+  }, [])
+  const totalKm = useMemo(() => Object.values(mileageMap).reduce((a, b) => a + b, 0), [mileageMap])
+
+  // 逐卡异步计算未缓存里程（串行，避免触发高德限流）
+  useEffect(() => {
+    const validIds = new Set(travels.map((t) => t.id))
+    setMileageMap((prev) => {
+      const next: Record<string, number> = {}
+      for (const [k, v] of Object.entries(prev)) {
+        if (validIds.has(k.split(':')[0])) next[k] = v
+      }
+      return next
+    })
+    let cancelled = false
+    ;(async () => {
+      for (const t of travels) {
+        if (cancelled) return
+        const mode = ROUTE_MODE_BY_TRANSPORT[t.transport_mode ?? ''] ?? 'straight'
+        const from = (t.departure_city ?? '').trim() || t.city
+        const to = t.city
+        if (!from || !to || from === to) continue
+        const key = `${t.id}:${mode}:${from}:${to}`
+        if (mileageMap[key] !== undefined) continue
+        const c1 = await getCityCoord(from)
+        const c2 = await getCityCoord(to)
+        if (!c1 || !c2) continue
+        const km = await amapCalcRoute(mode, c1, c2)
+        if (km == null || cancelled) continue
+        setMileageMap((prev) => {
+          const next = { ...prev, [key]: km }
+          writeJsonCache(MILEAGE_CACHE_KEY, next)
+          return next
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [travels, getCityCoord, mileageMap])
 
   const filtered = useMemo(() => {
     let list = travels.slice()
@@ -1778,7 +1859,7 @@ export default function Travel() {
                 <div>
                   <div className="lbl">旅行里程</div>
                   <div className="val">
-                    {visitedKm}
+                    {totalKm}
                     <em> km</em>
                   </div>
                 </div>

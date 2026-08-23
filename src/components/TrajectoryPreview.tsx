@@ -56,11 +56,11 @@ export default function TrajectoryPreview({ days }: { days: TravelDay[] }) {
         if (!stops.length) return
         const path = stops.map((s) => [s.lng, s.lat])
         const markers = stops.map(
-          (s, i) =>
+          (s) =>
             new AMap.Marker({
               position: [s.lng, s.lat],
               title: `${s.title}（${s.time}）`,
-              label: { content: String(i + 1), direction: 'top' },
+              // 不显示 label（默认白底框在图标上方显得突兀）
             }),
         )
         map.add(markers)
