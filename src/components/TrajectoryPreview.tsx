@@ -49,18 +49,26 @@ export default function TrajectoryPreview({ days }: { days: TravelDay[] }) {
       .then((AMap) => {
         if (!mounted || !mapEl.current) return
         if (!mapRef.current) {
-          mapRef.current = new AMap.Map(mapEl.current, { zoom: 11, viewMode: '2D' })
+          mapRef.current = new AMap.Map(mapEl.current, {
+            zoom: 11,
+            viewMode: '2D',
+            mapStyle: 'amap://styles/dark', // 深色模式
+          })
         }
         const map = mapRef.current
         map.clearMap()
         if (!stops.length) return
         const path = stops.map((s) => [s.lng, s.lat])
         const markers = stops.map(
-          (s) =>
+          (s, i) =>
             new AMap.Marker({
               position: [s.lng, s.lat],
               title: `${s.title}（${s.time}）`,
-              // 不显示 label（默认白底框在图标上方显得突兀）
+              // 序号保留：自定义圆角深蓝小标签（替代默认白底长方形 label）
+              label: {
+                content: `<span style="background:#1e80ff;color:#fff;border-radius:8px;padding:0 6px;font-size:11px;line-height:18px;display:inline-block;white-space:nowrap;">${i + 1}</span>`,
+                direction: 'top',
+              },
             }),
         )
         map.add(markers)
