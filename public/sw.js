@@ -87,20 +87,23 @@ self.addEventListener('fetch', (event) => {
 
   // 跨域 Storage 公开图片（travel-images / movie-covers 等）：cache-first
   // 路径含 uuid 不可变 → 命中缓存后不再回源，图片秒开（本地有就不拉线上）；
-  // 云端更新 = 新 uuid URL = 缓存 miss → 自动拉新并入库。
+  // 云端更新 = 新 uuid URL = 缓存 miss → 自动拉新并入库。任何异常回退直连，绝不让图片加载失败。
   if (url.hostname.endsWith('.supabase.co') && url.pathname.includes('/storage/v1/object/public/')) {
     event.respondWith(
-      caches.match(req).then(
-        (cached) =>
-          cached ||
-          fetch(req).then((resp) => {
-            if (resp && resp.status === 200) {
-              const copy = resp.clone();
-              caches.open(VERSION).then((c) => c.put(req, copy));
-            }
-            return resp;
-          })
-      )
+      caches
+        .match(req)
+        .then(
+          (cached) =>
+            cached ||
+            fetch(req).then((resp) => {
+              if (resp && resp.status === 200) {
+                const copy = resp.clone();
+                caches.open(VERSION).then((c) => c.put(req, copy)).catch(() => {});
+              }
+              return resp;
+            })
+        )
+        .catch(() => fetch(req))
     );
     return;
   }
