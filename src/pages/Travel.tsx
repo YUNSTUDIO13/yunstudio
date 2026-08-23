@@ -858,7 +858,6 @@ export default function Travel() {
   const [cardPop, setCardPop] = useState<{ id: string; x: number; y: number } | null>(null)
   const [toastMsg, setToastMsg] = useState('')
   const [syncErr, setSyncErr] = useState('') // 云端同步失败持久横幅（手机无需控制台即可见）
-  const [loginPrompt, setLoginPrompt] = useState(false) // 未登录 → 登录引导横幅
   // 轨迹动画显隐：开启后展示出发地→目的地的航线/铁路/自驾线，关闭后隐藏
   // 持久化到 localStorage（"重新打开网页也保持开启状态"）
   const [showTrajectory, setShowTrajectoryState] = useState(() => {
@@ -1072,7 +1071,6 @@ export default function Travel() {
         setSyncErr(s.msg)
       } else if (s.ok) {
         setSyncErr('')
-        setLoginPrompt(false)
       }
     })
     return () => setSyncStatusHandler?.(null)
