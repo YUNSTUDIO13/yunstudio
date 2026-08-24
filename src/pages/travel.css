@@ -948,6 +948,7 @@
     margin-bottom: 6px;
   }
   .t-field .label svg { color: rgb(var(--c-accent-rgb)); width: 14px; height: 14px; }
+  .t-field .label .req { color: rgb(220,38,38); margin-left: 2px; font-weight: 700; }
   .t-field .desc { font-size: 11px; color: var(--text-mute); margin-bottom: 8px; }
   .t-field .t-input {
     width: 100%;

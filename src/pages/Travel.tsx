@@ -1369,6 +1369,8 @@ export default function Travel() {
   const submitCreate = async () => {
     const city = cityText.trim()
     if (!city) return setCreateErr('请填写目的地')
+    const depText = departureText.trim()
+    if (!depText) return setCreateErr('请填写出发地')
     if (!startDate || !endDate) return setCreateErr('请选择行程日期')
     if (new Date(endDate) < new Date(startDate)) return setCreateErr('结束日期不能早于开始日期')
     if (!coverPreview) return setCreateErr('请上传一张封面图')
@@ -1378,8 +1380,7 @@ export default function Travel() {
       const hit = CITIES.find((c) => c.name === city)
       if (hit) prov = { name: hit.provinceName, adcode: hit.provinceAdcode }
     }
-    // 出发地：可选，未填则不写字段；未点选联想项时同样按城市名反查省
-    const depText = departureText.trim()
+    // 出发地：必填（上文已校验拦截），未点选联想项时同样按城市名反查省
     let dep = departureProvince.current
     if (depText && !dep.adcode) {
       const hit = CITIES.find((c) => c.name === depText)
@@ -1427,14 +1428,10 @@ export default function Travel() {
       end_date: endDate,
       cover: coverPreview,
       days,
-      // 出发地：未填则不写字段（undefined），老数据无此字段保持兼容
-      ...(depText
-        ? {
-            departure_city: depText,
-            departure_province_adcode: dep.adcode || '',
-            departure_province_name: dep.name || '',
-          }
-        : {}),
+      // 出发地：必填字段，总是写入（旧数据无此字段时详情仍兼容展示）
+      departure_city: depText,
+      departure_province_adcode: dep.adcode || '',
+      departure_province_name: dep.name || '',
       transport_mode: transportMode,
       type: travelType,
       created_at: existing?.created_at ?? now,
@@ -2595,7 +2592,7 @@ export default function Travel() {
             </div>
             <h3>{editTravelId ? '编辑旅行记录' : '新建旅行记录'}</h3>
 
-            {/* 出发地：可选，与"你想去哪里"同套城市联想逻辑 */}
+            {/* 出发地：必填，与"你想去哪里"同套城市联想逻辑 */}
             <div className="t-field">
               <div className="label">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2604,7 +2601,7 @@ export default function Travel() {
                   <path d="M17 8l4-4" />
                   <path d="M21 4l-4 4" />
                 </svg>
-                你从哪出发？
+                你从哪出发？<span className="req">*</span>
               </div>
               <div className="desc">支持全球多级城市，输入关键词自动联想</div>
               <input
@@ -2634,7 +2631,7 @@ export default function Travel() {
                   <circle cx="12" cy="11" r="3" />
                   <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
                 </svg>
-                你想去哪里？
+                你想去哪里？<span className="req">*</span>
               </div>
               <div className="desc">支持全球多级城市，输入关键词自动联想</div>
               <input
