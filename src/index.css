@@ -907,3 +907,38 @@ html[data-skin='flat-light'], html[data-skin='flat-light'] body {
   color: #ffffff !important;
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18);
 }
+
+/* ── 海浪进度条动画（WaveProgress） ──────────────────────────── */
+/* 模拟海浪持续向前推进：每根条做微幅宽度呼吸 + 亮度脉冲，
+   通过错位 animation-delay 形成波浪传递效果 */
+.wave-bar {
+  animation: wave-push 2.2s ease-in-out infinite;
+  transform-origin: left center;
+  will-change: transform, opacity;
+}
+@keyframes wave-push {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: var(--wave-base-opacity, 0.85);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scaleX(1.03);
+    opacity: calc(var(--wave-base-opacity, 0.85) + 0.12);
+    filter: brightness(1.15);
+  }
+  50% {
+    transform: scaleX(0.995);
+    opacity: var(--wave-base-opacity, 0.85);
+    filter: brightness(1.05);
+  }
+  75% {
+    transform: scaleX(1.02);
+    opacity: calc(var(--wave-base-opacity, 0.85) + 0.08);
+    filter: brightness(1.12);
+  }
+}
+/* 减少动效偏好：停止波浪动画 */
+@media (prefers-reduced-motion: reduce) {
+  .wave-bar { animation: none; }
+}

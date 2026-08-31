@@ -49,6 +49,47 @@ function MetricPill({ label, color, bg }: { label: string; color: string; bg: st
   )
 }
 
+// ── 海浪进度条 ──────────────────────────────────────────────
+// 阶梯状水平条 + 错位动画，模拟海浪持续向前推进的视觉效果。
+// percent 决定浪头位置；动画本身是纯视觉的（不随数值变化而停）。
+const WAVE_BAR_COUNT = 12
+function WaveProgress({ percent }: { percent: number }) {
+  // 每根条的参数：高度、垂直偏移、波浪相位偏移
+  const bars = Array.from({ length: WAVE_BAR_COUNT }, (_, i) => {
+    const t = i / (WAVE_BAR_COUNT - 1) // 0→1
+    // 高度：中间高两头低，形成纺锤形轮廓
+    const height = 8 + Math.sin(t * Math.PI) * 18 // 8~26px
+    // 波浪宽度偏移：正弦波 + 少量随机抖动，让浪头呈阶梯状
+    const phaseOffset = Math.sin(t * Math.PI * 2.5 + 0.8) * 10 + Math.sin(i * 1.7) * 4
+    const width = Math.max(4, Math.min(98, percent + phaseOffset))
+    return { height, width, delay: i * 0.09, index: i }
+  })
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3.2, minHeight: 0, padding: '2px 0' }}>
+      {bars.map((bar) => (
+        <div
+          key={bar.index}
+          className="wave-bar"
+          style={{
+            height: bar.height,
+            width: `${bar.width}%`,
+            borderRadius: 2,
+            background: `linear-gradient(90deg, 
+              rgba(180,200,255,.88) 0%, 
+              rgba(140,170,255,.65) ${Math.min(bar.width * 0.7, 60)}%, 
+              rgba(100,140,255,.18) ${Math.min(bar.width * 0.9, 85)}%, 
+              transparent 100%)`,
+            boxShadow: `0 0 12px rgba(120,160,255,.35), inset 0 1px 0 rgba(255,255,255,.25)`,
+            animationDelay: `${bar.delay}s`,
+            opacity: 0.85 + Math.sin(bar.index * 0.8) * 0.15,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function Overview() {
   const { user } = useAuth()
   const { profile } = useProfile()
@@ -225,15 +266,26 @@ export default function Overview() {
             case 'w_todo_progress':
               return (
                 <div key={id} className={`${SIZE_CLASS[size]}`}>
-          <Card style={{ height: '100%', padding: '15px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden' }}>
-            <CardHeader title="整体进度" style={{ marginBottom: 0 }} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <Display size={isMobile ? 32 : 28} color={C.displayPrimary}>{reqPct}%</Display>
-              <div style={{ flex: 1, position: 'relative', height: 3, background: 'var(--c-progress-track)', borderRadius: 2, overflow: 'visible' }}>
-                <div style={{ position: 'absolute', left: 0, top: '-1px', bottom: '-1px', width: `${reqPct}%`, background: 'var(--grad-progress)', borderRadius: 2, boxShadow: 'var(--c-progress-glow)' }} />
+          <Card style={{ height: '100%', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 0, overflow: 'hidden', background: 'linear-gradient(135deg, rgba(15,18,28,.95) 0%, rgba(10,12,22,.98) 100%)' }}>
+            {/* 主行：标题 + 海浪 + 百分比 */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, minHeight: 0 }}>
+              {/* 左：标题区 */}
+              <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#e8eaed', letterSpacing: '.03em', lineHeight: 1.2 }}>整体进度</span>
+                <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,.38)', letterSpacing: '.06em', textTransform: 'uppercase', lineHeight: 1.2 }}>需求上线率</span>
+              </div>
+
+              {/* 中：海浪阶梯 */}
+              <WaveProgress percent={reqPct} />
+
+              {/* 右：百分比 */}
+              <div style={{ flex: '0 0 auto', textAlign: 'right', minWidth: 52 }}>
+                <span style={{ fontSize: isMobile ? 30 : 26, fontWeight: 800, color: '#e8eaed', lineHeight: 1, fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif' }}>{reqPct}<span style={{ fontSize: isMobile ? 18 : 15, fontWeight: 600 }}>%</span></span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', marginTop: 'auto' }}>
+
+            {/* 底部：指标 pills */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.05)' }}>
               <MetricPill label={`已上线 ${reqLaunched}`} color={C.green} bg="rgba(94,234,212,.09)" />
               <MetricPill label={`待上线 ${reqPendingLaunch}`} color={C.amber} bg="rgba(251,191,36,.09)" />
             </div>
